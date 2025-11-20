@@ -33,6 +33,7 @@ const getTodayString = () => {
 };
 
 const TRIAL_DAYS = 7;
+const ACTIVATION_CODE = "LIBERADO"; // Código que você passará para os clientes
 
 const App: React.FC = () => {
   // -- Auth & Profile State --
@@ -173,18 +174,22 @@ const App: React.FC = () => {
   // -- Handlers --
   const handleLogin = (profile: UserProfile) => {
     setUserProfile(profile);
-    // Also update the shop name setting
     setSettings(prev => ({ ...prev, shopName: profile.shopName }));
   };
 
-  const handleSubscribe = () => {
-    // Simulation of a payment process
-    if(window.confirm("Isso simula uma compra real. Deseja ativar a versão PRO?")) {
+  const handleSubscribe = (codeInput: string): boolean => {
+    // Verifica o código inserido (remove espaços e deixa maiúsculo)
+    const cleanCode = codeInput.trim().toUpperCase();
+    
+    // Códigos de validação (Pode ser o padrão ou o seu nome de adm)
+    if (cleanCode === ACTIVATION_CODE || cleanCode === "LEANDRO" || cleanCode === "VITALICIO") {
        if (userProfile) {
          setUserProfile({ ...userProfile, isPro: true });
-         alert("Assinatura ativada com sucesso! Obrigado.");
+         alert("Pagamento confirmado! Acesso Vitalício Liberado.");
+         return true;
        }
     }
+    return false;
   };
 
   const handleSaveClient = (data: Omit<Client, 'id' | 'timestamp'>) => {
@@ -294,6 +299,11 @@ const App: React.FC = () => {
                 {trialStatus.daysLeft < 7 && !userProfile.isPro && (
                   <span className="text-[10px] bg-gray-800 text-gold-500 px-1.5 py-0.5 rounded border border-gold-500/30">
                     Teste: {trialStatus.daysLeft} dias restantes
+                  </span>
+                )}
+                {userProfile.isPro && (
+                   <span className="text-[10px] bg-gold-500/10 text-gold-500 px-1.5 py-0.5 rounded border border-gold-500/30 font-bold">
+                    PRO VITALÍCIO
                   </span>
                 )}
               </div>
