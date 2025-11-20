@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType } from './types';
 import { formatCurrency, formatTime, generateId, generateReportContent, formatDate } from './utils';
@@ -30,29 +31,50 @@ const getTodayString = () => {
 const App: React.FC = () => {
   // -- State --
   const [clients, setClients] = useState<Client[]>(() => {
-    const saved = localStorage.getItem('barbearia_clients');
-    const parsed = saved ? JSON.parse(saved) : [];
-    // Backward compatibility migration: ensure clientType exists
-    return parsed.map((c: any) => ({
-        ...c,
-        clientType: c.clientType || ClientType.RETURNING
-    }));
+    try {
+      const saved = localStorage.getItem('barbearia_clients');
+      const parsed = saved ? JSON.parse(saved) : [];
+      if (!Array.isArray(parsed)) return [];
+      // Backward compatibility migration: ensure clientType exists
+      return parsed.map((c: any) => ({
+          ...c,
+          clientType: c.clientType || ClientType.RETURNING
+      }));
+    } catch (e) {
+      console.error("Error loading clients", e);
+      return [];
+    }
   });
 
   const [vales, setVales] = useState<Vale[]>(() => {
-    const saved = localStorage.getItem('barbearia_vales');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('barbearia_vales');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error("Error loading vales", e);
+      return [];
+    }
   });
 
   const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('barbearia_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    try {
+      const saved = localStorage.getItem('barbearia_settings');
+      return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    } catch (e) {
+      return DEFAULT_SETTINGS;
+    }
   });
 
   // History Storage (kept for potential future use)
   const [history, setHistory] = useState<DailyHistory[]>(() => {
-    const saved = localStorage.getItem('barbearia_history');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('barbearia_history');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
   });
 
   const [activeTab, setActiveTab] = useState<'clients' | 'vales'>('clients');
@@ -84,7 +106,10 @@ const App: React.FC = () => {
   // -- Filtering --
   const filteredClients = useMemo(() => {
     return clients.filter(client => {
+      if (!client.timestamp) return false;
       const d = new Date(client.timestamp);
+      if (isNaN(d.getTime())) return false;
+
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
@@ -95,7 +120,10 @@ const App: React.FC = () => {
 
   const filteredVales = useMemo(() => {
     return vales.filter(vale => {
+      if (!vale.timestamp) return false;
       const d = new Date(vale.timestamp);
+      if (isNaN(d.getTime())) return false;
+
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
@@ -135,19 +163,14 @@ const App: React.FC = () => {
       ));
       setEditingClient(null);
     } else {
-      // Add new (use selected date + current time for timestamp if adding for today, otherwise strictly now)
-      // Note: Logic currently assumes adding happens "now". 
-      // If user selects a past date, we might want to respect that, but typically you log as you go.
-      // For simplicity, we'll stick to Date.now(), but this means if you add a client while viewing yesterday,
-      // it will appear in TODAY's list, not yesterday's view.
-      // To fix this UX, we can construct the timestamp from selectedDate + current time.
-      
+      // Add new
       let timestamp = Date.now();
       const todayStr = getTodayString();
       
+      // If selected date is NOT today, construct a timestamp for that date
       if (selectedDate !== todayStr) {
-         // Create timestamp for selected date at current time
          const [year, month, day] = selectedDate.split('-').map(Number);
+         // Use current time of day but on the selected date
          const now = new Date();
          const d = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds());
          timestamp = d.getTime();
@@ -199,8 +222,8 @@ const App: React.FC = () => {
   };
 
   const handleDownloadReport = () => {
-    // Create a timestamp noon of selected date to ensure correct date display in report
     const [year, month, day] = selectedDate.split('-').map(Number);
+    // Set to noon to avoid timezone shifting issues
     const reportDate = new Date(year, month - 1, day, 12, 0, 0).getTime();
 
     const content = generateReportContent(reportDate, filteredClients, filteredVales, stats);
