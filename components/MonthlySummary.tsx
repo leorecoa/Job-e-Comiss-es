@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Client, Vale, AppSettings } from '../types';
 import { formatCurrency } from '../utils';
 import { StatsCard } from './StatsCard';
-import { ArrowLeft, DollarSign, TrendingUp, Calendar, MinusCircle } from 'lucide-react';
+import { ArrowLeft, DollarSign, TrendingUp, Calendar, MinusCircle, Crown } from 'lucide-react';
 
 interface MonthlySummaryProps {
   clients: Client[];
@@ -11,6 +11,8 @@ interface MonthlySummaryProps {
   onBack: () => void;
   selectedMonth: string; // YYYY-MM
   onMonthChange: (month: string) => void;
+  isPro: boolean;
+  onSubscribeClick: () => void;
 }
 
 export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
@@ -20,6 +22,8 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
   onBack,
   selectedMonth,
   onMonthChange,
+  isPro,
+  onSubscribeClick
 }) => {
   
   // Filtra e calcula dados baseados no mês selecionado
@@ -100,16 +104,27 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
           </div>
         </div>
 
-        <div className="relative w-full md:w-auto">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                <Calendar size={16} />
+        <div className="flex gap-3 w-full md:w-auto items-center justify-end">
+            {!isPro && (
+                <button 
+                    onClick={onSubscribeClick}
+                    className="flex items-center gap-1 bg-gold-500 hover:bg-gold-600 text-black text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-lg shadow-gold-500/20 animate-pulse"
+                >
+                    <Crown size={14} /> ATIVE AGORA
+                </button>
+            )}
+
+            <div className="relative flex-grow md:flex-grow-0">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                    <Calendar size={16} />
+                </div>
+                <input 
+                    type="month" 
+                    value={selectedMonth}
+                    onChange={(e) => onMonthChange(e.target.value)}
+                    className="w-full md:w-40 bg-gray-900 border border-gray-700 text-white text-sm rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent block pl-10 p-2.5 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                />
             </div>
-            <input 
-                type="month" 
-                value={selectedMonth}
-                onChange={(e) => onMonthChange(e.target.value)}
-                className="w-full md:w-48 bg-gray-900 border border-gray-700 text-white text-sm rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent block pl-10 p-2.5 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
-            />
         </div>
       </div>
 

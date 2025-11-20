@@ -1,15 +1,24 @@
 import React, { useState } from 'react';
 import { AppSettings } from '../types';
-import { X, Save } from 'lucide-react';
+import { X, Save, Crown } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AppSettings;
   onSave: (newSettings: AppSettings) => void;
+  isPro: boolean;
+  onSubscribe: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onSave }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  settings, 
+  onSave,
+  isPro,
+  onSubscribe
+}) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
 
   if (!isOpen) return null;
@@ -39,6 +48,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           
+          {/* Plan Status Section */}
+          <div className={`p-4 rounded-xl border ${isPro ? 'bg-gold-500/10 border-gold-500/20' : 'bg-gray-900 border-gray-700'}`}>
+             <div className="flex justify-between items-center">
+                <div>
+                   <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Status do Plano</p>
+                   <p className={`font-bold ${isPro ? 'text-gold-500' : 'text-white'}`}>
+                      {isPro ? 'Vitalício PRO' : 'Versão de Teste'}
+                   </p>
+                </div>
+                {isPro ? (
+                    <Crown className="text-gold-500" />
+                ) : (
+                    <button 
+                        type="button"
+                        onClick={() => { onClose(); onSubscribe(); }}
+                        className="bg-gold-500 hover:bg-gold-600 text-black text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-gold-500/20 animate-pulse"
+                    >
+                        ATIVAR AGORA
+                    </button>
+                )}
+             </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Nome da Barbearia</label>
             <input
@@ -95,7 +127,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
           <div className="pt-4">
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-black font-bold py-3 rounded-xl transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded-xl transition-colors"
             >
               <Save size={20} />
               Salvar Alterações

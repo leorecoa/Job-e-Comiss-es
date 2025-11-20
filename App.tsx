@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile } from './types';
 import { formatCurrency, formatTime, generateId, generateReportContent, formatDate } from './utils';
@@ -9,6 +8,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { LoginScreen } from './components/LoginScreen';
 import { PaywallScreen } from './components/PaywallScreen';
 import { MonthlySummary } from './components/MonthlySummary';
+import { SubscriptionModal } from './components/SubscriptionModal';
 import { 
   Scissors, 
   Users, 
@@ -23,7 +23,9 @@ import {
   Calendar,
   User,
   LogOut,
-  BarChart3
+  BarChart3,
+  Crown,
+  Sparkles
 } from 'lucide-react';
 
 const getTodayString = () => {
@@ -102,6 +104,7 @@ const App: React.FC = () => {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isValeModalOpen, setValeModalOpen] = useState(false);
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [isSubscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
 
   // -- Effects --
   useEffect(() => {
@@ -198,7 +201,6 @@ const App: React.FC = () => {
     if (cleanCode === ACTIVATION_CODE || cleanCode === "LEANDRO" || cleanCode === "VITALICIO") {
        if (userProfile) {
          setUserProfile({ ...userProfile, isPro: true });
-         alert("Pagamento confirmado! Acesso Vitalício Liberado.");
          return true;
        }
     }
@@ -295,33 +297,55 @@ const App: React.FC = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             
             {/* Left: Logo & Brand */}
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              {settings.logoUrl ? (
-                <img src={settings.logoUrl} alt="Logo" className="h-10 w-auto object-contain" />
-              ) : (
-                <div className="bg-gradient-to-br from-gold-400 to-gold-600 p-2 rounded-lg shadow-lg shadow-gold-500/20">
-                  <Scissors className="text-gray-900 w-5 h-5" />
+            <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+              <div className="flex items-center gap-3">
+                {settings.logoUrl ? (
+                    <img src={settings.logoUrl} alt="Logo" className="h-10 w-auto object-contain" />
+                ) : (
+                    <div className="bg-gradient-to-br from-gold-400 to-gold-600 p-2 rounded-lg shadow-lg shadow-gold-500/20">
+                    <Scissors className="text-gray-900 w-5 h-5" />
+                    </div>
+                )}
+                <div>
+                    <h1 className="text-xl font-display font-bold text-white leading-tight">
+                    {settings.shopName}
+                    </h1>
+                    {userProfile.isPro ? (
+                        <span className="flex items-center gap-1 text-[10px] text-gold-500 font-bold uppercase tracking-wider">
+                            <Crown size={10} fill="currentColor" /> Vitalício PRO
+                        </span>
+                    ) : (
+                        <span className="text-[10px] bg-gray-800 text-gold-500 px-1.5 py-0.5 rounded border border-gold-500/30">
+                        Teste: {trialStatus.daysLeft} dias
+                        </span>
+                    )}
                 </div>
-              )}
-              <div>
-                <h1 className="text-xl font-display font-bold text-white leading-tight">
-                  {settings.shopName}
-                </h1>
-                {trialStatus.daysLeft < 7 && !userProfile.isPro && (
-                  <span className="text-[10px] bg-gray-800 text-gold-500 px-1.5 py-0.5 rounded border border-gold-500/30">
-                    Teste: {trialStatus.daysLeft} dias restantes
-                  </span>
-                )}
-                {userProfile.isPro && (
-                   <span className="text-[10px] bg-gold-500/10 text-gold-500 px-1.5 py-0.5 rounded border border-gold-500/30 font-bold">
-                    PRO VITALÍCIO
-                  </span>
-                )}
               </div>
+              
+              {/* Mobile CTA (Small) */}
+               {!userProfile.isPro && (
+                 <button 
+                   onClick={() => setSubscriptionModalOpen(true)}
+                   className="md:hidden bg-gold-500 text-black text-[10px] font-bold px-2 py-1.5 rounded-lg flex items-center gap-1 animate-pulse"
+                 >
+                    <Crown size={12} /> ATIVAR
+                 </button>
+               )}
             </div>
 
             {/* Right: User Profile & Date */}
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+              
+              {/* Desktop CTA */}
+              {!userProfile.isPro && (
+                 <button 
+                   onClick={() => setSubscriptionModalOpen(true)}
+                   className="hidden md:flex items-center gap-2 bg-gradient-to-r from-gold-400 to-gold-600 hover:from-gold-500 hover:to-gold-700 text-black px-4 py-2 rounded-xl font-bold shadow-lg shadow-gold-500/20 transition-all transform hover:scale-105"
+                 >
+                    <Crown size={18} /> Ative Agora
+                 </button>
+              )}
+
               <div className="flex items-center gap-3 bg-gray-800/50 px-3 py-1.5 rounded-xl border border-gray-700/50">
                 <div className="bg-gray-700 rounded-full p-1.5">
                   <User size={16} className="text-gray-300" />
@@ -367,8 +391,18 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex gap-3 w-full lg:w-auto lg:justify-end">
+            <div className="flex gap-3 w-full lg:w-auto lg:justify-end items-center">
               
+              {/* Daily View CTA Button if NOT PRO */}
+              {!userProfile.isPro && (
+                  <button 
+                    onClick={() => setSubscriptionModalOpen(true)}
+                    className="lg:hidden flex-1 flex items-center justify-center gap-1 bg-gold-500/20 border border-gold-500/50 text-gold-500 px-3 py-2.5 rounded-xl font-bold text-xs"
+                  >
+                    <Crown size={14} /> ATIVAR PRO
+                  </button>
+              )}
+
               {/* View Switcher Button */}
               <button 
                 onClick={() => setViewMode('monthly')}
@@ -409,6 +443,8 @@ const App: React.FC = () => {
             onBack={() => setViewMode('daily')}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
+            isPro={userProfile.isPro}
+            onSubscribeClick={() => setSubscriptionModalOpen(true)}
           />
         ) : (
           /* Standard Daily View */
@@ -629,6 +665,14 @@ const App: React.FC = () => {
         onClose={() => setSettingsModalOpen(false)}
         settings={settings}
         onSave={setSettings}
+        isPro={userProfile.isPro}
+        onSubscribe={() => setSubscriptionModalOpen(true)}
+      />
+
+      <SubscriptionModal
+        isOpen={isSubscriptionModalOpen}
+        onClose={() => setSubscriptionModalOpen(false)}
+        onSubscribe={handleSubscribe}
       />
     </div>
   );
