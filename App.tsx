@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType } from './types';
+import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile } from './types';
 import { formatCurrency, formatTime, generateId, generateReportContent, formatDate } from './utils';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
 import { AddValeModal } from './components/AddValeModal';
 import { SettingsModal } from './components/SettingsModal';
+import { LoginScreen } from './components/LoginScreen';
+import { PaywallScreen } from './components/PaywallScreen';
 import { 
   Scissors, 
   Users, 
@@ -17,7 +19,9 @@ import {
   TrendingUp,
   Download,
   Pencil,
-  Calendar
+  Calendar,
+  User,
+  LogOut
 } from 'lucide-react';
 
 const getTodayString = () => {
@@ -28,14 +32,25 @@ const getTodayString = () => {
   return `${year}-${month}-${day}`;
 };
 
+const TRIAL_DAYS = 7;
+
 const App: React.FC = () => {
-  // -- State --
+  // -- Auth & Profile State --
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem('barbearia_profile');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // -- Data State --
   const [clients, setClients] = useState<Client[]>(() => {
     try {
       const saved = localStorage.getItem('barbearia_clients');
       const parsed = saved ? JSON.parse(saved) : [];
       if (!Array.isArray(parsed)) return [];
-      // Backward compatibility migration: ensure clientType exists
       return parsed.map((c: any) => ({
           ...c,
           clientType: c.clientType || ClientType.RETURNING
@@ -66,17 +81,6 @@ const App: React.FC = () => {
     }
   });
 
-  // History Storage (kept for potential future use)
-  const [history, setHistory] = useState<DailyHistory[]>(() => {
-    try {
-      const saved = localStorage.getItem('barbearia_history');
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
   const [activeTab, setActiveTab] = useState<'clients' | 'vales'>('clients');
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   
@@ -87,6 +91,10 @@ const App: React.FC = () => {
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
 
   // -- Effects --
+  useEffect(() => {
+    localStorage.setItem('barbearia_profile', JSON.stringify(userProfile));
+  }, [userProfile]);
+
   useEffect(() => {
     localStorage.setItem('barbearia_clients', JSON.stringify(clients));
   }, [clients]);
@@ -99,9 +107,23 @@ const App: React.FC = () => {
     localStorage.setItem('barbearia_settings', JSON.stringify(settings));
   }, [settings]);
 
-  useEffect(() => {
-    localStorage.setItem('barbearia_history', JSON.stringify(history));
-  }, [history]);
+  // -- Derived State (Trial Logic) --
+  const trialStatus = useMemo(() => {
+    if (!userProfile) return { isExpired: false, daysLeft: 7, daysUsed: 0 };
+    
+    if (userProfile.isPro) return { isExpired: false, daysLeft: 999, daysUsed: 0 };
+
+    const now = Date.now();
+    const start = userProfile.startDate;
+    const diffTime = Math.abs(now - start);
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    
+    return {
+      isExpired: diffDays > TRIAL_DAYS,
+      daysLeft: Math.max(0, Math.ceil(TRIAL_DAYS - diffDays)),
+      daysUsed: diffDays
+    };
+  }, [userProfile]);
 
   // -- Filtering --
   const filteredClients = useMemo(() => {
@@ -135,12 +157,8 @@ const App: React.FC = () => {
   // -- Calculations --
   const stats = useMemo(() => {
     const totalSales = filteredClients.reduce((acc, curr) => acc + curr.totalValue, 0);
-    
-    // Commission is typically calculated on total sales
     const grossCommission = totalSales * (settings.commissionRate / 100);
-    
     const totalVales = filteredVales.reduce((acc, curr) => acc + curr.value, 0);
-    
     const netCommission = grossCommission - totalVales;
 
     return {
@@ -153,34 +171,36 @@ const App: React.FC = () => {
   }, [filteredClients, filteredVales, settings.commissionRate]);
 
   // -- Handlers --
+  const handleLogin = (profile: UserProfile) => {
+    setUserProfile(profile);
+    // Also update the shop name setting
+    setSettings(prev => ({ ...prev, shopName: profile.shopName }));
+  };
+
+  const handleSubscribe = () => {
+    // Simulation of a payment process
+    if(window.confirm("Isso simula uma compra real. Deseja ativar a versão PRO?")) {
+       if (userProfile) {
+         setUserProfile({ ...userProfile, isPro: true });
+         alert("Assinatura ativada com sucesso! Obrigado.");
+       }
+    }
+  };
+
   const handleSaveClient = (data: Omit<Client, 'id' | 'timestamp'>) => {
     if (editingClient) {
-      // Update existing
-      setClients(prev => prev.map(c => 
-        c.id === editingClient.id 
-          ? { ...c, ...data } 
-          : c
-      ));
+      setClients(prev => prev.map(c => c.id === editingClient.id ? { ...c, ...data } : c));
       setEditingClient(null);
     } else {
-      // Add new
       let timestamp = Date.now();
       const todayStr = getTodayString();
-      
-      // If selected date is NOT today, construct a timestamp for that date
       if (selectedDate !== todayStr) {
          const [year, month, day] = selectedDate.split('-').map(Number);
-         // Use current time of day but on the selected date
          const now = new Date();
          const d = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds());
          timestamp = d.getTime();
       }
-
-      const newClient: Client = {
-        ...data,
-        id: generateId(),
-        timestamp: timestamp,
-      };
+      const newClient: Client = { ...data, id: generateId(), timestamp: timestamp };
       setClients(prev => [newClient, ...prev]);
     }
   };
@@ -193,19 +213,13 @@ const App: React.FC = () => {
   const handleAddVale = (data: Omit<Vale, 'id' | 'timestamp'>) => {
     let timestamp = Date.now();
     const todayStr = getTodayString();
-      
     if (selectedDate !== todayStr) {
         const [year, month, day] = selectedDate.split('-').map(Number);
         const now = new Date();
         const d = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds());
         timestamp = d.getTime();
     }
-
-    const newVale: Vale = {
-      ...data,
-      id: generateId(),
-      timestamp: timestamp,
-    };
+    const newVale: Vale = { ...data, id: generateId(), timestamp: timestamp };
     setVales(prev => [newVale, ...prev]);
   };
 
@@ -223,9 +237,7 @@ const App: React.FC = () => {
 
   const handleDownloadReport = () => {
     const [year, month, day] = selectedDate.split('-').map(Number);
-    // Set to noon to avoid timezone shifting issues
     const reportDate = new Date(year, month - 1, day, 12, 0, 0).getTime();
-
     const content = generateReportContent(reportDate, filteredClients, filteredVales, stats);
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -241,129 +253,172 @@ const App: React.FC = () => {
     setEditingClient(null);
     setClientModalOpen(true);
   };
+  
+  const handleLogout = () => {
+    if(window.confirm("Deseja sair? Isso irá manter seus dados, mas pedirá login novamente.")) {
+       // We don't delete data, just the session profile
+       setUserProfile(null);
+    }
+  }
+
+  // -- Render Logic --
+
+  if (!userProfile) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  if (trialStatus.isExpired) {
+    return <PaywallScreen onSubscribe={handleSubscribe} daysUsed={trialStatus.daysUsed} />;
+  }
 
   return (
-    <div className="min-h-screen bg-gray-900 pb-20">
-      {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 pt-8 pb-12 px-4 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-gold-500 to-transparent opacity-50"></div>
-        <div className="max-w-5xl mx-auto text-center relative z-10">
-            <div className="flex items-center justify-center mb-4">
-                {settings.logoUrl ? (
-                    <img src={settings.logoUrl} alt="Logo" className="h-16 w-auto object-contain animate-slide-in" />
-                ) : (
-                    <div className="bg-gold-500 p-3 rounded-full shadow-lg shadow-gold-500/30 animate-slide-in">
-                        <Scissors className="text-gray-900 w-8 h-8" />
-                    </div>
+    <div className="min-h-screen bg-gray-900 pb-20 font-sans">
+      {/* Modern Horizontal Header */}
+      <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-gray-900/90">
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            
+            {/* Left: Logo & Brand */}
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              {settings.logoUrl ? (
+                <img src={settings.logoUrl} alt="Logo" className="h-10 w-auto object-contain" />
+              ) : (
+                <div className="bg-gradient-to-br from-gold-400 to-gold-600 p-2 rounded-lg shadow-lg shadow-gold-500/20">
+                  <Scissors className="text-gray-900 w-5 h-5" />
+                </div>
+              )}
+              <div>
+                <h1 className="text-xl font-display font-bold text-white leading-tight">
+                  {settings.shopName}
+                </h1>
+                {trialStatus.daysLeft < 7 && !userProfile.isPro && (
+                  <span className="text-[10px] bg-gray-800 text-gold-500 px-1.5 py-0.5 rounded border border-gold-500/30">
+                    Teste: {trialStatus.daysLeft} dias restantes
+                  </span>
                 )}
+              </div>
             </div>
-          <h1 className="text-4xl font-display font-bold text-gold-500 mb-2 tracking-tight animate-slide-in" style={{ animationDelay: '0.1s' }}>
-            {settings.shopName}
-          </h1>
-          <p className="text-gray-400 font-sans font-light animate-slide-in" style={{ animationDelay: '0.2s' }}>Gestão Profissional de Clientes e Comissões</p>
+
+            {/* Right: User Profile & Date */}
+            <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+              <div className="flex items-center gap-3 bg-gray-800/50 px-3 py-1.5 rounded-xl border border-gray-700/50">
+                <div className="bg-gray-700 rounded-full p-1.5">
+                  <User size={16} className="text-gray-300" />
+                </div>
+                <div className="text-right hidden sm:block">
+                   <p className="text-xs text-gray-400">Olá,</p>
+                   <p className="text-sm font-semibold text-white leading-none">{userProfile.ownerName}</p>
+                </div>
+                <button onClick={handleLogout} className="ml-2 text-gray-500 hover:text-red-400 transition-colors">
+                    <LogOut size={16} />
+                </button>
+              </div>
+            </div>
+
+          </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 -mt-8 relative z-20">
-        {/* Dashboard Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-slide-in" style={{ animationDelay: '0.3s' }}>
-          <StatsCard 
-            title="Clientes" 
-            value={stats.totalClients.toString()} 
-            icon={<Users size={24} />} 
-            colorClass="bg-gray-800 border-gray-700"
-          />
-          <StatsCard 
-            title="Total Vendas" 
-            value={formatCurrency(stats.totalSales)} 
-            icon={<DollarSign size={24} />} 
-            colorClass="bg-gray-800 border-gray-700 text-green-400"
-          />
-          <StatsCard 
-            title="Comissão Líquida" 
-            value={formatCurrency(stats.netCommission)} 
-            subtitle={`(Total - Vales: ${formatCurrency(stats.totalVales)})`}
-            icon={<TrendingUp size={24} />} 
-            colorClass="bg-gray-800 border-gray-700 text-gold-500"
-          />
-        </div>
-
-        {/* Actions Toolbar */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8 justify-between items-start md:items-center bg-gray-800/50 p-3 rounded-xl border border-gray-700/50 backdrop-blur-sm animate-slide-in" style={{ animationDelay: '0.4s' }}>
-          
-          <div className="flex gap-3 flex-wrap w-full md:w-auto">
+      <main className="max-w-6xl mx-auto px-4 pt-6 relative z-20">
+        
+        {/* Actions & Date Filter Toolbar */}
+        <div className="flex flex-col lg:flex-row gap-4 mb-6 justify-between items-start lg:items-center">
+          <div className="flex gap-2 flex-wrap w-full lg:w-auto">
             <button 
               onClick={handleOpenAddClient}
-              className="flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-5 py-2.5 rounded-lg font-bold transition-colors shadow-lg shadow-gold-500/20"
+              className="flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
             >
-              <Plus size={18} /> <span className="hidden sm:inline">Adicionar</span> Cliente
+              <Plus size={18} /> <span className="hidden sm:inline">Novo</span> Atendimento
             </button>
             <button 
               onClick={() => setValeModalOpen(true)}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 px-5 py-2.5 rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95"
             >
-              <MinusCircle size={18} /> <span className="hidden sm:inline">Vale</span>
+              <MinusCircle size={18} /> Vale
             </button>
              <button 
               onClick={() => setSettingsModalOpen(true)}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 px-3 py-2.5 rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors"
               title="Configurações"
             >
               <Settings size={18} />
             </button>
           </div>
 
-          <div className="flex gap-3 flex-wrap w-full md:w-auto justify-end">
-             <div className="relative flex items-center">
-                <div className="absolute left-3 text-gray-400 pointer-events-none">
+          <div className="flex gap-3 w-full lg:w-auto lg:justify-end">
+            <div className="relative flex-grow lg:flex-grow-0">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                     <Calendar size={16} />
                 </div>
                 <input 
                     type="date" 
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-gold-500 focus:border-gold-500 block w-full pl-10 p-2.5 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                    className="w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent block pl-10 p-2.5 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert transition-all"
                 />
             </div>
             
             <button 
               onClick={handleDownloadReport}
-              className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
-              title="Baixar Relatório em Texto"
+              className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 text-white px-4 py-2.5 rounded-xl border border-gray-700 font-medium transition-colors"
+              title="Baixar Relatório"
             >
-              <Download size={18} /> <span className="hidden sm:inline">Relatório</span>
+              <Download size={18} />
             </button>
           </div>
         </div>
 
+        {/* Dashboard Stats - Modern Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <StatsCard 
+            title="Atendimentos" 
+            value={stats.totalClients.toString()} 
+            icon={<Users size={20} />} 
+            colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700"
+          />
+          <StatsCard 
+            title="Faturamento" 
+            value={formatCurrency(stats.totalSales)} 
+            icon={<DollarSign size={20} />} 
+            colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700 text-green-400"
+          />
+          <StatsCard 
+            title="Sua Comissão" 
+            value={formatCurrency(stats.netCommission)} 
+            subtitle={`- ${formatCurrency(stats.totalVales)} em vales`}
+            icon={<TrendingUp size={20} />} 
+            colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gold-500/30 text-gold-500 relative overflow-hidden"
+          />
+        </div>
+
         {/* List Section */}
-        <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl animate-slide-in" style={{ animationDelay: '0.5s' }}>
+        <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
           {/* Tabs */}
-          <div className="flex border-b border-gray-700">
+          <div className="flex border-b border-gray-700 bg-gray-900/50">
             <button
               onClick={() => setActiveTab('clients')}
-              className={`flex-1 py-4 text-center font-semibold transition-colors relative ${
+              className={`flex-1 py-4 text-sm md:text-base font-semibold transition-all relative ${
                 activeTab === 'clients' 
-                  ? 'text-gold-500 bg-gray-800' 
-                  : 'text-gray-500 bg-gray-900 hover:bg-gray-800 hover:text-gray-300'
+                  ? 'text-white' 
+                  : 'text-gray-500 hover:text-gray-300'
               }`}
             >
-              Clientes Atendidos
+              Clientes
               {activeTab === 'clients' && (
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500"></div>
+                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_-2px_10px_rgba(245,158,11,0.5)]"></div>
               )}
             </button>
             <button
               onClick={() => setActiveTab('vales')}
-              className={`flex-1 py-4 text-center font-semibold transition-colors relative ${
+              className={`flex-1 py-4 text-sm md:text-base font-semibold transition-all relative ${
                 activeTab === 'vales' 
-                  ? 'text-red-400 bg-gray-800' 
-                  : 'text-gray-500 bg-gray-900 hover:bg-gray-800 hover:text-gray-300'
+                  ? 'text-white' 
+                  : 'text-gray-500 hover:text-gray-300'
               }`}
             >
-              Vales e Retiradas
+              Vales
               {activeTab === 'vales' && (
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-500"></div>
+                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-500 shadow-[0_-2px_10px_rgba(239,68,68,0.5)]"></div>
               )}
             </button>
           </div>
@@ -375,31 +430,40 @@ const App: React.FC = () => {
                 {filteredClients.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                     <Users size={48} className="mb-4 opacity-20" />
-                    <p>Nenhum atendimento registrado em {selectedDate.split('-').reverse().join('/')}.</p>
+                    <p className="text-sm">Nenhum atendimento em {selectedDate.split('-').reverse().join('/')}.</p>
                   </div>
                 ) : (
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
-                        <th className="p-4 font-medium">Hora</th>
+                        <th className="p-4 font-medium rounded-tl-lg">Hora</th>
                         <th className="p-4 font-medium">Cliente</th>
-                        <th className="p-4 font-medium">Tipo</th>
-                        <th className="p-4 font-medium">Barbeiro</th>
+                        <th className="p-4 font-medium hidden md:table-cell">Tipo</th>
+                        <th className="p-4 font-medium hidden md:table-cell">Barbeiro</th>
                         <th className="p-4 font-medium">Serviço</th>
                         <th className="p-4 font-medium text-right">Valor</th>
-                        <th className="p-4 font-medium w-24"></th>
+                        <th className="p-4 font-medium w-24 rounded-tr-lg"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-700">
-                      {filteredClients.map((client, index) => (
+                    <tbody className="divide-y divide-gray-700/50">
+                      {filteredClients.map((client) => (
                         <tr 
                           key={client.id} 
-                          className="hover:bg-gray-700/50 transition-colors group animate-slide-in"
-                          style={{ animationDelay: `${index * 0.05}s` }}
+                          className="hover:bg-gray-700/30 transition-colors group"
                         >
                           <td className="p-4 text-gray-400 font-mono text-sm">{formatTime(client.timestamp)}</td>
-                          <td className="p-4 font-medium text-white">{client.name}</td>
-                          <td className="p-4">
+                          <td className="p-4 font-medium text-white">
+                            {client.name}
+                            {/* Mobile only Type */}
+                            <div className="md:hidden mt-1">
+                               <span className={`text-[10px] font-bold uppercase tracking-wide
+                                    ${client.clientType === ClientType.NEW ? 'text-green-400' : 'text-gold-500'}
+                                `}>
+                                    {client.clientType === ClientType.NEW ? 'Novo' : 'Casa'}
+                                </span>
+                            </div>
+                          </td>
+                          <td className="p-4 hidden md:table-cell">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border
                                 ${client.clientType === ClientType.NEW 
                                     ? 'bg-green-900/20 text-green-400 border-green-500/30' 
@@ -408,35 +472,33 @@ const App: React.FC = () => {
                                 {client.clientType}
                             </span>
                           </td>
-                          <td className="p-4 text-gray-300">{client.barberName}</td>
+                          <td className="p-4 text-gray-300 hidden md:table-cell">{client.barberName}</td>
                           <td className="p-4">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                              ${client.serviceType === ServiceType.CUT ? 'bg-blue-900/50 text-blue-400 border border-blue-800' : ''}
-                              ${client.serviceType === ServiceType.COMBO ? 'bg-purple-900/50 text-purple-400 border border-purple-800' : ''}
-                              ${client.serviceType === ServiceType.OTHER ? 'bg-gray-700 text-gray-300 border border-gray-600' : ''}
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
+                              ${client.serviceType === ServiceType.CUT ? 'bg-blue-900/20 text-blue-400 border-blue-800/50' : ''}
+                              ${client.serviceType === ServiceType.COMBO ? 'bg-purple-900/20 text-purple-400 border-purple-800/50' : ''}
+                              ${client.serviceType === ServiceType.OTHER ? 'bg-gray-700/50 text-gray-300 border-gray-600/50' : ''}
                             `}>
                               {client.serviceType}
                             </span>
                             {client.extraValue > 0 && (
-                                <span className="ml-2 text-xs text-gray-500">+ R$ {client.extraValue}</span>
+                                <span className="ml-2 text-xs text-gray-500 block sm:inline mt-1 sm:mt-0">+ R$ {client.extraValue}</span>
                             )}
                           </td>
                           <td className="p-4 text-right font-bold text-white">{formatCurrency(client.totalValue)}</td>
                           <td className="p-4 text-right">
-                             <div className="flex gap-1 justify-end">
+                             <div className="flex gap-1 justify-end opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
                                   onClick={() => handleEditClient(client)}
                                   className="p-2 text-gray-400 hover:text-gold-500 hover:bg-gold-500/10 rounded-lg transition-colors"
-                                  title="Editar Atendimento"
                                 >
-                                  <Pencil size={18} />
+                                  <Pencil size={16} />
                                 </button>
                                 <button 
                                   onClick={() => handleDeleteClient(client.id)}
                                   className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                                  title="Excluir Atendimento"
                                 >
-                                  <Trash2 size={18} />
+                                  <Trash2 size={16} />
                                 </button>
                             </div>
                           </td>
@@ -452,25 +514,24 @@ const App: React.FC = () => {
                  {filteredVales.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                     <MinusCircle size={48} className="mb-4 opacity-20" />
-                    <p>Nenhum vale registrado em {selectedDate.split('-').reverse().join('/')}.</p>
+                    <p className="text-sm">Nenhum vale em {selectedDate.split('-').reverse().join('/')}.</p>
                   </div>
                 ) : (
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
-                        <th className="p-4 font-medium">Hora</th>
+                        <th className="p-4 font-medium rounded-tl-lg">Hora</th>
                         <th className="p-4 font-medium">Barbeiro</th>
                         <th className="p-4 font-medium">Descrição</th>
                         <th className="p-4 font-medium text-right">Valor</th>
-                        <th className="p-4 font-medium w-16"></th>
+                        <th className="p-4 font-medium w-16 rounded-tr-lg"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-700">
-                      {filteredVales.map((vale, index) => (
+                    <tbody className="divide-y divide-gray-700/50">
+                      {filteredVales.map((vale) => (
                         <tr 
                           key={vale.id} 
-                          className="hover:bg-gray-700/50 transition-colors group animate-slide-in"
-                          style={{ animationDelay: `${index * 0.05}s` }}
+                          className="hover:bg-gray-700/30 transition-colors group"
                         >
                           <td className="p-4 text-gray-400 font-mono text-sm">{formatTime(vale.timestamp)}</td>
                           <td className="p-4 font-medium text-white">{vale.barberName}</td>
@@ -479,10 +540,9 @@ const App: React.FC = () => {
                           <td className="p-4 text-right">
                             <button 
                               onClick={() => handleDeleteVale(vale.id)}
-                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                              title="Excluir Vale"
+                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-100 sm:opacity-0 group-hover:opacity-100"
                             >
-                              <Trash2 size={18} />
+                              <Trash2 size={16} />
                             </button>
                           </td>
                         </tr>
@@ -497,8 +557,9 @@ const App: React.FC = () => {
       </main>
 
       {/* Footer Credit */}
-      <footer className="text-center text-gray-600 text-sm py-8 mt-8">
+      <footer className="text-center text-gray-600 text-xs py-8 mt-8">
          <p>Barbearia Pro System &copy; {new Date().getFullYear()}</p>
+         {userProfile.isPro && <span className="text-gold-500/50 text-[10px] mt-1 block">Licença PRO Ativa</span>}
       </footer>
 
       {/* Modals */}

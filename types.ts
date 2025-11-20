@@ -1,3 +1,4 @@
+
 export enum ServiceType {
   CUT = 'Corte',
   COMBO = 'Combo', // Cut + Beard
@@ -47,6 +48,14 @@ export interface AppSettings {
   priceCut: number;
   priceCombo: number;
   commissionRate: number; // Percentage (e.g., 40)
+}
+
+export interface UserProfile {
+  ownerName: string;
+  shopName: string;
+  email: string;
+  startDate: number; // Timestamp of when they started using the app
+  isPro: boolean; // If they have paid
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
