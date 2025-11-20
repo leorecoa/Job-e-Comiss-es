@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
 import { formatCurrency, formatTime, generateId, generateReportContent, formatDate } from './utils';
@@ -10,6 +9,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { PaywallScreen } from './components/PaywallScreen';
 import { MonthlySummary } from './components/MonthlySummary';
 import { SubscriptionModal } from './components/SubscriptionModal';
+import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { 
   Scissors, 
   Users, 
@@ -27,7 +27,9 @@ import {
   BarChart3,
   Crown,
   Sparkles,
-  UsersRound
+  UsersRound,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 const getTodayString = () => {
@@ -112,6 +114,18 @@ const App: React.FC = () => {
   const [isValeModalOpen, setValeModalOpen] = useState(false);
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
   const [isSubscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
+
+  // -- Notification State --
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const addToast = (message: string, type: ToastType = 'success') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setToasts(prev => [...prev, { id, message, type }]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
 
   // -- Effects --
   useEffect(() => {
@@ -205,6 +219,7 @@ const App: React.FC = () => {
   const handleLogin = (profile: UserProfile) => {
     setUserProfile(profile);
     setSettings(prev => ({ ...prev, shopName: profile.shopName }));
+    addToast(`Bem-vindo, ${profile.ownerName}!`, 'success');
   };
 
   const handleSubscribe = (codeInput: string): boolean => {
@@ -214,16 +229,19 @@ const App: React.FC = () => {
 
     if (CODES_ADMIN.includes(cleanCode)) {
         setUserProfile({ ...userProfile, isPro: true, planType: 'admin_life' });
+        addToast('Modo Admin Vitalício Ativado!', 'success');
         return true;
     }
 
     if (CODES_VIP.includes(cleanCode)) {
         setUserProfile({ ...userProfile, isPro: true, planType: 'vip_monthly' });
+        addToast('Assinatura VIP Ativada!', 'success');
         return true;
     }
 
     if (CODES_PRO.includes(cleanCode)) {
         setUserProfile({ ...userProfile, isPro: true, planType: 'pro_monthly' });
+        addToast('Assinatura PRO Ativada!', 'success');
         return true;
     }
 
@@ -241,9 +259,11 @@ const App: React.FC = () => {
     if (editingClient) {
       setClients(prev => prev.map(c => c.id === editingClient.id ? { ...clientInfo, id: c.id, timestamp } : c));
       setEditingClient(null);
+      addToast('Atendimento atualizado!', 'success');
     } else {
       const newClient: Client = { ...clientInfo, id: generateId(), timestamp };
       setClients(prev => [newClient, ...prev]);
+      addToast('Novo atendimento salvo!', 'success');
     }
   };
 
@@ -263,17 +283,20 @@ const App: React.FC = () => {
     }
     const newVale: Vale = { ...data, id: generateId(), timestamp: timestamp };
     setVales(prev => [newVale, ...prev]);
+    addToast('Vale registrado!', 'success');
   };
 
   const handleDeleteClient = (id: string) => {
     if(window.confirm('Tem certeza que deseja excluir este cliente?')) {
       setClients(prev => prev.filter(c => c.id !== id));
+      addToast('Cliente removido.', 'info');
     }
   };
 
   const handleDeleteVale = (id: string) => {
     if(window.confirm('Tem certeza que deseja excluir este vale?')) {
       setVales(prev => prev.filter(v => v.id !== id));
+      addToast('Vale removido.', 'info');
     }
   };
 
@@ -289,6 +312,7 @@ const App: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    addToast('Relatório baixado!', 'success');
   };
 
   const handleOpenAddClient = () => {
@@ -297,10 +321,21 @@ const App: React.FC = () => {
   };
   
   const handleLogout = () => {
-    if(window.confirm("Deseja sair? Isso irá manter seus dados, mas pedirá login novamente.")) {
+    if(window.confirm("Deseja sair?")) {
        setUserProfile(null);
     }
   }
+
+  const changeDate = (days: number) => {
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
+    d.setDate(d.getDate() + days);
+    
+    const newYear = d.getFullYear();
+    const newMonth = String(d.getMonth() + 1).padStart(2, '0');
+    const newDay = String(d.getDate()).padStart(2, '0');
+    setSelectedDate(`${newYear}-${newMonth}-${newDay}`);
+  };
 
   // -- Render Logic --
 
@@ -313,7 +348,9 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 pb-20 font-sans">
+    <div className="min-h-screen bg-gray-900 pb-24 font-sans selection:bg-gold-500/30">
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+
       {/* Modern Horizontal Header */}
       <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-gray-900/90">
         <div className="max-w-6xl mx-auto px-4 py-3">
@@ -396,7 +433,7 @@ const App: React.FC = () => {
             <div className="flex gap-2 flex-wrap w-full lg:w-auto">
               <button 
                 onClick={handleOpenAddClient}
-                className="flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
+                className="hidden md:flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
               >
                 <Plus size={18} /> <span className="hidden sm:inline">Novo</span> Atendimento
               </button>
@@ -404,7 +441,7 @@ const App: React.FC = () => {
                 onClick={() => setValeModalOpen(true)}
                 className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95"
               >
-                <MinusCircle size={18} /> Vale
+                <MinusCircle size={18} /> <span className="hidden xs:inline">Vale</span>
               </button>
               <button 
                 onClick={() => setSettingsModalOpen(true)}
@@ -415,37 +452,37 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex gap-3 w-full lg:w-auto lg:justify-end items-center">
+            <div className="flex flex-wrap gap-3 w-full lg:w-auto lg:justify-end items-center">
               
-              {/* Daily View CTA Button if NOT PRO */}
-              {!userProfile.isPro && (
-                  <button 
-                    onClick={() => setSubscriptionModalOpen(true)}
-                    className="lg:hidden flex-1 flex items-center justify-center gap-1 bg-gold-500/20 border border-gold-500/50 text-gold-500 px-3 py-2.5 rounded-xl font-bold text-xs"
-                  >
-                    <Crown size={14} /> ASSINAR
-                  </button>
-              )}
-
               {/* View Switcher Button */}
               <button 
                 onClick={() => setViewMode('monthly')}
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-blue-400 px-4 py-2.5 rounded-xl font-medium transition-colors"
+                className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-blue-400 px-4 py-2.5 rounded-xl font-medium transition-colors"
                 title="Ver Resumo Mensal"
               >
-                <BarChart3 size={18} /> <span className="hidden sm:inline">Relatório Mensal</span>
+                <BarChart3 size={18} /> <span className="hidden sm:inline">Mensal</span>
               </button>
 
-              <div className="relative flex-grow lg:flex-grow-0">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                      <Calendar size={16} />
-                  </div>
-                  <input 
-                      type="date" 
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent block pl-10 p-2.5 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert transition-all"
-                  />
+              {/* Date Navigation */}
+              <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5">
+                <button 
+                    onClick={() => changeDate(-1)}
+                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                    <ChevronLeft size={20} />
+                </button>
+                <input 
+                    type="date" 
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="bg-transparent border-none text-white text-sm font-medium focus:ring-0 text-center w-32 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                />
+                <button 
+                    onClick={() => changeDate(1)}
+                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                    <ChevronRight size={20} />
+                </button>
               </div>
               
               <button 
@@ -472,9 +509,9 @@ const App: React.FC = () => {
           />
         ) : (
           /* Standard Daily View */
-          <div className="animate-slide-in">
+          <div className="animate-slide-in space-y-6">
             {/* Dashboard Stats - Modern Layout */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <StatsCard 
                 title="Atendimentos" 
                 value={stats.totalClients.toString()} 
@@ -529,13 +566,16 @@ const App: React.FC = () => {
               </div>
 
               {/* Content Area */}
-              <div className="min-h-[300px]">
+              <div className="min-h-[300px] bg-gray-900/30">
                 {activeTab === 'clients' ? (
                   <div className="overflow-x-auto">
                     {filteredClients.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                        <Users size={48} className="mb-4 opacity-20" />
-                        <p className="text-sm">Nenhum atendimento em {selectedDate.split('-').reverse().join('/')}.</p>
+                        <div className="bg-gray-800/50 p-6 rounded-full mb-4 border border-gray-700">
+                             <Scissors size={48} className="text-gray-600" />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-400">Nenhum corte hoje</h3>
+                        <p className="text-sm text-gray-600">Clique no botão + para iniciar</p>
                       </div>
                     ) : (
                       <table className="w-full text-left border-collapse">
@@ -618,8 +658,10 @@ const App: React.FC = () => {
                   <div className="overflow-x-auto">
                     {filteredVales.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                        <MinusCircle size={48} className="mb-4 opacity-20" />
-                        <p className="text-sm">Nenhum vale em {selectedDate.split('-').reverse().join('/')}.</p>
+                        <div className="bg-gray-800/50 p-6 rounded-full mb-4 border border-gray-700">
+                            <MinusCircle size={48} className="text-gray-600" />
+                        </div>
+                        <p className="text-sm">Nenhum vale registrado hoje.</p>
                       </div>
                     ) : (
                       <table className="w-full text-left border-collapse">
@@ -661,6 +703,18 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Floating Action Button (FAB) - Mobile Only */}
+        {viewMode === 'daily' && (
+            <button
+                onClick={handleOpenAddClient}
+                className="md:hidden fixed bottom-6 right-6 z-50 bg-gold-500 hover:bg-gold-600 text-black p-4 rounded-full shadow-2xl shadow-gold-500/40 transition-transform hover:scale-110 active:scale-95 flex items-center justify-center"
+                title="Novo Atendimento"
+            >
+                <Plus size={28} strokeWidth={2.5} />
+            </button>
+        )}
+
       </main>
 
       {/* Footer Credit */}

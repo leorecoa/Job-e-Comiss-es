@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Barbearia Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,6 +27,9 @@
                 900: '#111827',
                 950: '#030712',
               }
+            },
+            screens: {
+                'xs': '375px',
             }
           }
         }
@@ -35,8 +37,10 @@
     </script>
     <style>
       body {
-        background-color: #111827;
+        background-color: #0f172a; /* Slate 900 base */
+        background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 100%);
         color: #f3f4f6;
+        -webkit-tap-highlight-color: transparent;
       }
       
       @keyframes slideIn {
@@ -46,6 +50,22 @@
       
       .animate-slide-in {
         animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1f2937; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #4b5563; 
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #6b7280; 
       }
     </style>
   <script type="importmap">
