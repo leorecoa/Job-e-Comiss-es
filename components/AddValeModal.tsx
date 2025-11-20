@@ -1,24 +1,27 @@
+
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign } from 'lucide-react';
+import { X, DollarSign, ChevronDown } from 'lucide-react';
+import { AppSettings } from '../types';
 
 interface AddValeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (valeData: any) => void;
+  settings?: AppSettings;
 }
 
-export const AddValeModal: React.FC<AddValeModalProps> = ({ isOpen, onClose, onAdd }) => {
+export const AddValeModal: React.FC<AddValeModalProps> = ({ isOpen, onClose, onAdd, settings }) => {
   const [barber, setBarber] = useState('');
   const [value, setValue] = useState('');
   const [description, setDescription] = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      setBarber('');
+      setBarber(settings?.barbers && settings.barbers.length > 0 ? settings.barbers[0] : '');
       setValue('');
       setDescription('');
     }
-  }, [isOpen]);
+  }, [isOpen, settings]);
 
   if (!isOpen) return null;
 
@@ -45,14 +48,30 @@ export const AddValeModal: React.FC<AddValeModalProps> = ({ isOpen, onClose, onA
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Barbeiro</label>
-            <input
-              required
-              type="text"
-              value={barber}
-              onChange={(e) => setBarber(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-red-500 outline-none"
-              placeholder="Quem está retirando?"
-            />
+             {settings?.barbers && settings.barbers.length > 0 ? (
+                 <div className="relative">
+                    <select
+                        required
+                        value={barber}
+                        onChange={(e) => setBarber(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-red-500 outline-none appearance-none"
+                    >
+                        {settings.barbers.map(b => (
+                            <option key={b} value={b}>{b}</option>
+                        ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={16} />
+                 </div>
+            ) : (
+                <input
+                required
+                type="text"
+                value={barber}
+                onChange={(e) => setBarber(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-red-500 outline-none"
+                placeholder="Quem está retirando?"
+                />
+            )}
           </div>
 
           <div>

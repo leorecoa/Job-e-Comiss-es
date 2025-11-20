@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { CheckCircle, Lock, Copy, Check } from 'lucide-react';
+import { CheckCircle, Lock, Copy, Check, Users } from 'lucide-react';
 
 interface PaywallScreenProps {
   onSubscribe: (code: string) => boolean; // Agora retorna boleano se deu certo
@@ -22,7 +23,7 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
   const handleUnlock = () => {
     const success = onSubscribe(activationCode);
     if (!success) {
-      setError('Código inválido. Verifique com o administrador.');
+      setError('Código inválido. Verifique qual plano você adquiriu.');
     } else {
       setError('');
     }
@@ -34,7 +35,7 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-gold-500/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="bg-gray-900 rounded-3xl shadow-2xl border border-gray-800 w-full max-w-lg overflow-hidden animate-slide-in relative z-10">
+      <div className="bg-gray-900 rounded-3xl shadow-2xl border border-gray-800 w-full max-w-3xl overflow-hidden animate-slide-in relative z-10">
         <div className="bg-gold-500 p-1 h-2 w-full"></div>
         
         <div className="p-8 text-center">
@@ -43,72 +44,79 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
           </div>
           
           <h2 className="text-2xl font-display font-bold text-white mb-2">Período de Teste Encerrado</h2>
-          <p className="text-gray-400 text-sm mb-6">
-            Sua avaliação de 7 dias acabou. Para continuar usando o sistema profissionalmente, assine o plano mensal.
+          <p className="text-gray-400 text-sm mb-8">
+            Escolha o plano ideal para continuar gerenciando sua barbearia profissionalmente.
           </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+             {/* Plano PRO */}
+             <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 hover:border-gold-500/50 transition-colors">
+                <h3 className="text-lg font-bold text-white mb-1">PRO Individual</h3>
+                <p className="text-gold-500 font-bold text-xl mb-3">R$ 29,90 <span className="text-xs font-normal text-gray-500">/mês</span></p>
+                <p className="text-xs text-gray-400 mb-4">Para barbeiros autônomos.</p>
+                <ul className="text-left text-xs text-gray-300 space-y-2">
+                    <li className="flex gap-2"><Check size={12} className="text-gold-500"/> 1 Usuário</li>
+                    <li className="flex gap-2"><Check size={12} className="text-gold-500"/> Gestão Completa</li>
+                </ul>
+             </div>
+
+             {/* Plano VIP */}
+             <div className="bg-blue-900/10 border border-blue-500/30 rounded-xl p-5 hover:bg-blue-900/20 transition-colors relative">
+                <div className="absolute top-3 right-3">
+                    <Users size={16} className="text-blue-400"/>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1">VIP Equipe</h3>
+                <p className="text-blue-400 font-bold text-xl mb-3">R$ 59,90 <span className="text-xs font-normal text-gray-500">/mês</span></p>
+                <p className="text-xs text-gray-400 mb-4">Para barbearias com equipe.</p>
+                <ul className="text-left text-xs text-gray-300 space-y-2">
+                    <li className="flex gap-2"><Check size={12} className="text-blue-400"/> Até 4 Barbeiros</li>
+                    <li className="flex gap-2"><Check size={12} className="text-blue-400"/> Seleção Rápida</li>
+                </ul>
+             </div>
+          </div>
 
           {/* Área do PIX */}
           <div className="bg-gray-800/80 rounded-xl p-5 mb-6 border border-gray-700 text-left relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-gold-500 text-black text-[10px] font-bold px-2 py-1 rounded-bl-lg">
-              PIX
-            </div>
-            <p className="text-xs text-gray-500 uppercase font-bold mb-3 tracking-wider">Dados para Pagamento</p>
-            
-            <div className="space-y-2 mb-4">
-              <div>
-                <p className="text-xs text-gray-400">Chave PIX (CPF):</p>
-                <div className="flex items-center gap-2">
-                   <code className="text-gold-500 font-mono font-bold text-lg">{pixKey}</code>
-                   <button onClick={handleCopyPix} className="text-gray-400 hover:text-white transition-colors" title="Copiar">
-                     {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
-                   </button>
+            <div className="flex justify-between items-start">
+                <div className="space-y-2 mb-2 w-full">
+                    <div>
+                        <p className="text-xs text-gray-400">Chave PIX (CPF) - Leandro Jesse da Silva:</p>
+                        <div className="flex items-center gap-2 mt-1">
+                            <code className="bg-gray-900 px-2 py-1 rounded text-gold-500 font-mono font-bold text-sm">{pixKey}</code>
+                            <button onClick={handleCopyPix} className="text-gray-400 hover:text-white transition-colors" title="Copiar">
+                                {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+                            </button>
+                        </div>
+                    </div>
                 </div>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">Nome:</p>
-                <p className="text-white font-medium">Leandro Jesse da Silva</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">Banco:</p>
-                <p className="text-white font-medium">Banco Pan</p>
-              </div>
             </div>
-
-            <div className="border-t border-gray-700 pt-3">
-              <p className="text-xs text-gray-300 text-center">
-                Valor: <span className="text-white font-bold">R$ 29,90</span> <span className="text-gray-500">/ mês</span>
-              </p>
-            </div>
+            <p className="text-[10px] text-gray-500 italic mt-2 border-t border-gray-700 pt-2">Faça o PIX do valor correspondente ao plano escolhido.</p>
           </div>
 
           {/* Área de Desbloqueio */}
-          <div className="space-y-3">
+          <div className="space-y-3 max-w-md mx-auto">
             <label className="block text-left text-sm font-medium text-gray-300">
-              Já fez o PIX? Digite o código de liberação mensal:
+              Digite o código recebido:
             </label>
             <div className="flex gap-2">
               <input 
                 type="text" 
                 value={activationCode}
                 onChange={(e) => setActivationCode(e.target.value.toUpperCase())}
-                placeholder="CÓDIGO MENSAL"
+                placeholder="SEU CÓDIGO DE ATIVAÇÃO"
                 className="flex-1 bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-gold-500 outline-none uppercase tracking-widest font-mono text-center"
               />
             </div>
-             {error && <p className="text-red-400 text-xs text-left">{error}</p>}
+             {error && <p className="text-red-400 text-xs text-center">{error}</p>}
             
             <button
               onClick={handleUnlock}
               className="w-full bg-gold-500 hover:bg-gold-600 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-gold-500/20"
             >
               <CheckCircle size={20} />
-              Validar e Liberar Acesso
+              Liberar Acesso
             </button>
           </div>
-
-          <p className="text-[10px] text-gray-600 mt-6">
-            Após o pagamento, envie o comprovante para receber seu código mensal.
-          </p>
         </div>
       </div>
     </div>

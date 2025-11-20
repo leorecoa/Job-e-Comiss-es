@@ -25,7 +25,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       ownerName,
       email,
       startDate: Date.now(),
-      isPro: isAdmin // Se for admin, já começa pago/vitalício
+      isPro: isAdmin, // Se for admin, já começa pago/vitalício
+      planType: isAdmin ? 'admin_life' : 'trial'
     };
     
     onLogin(newProfile);

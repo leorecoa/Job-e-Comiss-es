@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ServiceType, AppSettings, ClientType, Client } from '../types';
-import { X, Check, UserPlus, UserCheck, Clock } from 'lucide-react';
+import { X, Check, UserPlus, UserCheck, Clock, ChevronDown } from 'lucide-react';
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -44,7 +44,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
       } else {
         setName('');
-        setBarber('');
+        // Pre-select first barber if available in list
+        setBarber(settings.barbers && settings.barbers.length > 0 ? settings.barbers[0] : '');
         setService(ServiceType.CUT);
         setClientType(ClientType.RETURNING);
         setExtraValue('0');
@@ -57,7 +58,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setTime(`${hours}:${minutes}`);
       }
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, settings.barbers]);
 
   if (!isOpen) return null;
 
@@ -102,7 +103,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
           
           {/* Top Row: Client Type & Time */}
           <div className="grid grid-cols-2 gap-3 mb-2">
-             {/* Client Type Toggle - slightly modified to fit */}
+             {/* Client Type Toggle */}
              <div className="flex bg-gray-900 rounded-lg p-1 border border-gray-700">
                 <button
                   type="button"
@@ -157,14 +158,30 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Barbeiro</label>
-            <input
-              required
-              type="text"
-              value={barber}
-              onChange={(e) => setBarber(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
-              placeholder="Quem atendeu?"
-            />
+            {settings.barbers && settings.barbers.length > 0 ? (
+                 <div className="relative">
+                    <select
+                        required
+                        value={barber}
+                        onChange={(e) => setBarber(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none appearance-none"
+                    >
+                        {settings.barbers.map(b => (
+                            <option key={b} value={b}>{b}</option>
+                        ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={16} />
+                 </div>
+            ) : (
+                <input
+                required
+                type="text"
+                value={barber}
+                onChange={(e) => setBarber(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
+                placeholder="Quem atendeu?"
+                />
+            )}
           </div>
 
           <div>

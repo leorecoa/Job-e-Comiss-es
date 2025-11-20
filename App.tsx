@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile } from './types';
+import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
 import { formatCurrency, formatTime, generateId, generateReportContent, formatDate } from './utils';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
@@ -25,7 +26,8 @@ import {
   LogOut,
   BarChart3,
   Crown,
-  Sparkles
+  Sparkles,
+  UsersRound
 } from 'lucide-react';
 
 const getTodayString = () => {
@@ -44,8 +46,11 @@ const getCurrentMonthString = () => {
 };
 
 const TRIAL_DAYS = 7;
-// Códigos aceitos para ativar a assinatura
-const ACCEPTED_CODES = ["LIBERADO", "MENSAL", "PRO", "VIP", "LEANDRO"]; 
+
+// Códigos
+const CODES_PRO = ["MENSAL", "PRO", "LIBERADO"];
+const CODES_VIP = ["VIP", "EQUIPE", "TIME", "VIP4"];
+const CODES_ADMIN = ["LEANDRO", "ADMIN"];
 
 const App: React.FC = () => {
   // -- Auth & Profile State --
@@ -88,7 +93,8 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
       const saved = localStorage.getItem('barbearia_settings');
-      return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+      const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+      return { ...DEFAULT_SETTINGS, ...parsed }; // Ensure new fields like barbers exist
     } catch (e) {
       return DEFAULT_SETTINGS;
     }
@@ -142,10 +148,9 @@ const App: React.FC = () => {
     };
   }, [userProfile]);
 
-  // Helper para verificar se é o ADMIN
-  const isAdmin = useMemo(() => {
-    return userProfile?.email === 'leandro@admin';
-  }, [userProfile]);
+  // Helper para verificar se é o ADMIN ou VIP
+  const isAdmin = useMemo(() => userProfile?.planType === 'admin_life', [userProfile]);
+  const isVip = useMemo(() => userProfile?.planType === 'vip_monthly' || userProfile?.planType === 'admin_life', [userProfile]);
 
   // -- Filtering (Only for Daily View) --
   const filteredClients = useMemo(() => {
@@ -204,12 +209,24 @@ const App: React.FC = () => {
 
   const handleSubscribe = (codeInput: string): boolean => {
     const cleanCode = codeInput.trim().toUpperCase();
-    if (ACCEPTED_CODES.includes(cleanCode)) {
-       if (userProfile) {
-         setUserProfile({ ...userProfile, isPro: true });
-         return true;
-       }
+    
+    if (!userProfile) return false;
+
+    if (CODES_ADMIN.includes(cleanCode)) {
+        setUserProfile({ ...userProfile, isPro: true, planType: 'admin_life' });
+        return true;
     }
+
+    if (CODES_VIP.includes(cleanCode)) {
+        setUserProfile({ ...userProfile, isPro: true, planType: 'vip_monthly' });
+        return true;
+    }
+
+    if (CODES_PRO.includes(cleanCode)) {
+        setUserProfile({ ...userProfile, isPro: true, planType: 'pro_monthly' });
+        return true;
+    }
+
     return false;
   };
 
@@ -318,8 +335,8 @@ const App: React.FC = () => {
                     </h1>
                     {userProfile.isPro ? (
                         <span className="flex items-center gap-1 text-[10px] text-gold-500 font-bold uppercase tracking-wider">
-                            <Crown size={10} fill="currentColor" /> 
-                            {isAdmin ? 'Admin Vitalício' : 'Assinatura PRO'}
+                            {isVip ? <UsersRound size={10} fill="currentColor" /> : <Crown size={10} fill="currentColor" />}
+                            {userProfile.planType === 'admin_life' ? 'Admin Vitalício' : (isVip ? 'VIP Multi-Barbeiro' : 'Assinatura PRO')}
                         </span>
                     ) : (
                         <span className="text-[10px] bg-gray-800 text-gold-500 px-1.5 py-0.5 rounded border border-gold-500/30">
@@ -651,7 +668,7 @@ const App: React.FC = () => {
          <p>Barbearia Pro System &copy; {new Date().getFullYear()}</p>
          {userProfile.isPro && (
            <span className="text-gold-500/50 text-[10px] mt-1 block">
-             {isAdmin ? 'Licença ADMIN' : 'Assinatura Ativa'}
+             {isAdmin ? 'Licença ADMIN' : (isVip ? 'Assinatura VIP Multi' : 'Assinatura PRO Standard')}
            </span>
          )}
       </footer>
@@ -669,6 +686,7 @@ const App: React.FC = () => {
         isOpen={isValeModalOpen}
         onClose={() => setValeModalOpen(false)}
         onAdd={handleAddVale}
+        settings={settings}
       />
 
       <SettingsModal 
@@ -676,7 +694,7 @@ const App: React.FC = () => {
         onClose={() => setSettingsModalOpen(false)}
         settings={settings}
         onSave={setSettings}
-        isPro={userProfile.isPro}
+        userProfile={userProfile}
         onSubscribe={() => setSubscriptionModalOpen(true)}
       />
 

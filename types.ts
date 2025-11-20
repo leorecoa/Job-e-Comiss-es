@@ -48,14 +48,18 @@ export interface AppSettings {
   priceCut: number;
   priceCombo: number;
   commissionRate: number; // Percentage (e.g., 40)
+  barbers: string[]; // Lista de barbeiros cadastrados (VIP)
 }
+
+export type PlanType = 'trial' | 'pro_monthly' | 'vip_monthly' | 'admin_life';
 
 export interface UserProfile {
   ownerName: string;
   shopName: string;
   email: string;
   startDate: number; // Timestamp of when they started using the app
-  isPro: boolean; // If they have paid
+  isPro: boolean; // If they have paid (General check)
+  planType: PlanType; // Specific plan detail
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -64,4 +68,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   priceCut: 60,
   priceCombo: 90,
   commissionRate: 40,
+  barbers: []
 };

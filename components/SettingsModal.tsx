@@ -1,13 +1,14 @@
+
 import React, { useState } from 'react';
-import { AppSettings } from '../types';
-import { X, Save, Crown } from 'lucide-react';
+import { AppSettings, UserProfile } from '../types';
+import { X, Save, Crown, Users, Trash2, Plus } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AppSettings;
   onSave: (newSettings: AppSettings) => void;
-  isPro: boolean;
+  userProfile: UserProfile;
   onSubscribe: () => void;
 }
 
@@ -16,17 +17,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose, 
   settings, 
   onSave,
-  isPro,
+  userProfile,
   onSubscribe
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
+  const [newBarberName, setNewBarberName] = useState('');
 
   if (!isOpen) return null;
+
+  const isVip = userProfile.planType === 'vip_monthly' || userProfile.planType === 'admin_life';
 
   const handleChange = (field: keyof AppSettings, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: typeof prev[field] === 'number' ? Number(value) : value
+    }));
+  };
+
+  const handleAddBarber = () => {
+    if (newBarberName.trim() && (formData.barbers?.length || 0) < 4) {
+        setFormData(prev => ({
+            ...prev,
+            barbers: [...(prev.barbers || []), newBarberName.trim()]
+        }));
+        setNewBarberName('');
+    }
+  };
+
+  const handleRemoveBarber = (index: number) => {
+    setFormData(prev => ({
+        ...prev,
+        barbers: prev.barbers?.filter((_, i) => i !== index) || []
     }));
   };
 
@@ -38,7 +59,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700">
+      <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white font-display">Configurações</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
@@ -49,15 +70,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           
           {/* Plan Status Section */}
-          <div className={`p-4 rounded-xl border ${isPro ? 'bg-gold-500/10 border-gold-500/20' : 'bg-gray-900 border-gray-700'}`}>
+          <div className={`p-4 rounded-xl border ${userProfile.isPro ? 'bg-gold-500/10 border-gold-500/20' : 'bg-gray-900 border-gray-700'}`}>
              <div className="flex justify-between items-center">
                 <div>
-                   <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Status do Plano</p>
-                   <p className={`font-bold ${isPro ? 'text-gold-500' : 'text-white'}`}>
-                      {isPro ? 'Assinatura PRO Ativa' : 'Versão de Teste'}
+                   <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Seu Plano</p>
+                   <p className={`font-bold text-sm ${userProfile.isPro ? 'text-gold-500' : 'text-white'}`}>
+                      {userProfile.isPro 
+                        ? (isVip ? 'VIP Multi-Barbeiros (Ativo)' : 'Assinatura PRO Standard') 
+                        : 'Versão de Teste'}
                    </p>
                 </div>
-                {isPro ? (
+                {userProfile.isPro ? (
                     <Crown className="text-gold-500" />
                 ) : (
                     <button 
@@ -70,6 +93,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
              </div>
           </div>
+
+          {/* VIP Barber Management Section */}
+          {isVip && (
+            <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-900/10 space-y-3">
+                <div className="flex items-center gap-2 text-blue-400 mb-2">
+                    <Users size={18} />
+                    <h3 className="font-bold text-sm">Equipe (VIP)</h3>
+                </div>
+                
+                <div className="space-y-2">
+                    {(formData.barbers || []).map((barber, index) => (
+                        <div key={index} className="flex justify-between items-center bg-gray-900 p-2 rounded-lg border border-gray-700">
+                            <span className="text-white text-sm">{barber}</span>
+                            <button 
+                                type="button"
+                                onClick={() => handleRemoveBarber(index)}
+                                className="text-red-400 hover:text-red-300"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+
+                {(formData.barbers?.length || 0) < 4 ? (
+                    <div className="flex gap-2 mt-2">
+                        <input 
+                            type="text"
+                            value={newBarberName}
+                            onChange={(e) => setNewBarberName(e.target.value)}
+                            placeholder="Nome do Barbeiro"
+                            className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <button 
+                            type="button"
+                            onClick={handleAddBarber}
+                            className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg"
+                        >
+                            <Plus size={18} />
+                        </button>
+                    </div>
+                ) : (
+                    <p className="text-xs text-gray-500 text-center">Limite de 4 barbeiros atingido.</p>
+                )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Nome da Barbearia</label>
