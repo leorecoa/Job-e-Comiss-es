@@ -128,7 +128,7 @@ const App: React.FC = () => {
 
   // -- Filtering --
   const filteredClients = useMemo(() => {
-    return clients.filter(client => {
+    const filtered = clients.filter(client => {
       if (!client.timestamp) return false;
       const d = new Date(client.timestamp);
       if (isNaN(d.getTime())) return false;
@@ -139,10 +139,12 @@ const App: React.FC = () => {
       const dateString = `${year}-${month}-${day}`;
       return dateString === selectedDate;
     });
+    // Sort by timestamp descending (Newest/Latest first)
+    return filtered.sort((a, b) => b.timestamp - a.timestamp);
   }, [clients, selectedDate]);
 
   const filteredVales = useMemo(() => {
-    return vales.filter(vale => {
+    const filtered = vales.filter(vale => {
       if (!vale.timestamp) return false;
       const d = new Date(vale.timestamp);
       if (isNaN(d.getTime())) return false;
@@ -153,6 +155,8 @@ const App: React.FC = () => {
       const dateString = `${year}-${month}-${day}`;
       return dateString === selectedDate;
     });
+    // Sort by timestamp descending
+    return filtered.sort((a, b) => b.timestamp - a.timestamp);
   }, [vales, selectedDate]);
 
   // -- Calculations --
@@ -192,20 +196,19 @@ const App: React.FC = () => {
     return false;
   };
 
-  const handleSaveClient = (data: Omit<Client, 'id' | 'timestamp'>) => {
+  const handleSaveClient = (data: any) => {
+    const { timeStr, ...clientInfo } = data;
+
+    // Combine selectedDate (YYYY-MM-DD) with timeStr (HH:mm) to get timestamp
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const [hours, minutes] = timeStr ? timeStr.split(':').map(Number) : [new Date().getHours(), new Date().getMinutes()];
+    const timestamp = new Date(year, month - 1, day, hours, minutes).getTime();
+
     if (editingClient) {
-      setClients(prev => prev.map(c => c.id === editingClient.id ? { ...c, ...data } : c));
+      setClients(prev => prev.map(c => c.id === editingClient.id ? { ...clientInfo, id: c.id, timestamp } : c));
       setEditingClient(null);
     } else {
-      let timestamp = Date.now();
-      const todayStr = getTodayString();
-      if (selectedDate !== todayStr) {
-         const [year, month, day] = selectedDate.split('-').map(Number);
-         const now = new Date();
-         const d = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds());
-         timestamp = d.getTime();
-      }
-      const newClient: Client = { ...data, id: generateId(), timestamp: timestamp };
+      const newClient: Client = { ...clientInfo, id: generateId(), timestamp };
       setClients(prev => [newClient, ...prev]);
     }
   };

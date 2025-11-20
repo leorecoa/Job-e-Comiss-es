@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { ServiceType, AppSettings, ClientType, Client } from '../types';
-import { X, Check, UserPlus, UserCheck } from 'lucide-react';
+import { X, Check, UserPlus, UserCheck, Clock } from 'lucide-react';
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   const [clientType, setClientType] = useState<ClientType>(ClientType.RETURNING);
   const [extraValue, setExtraValue] = useState<string>('0');
   const [customPrice, setCustomPrice] = useState<string>('');
+  const [time, setTime] = useState('');
 
   // Reset or populate form when modal opens
   useEffect(() => {
@@ -27,13 +29,19 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setService(initialData.serviceType);
         setClientType(initialData.clientType || ClientType.RETURNING);
         setExtraValue(initialData.extraValue.toString());
-        // Calculate custom price if it was OTHER or if prices changed, 
-        // but simpler is to just set logic for custom price input
+        
         if (initialData.serviceType === ServiceType.OTHER) {
            setCustomPrice(initialData.serviceValue.toString());
         } else {
            setCustomPrice('');
         }
+
+        // Set time from timestamp
+        const d = new Date(initialData.timestamp);
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        setTime(`${hours}:${minutes}`);
+
       } else {
         setName('');
         setBarber('');
@@ -41,6 +49,12 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setClientType(ClientType.RETURNING);
         setExtraValue('0');
         setCustomPrice('');
+        
+        // Set current time
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        setTime(`${hours}:${minutes}`);
       }
     }
   }, [isOpen, initialData]);
@@ -50,8 +64,6 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   const getBasePrice = () => {
     if (service === ServiceType.CUT) return settings.priceCut;
     if (service === ServiceType.COMBO) return settings.priceCombo;
-    // If editing and type is OTHER, use customPrice. 
-    // If type was standard but user selects OTHER, customPrice applies.
     return Number(customPrice) || 0;
   };
 
@@ -68,7 +80,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
       clientType: clientType,
       serviceValue: getBasePrice(),
       extraValue: Number(extraValue),
-      totalValue: getTotal()
+      totalValue: getTotal(),
+      timeStr: time // Send the time string back to App
     });
     onClose();
   };
@@ -87,32 +100,47 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           
-          {/* Client Type Toggle */}
+          {/* Top Row: Client Type & Time */}
           <div className="grid grid-cols-2 gap-3 mb-2">
-            <button
-              type="button"
-              onClick={() => setClientType(ClientType.NEW)}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium border transition-all ${
-                clientType === ClientType.NEW
-                  ? 'bg-green-900/30 border-green-500/50 text-green-400'
-                  : 'bg-gray-900 border-gray-700 text-gray-500 hover:bg-gray-700'
-              }`}
-            >
-              <UserPlus size={16} />
-              Novidade
-            </button>
-            <button
-              type="button"
-              onClick={() => setClientType(ClientType.RETURNING)}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium border transition-all ${
-                clientType === ClientType.RETURNING
-                  ? 'bg-gold-500/20 border-gold-500/50 text-gold-500'
-                  : 'bg-gray-900 border-gray-700 text-gray-500 hover:bg-gray-700'
-              }`}
-            >
-              <UserCheck size={16} />
-              Da Casa
-            </button>
+             {/* Client Type Toggle - slightly modified to fit */}
+             <div className="flex bg-gray-900 rounded-lg p-1 border border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => setClientType(ClientType.NEW)}
+                  className={`flex-1 flex items-center justify-center rounded-md text-xs font-medium transition-all py-2 ${
+                    clientType === ClientType.NEW
+                      ? 'bg-green-900/50 text-green-400 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <UserPlus size={14} className="mr-1" /> Novo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClientType(ClientType.RETURNING)}
+                  className={`flex-1 flex items-center justify-center rounded-md text-xs font-medium transition-all py-2 ${
+                    clientType === ClientType.RETURNING
+                      ? 'bg-gold-500/20 text-gold-500 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <UserCheck size={14} className="mr-1" /> Casa
+                </button>
+             </div>
+
+             {/* Time Input */}
+             <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <Clock size={16} />
+                </div>
+                <input
+                  type="time"
+                  required
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-3 py-2.5 text-white focus:ring-2 focus:ring-gold-500 outline-none [color-scheme:dark]"
+                />
+             </div>
           </div>
 
           <div>
