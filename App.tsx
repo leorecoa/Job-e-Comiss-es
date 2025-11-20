@@ -8,6 +8,7 @@ import { AddValeModal } from './components/AddValeModal';
 import { SettingsModal } from './components/SettingsModal';
 import { LoginScreen } from './components/LoginScreen';
 import { PaywallScreen } from './components/PaywallScreen';
+import { MonthlySummary } from './components/MonthlySummary';
 import { 
   Scissors, 
   Users, 
@@ -21,7 +22,8 @@ import {
   Pencil,
   Calendar,
   User,
-  LogOut
+  LogOut,
+  BarChart3
 } from 'lucide-react';
 
 const getTodayString = () => {
@@ -30,6 +32,13 @@ const getTodayString = () => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const getCurrentMonthString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
 };
 
 const TRIAL_DAYS = 7;
@@ -82,8 +91,11 @@ const App: React.FC = () => {
     }
   });
 
+  // -- View State --
+  const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
   const [activeTab, setActiveTab] = useState<'clients' | 'vales'>('clients');
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
+  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthString());
   
   // Modals State
   const [isClientModalOpen, setClientModalOpen] = useState(false);
@@ -126,7 +138,7 @@ const App: React.FC = () => {
     };
   }, [userProfile]);
 
-  // -- Filtering --
+  // -- Filtering (Only for Daily View) --
   const filteredClients = useMemo(() => {
     const filtered = clients.filter(client => {
       if (!client.timestamp) return false;
@@ -182,10 +194,7 @@ const App: React.FC = () => {
   };
 
   const handleSubscribe = (codeInput: string): boolean => {
-    // Verifica o código inserido (remove espaços e deixa maiúsculo)
     const cleanCode = codeInput.trim().toUpperCase();
-    
-    // Códigos de validação (Pode ser o padrão ou o seu nome de adm)
     if (cleanCode === ACTIVATION_CODE || cleanCode === "LEANDRO" || cleanCode === "VITALICIO") {
        if (userProfile) {
          setUserProfile({ ...userProfile, isPro: true });
@@ -264,7 +273,6 @@ const App: React.FC = () => {
   
   const handleLogout = () => {
     if(window.confirm("Deseja sair? Isso irá manter seus dados, mas pedirá login novamente.")) {
-       // We don't delete data, just the session profile
        setUserProfile(null);
     }
   }
@@ -334,239 +342,265 @@ const App: React.FC = () => {
 
       <main className="max-w-6xl mx-auto px-4 pt-6 relative z-20">
         
-        {/* Actions & Date Filter Toolbar */}
-        <div className="flex flex-col lg:flex-row gap-4 mb-6 justify-between items-start lg:items-center">
-          <div className="flex gap-2 flex-wrap w-full lg:w-auto">
-            <button 
-              onClick={handleOpenAddClient}
-              className="flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
-            >
-              <Plus size={18} /> <span className="hidden sm:inline">Novo</span> Atendimento
-            </button>
-            <button 
-              onClick={() => setValeModalOpen(true)}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95"
-            >
-              <MinusCircle size={18} /> Vale
-            </button>
-             <button 
-              onClick={() => setSettingsModalOpen(true)}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors"
-              title="Configurações"
-            >
-              <Settings size={18} />
-            </button>
-          </div>
-
-          <div className="flex gap-3 w-full lg:w-auto lg:justify-end">
-            <div className="relative flex-grow lg:flex-grow-0">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                    <Calendar size={16} />
-                </div>
-                <input 
-                    type="date" 
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent block pl-10 p-2.5 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert transition-all"
-                />
+        {/* Toolbar (Conditional based on View Mode) */}
+        {viewMode === 'daily' && (
+          <div className="flex flex-col lg:flex-row gap-4 mb-6 justify-between items-start lg:items-center animate-slide-in">
+            <div className="flex gap-2 flex-wrap w-full lg:w-auto">
+              <button 
+                onClick={handleOpenAddClient}
+                className="flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
+              >
+                <Plus size={18} /> <span className="hidden sm:inline">Novo</span> Atendimento
+              </button>
+              <button 
+                onClick={() => setValeModalOpen(true)}
+                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95"
+              >
+                <MinusCircle size={18} /> Vale
+              </button>
+              <button 
+                onClick={() => setSettingsModalOpen(true)}
+                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors"
+                title="Configurações"
+              >
+                <Settings size={18} />
+              </button>
             </div>
-            
-            <button 
-              onClick={handleDownloadReport}
-              className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 text-white px-4 py-2.5 rounded-xl border border-gray-700 font-medium transition-colors"
-              title="Baixar Relatório"
-            >
-              <Download size={18} />
-            </button>
+
+            <div className="flex gap-3 w-full lg:w-auto lg:justify-end">
+              
+              {/* View Switcher Button */}
+              <button 
+                onClick={() => setViewMode('monthly')}
+                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-blue-400 px-4 py-2.5 rounded-xl font-medium transition-colors"
+                title="Ver Resumo Mensal"
+              >
+                <BarChart3 size={18} /> <span className="hidden sm:inline">Relatório Mensal</span>
+              </button>
+
+              <div className="relative flex-grow lg:flex-grow-0">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                      <Calendar size={16} />
+                  </div>
+                  <input 
+                      type="date" 
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent block pl-10 p-2.5 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert transition-all"
+                  />
+              </div>
+              
+              <button 
+                onClick={handleDownloadReport}
+                className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 text-white px-4 py-2.5 rounded-xl border border-gray-700 font-medium transition-colors"
+                title="Baixar Relatório do Dia"
+              >
+                <Download size={18} />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Dashboard Stats - Modern Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <StatsCard 
-            title="Atendimentos" 
-            value={stats.totalClients.toString()} 
-            icon={<Users size={20} />} 
-            colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700"
+        {viewMode === 'monthly' ? (
+          <MonthlySummary 
+            clients={clients}
+            vales={vales}
+            settings={settings}
+            onBack={() => setViewMode('daily')}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
           />
-          <StatsCard 
-            title="Faturamento" 
-            value={formatCurrency(stats.totalSales)} 
-            icon={<DollarSign size={20} />} 
-            colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700 text-green-400"
-          />
-          <StatsCard 
-            title="Sua Comissão" 
-            value={formatCurrency(stats.netCommission)} 
-            subtitle={`- ${formatCurrency(stats.totalVales)} em vales`}
-            icon={<TrendingUp size={20} />} 
-            colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gold-500/30 text-gold-500 relative overflow-hidden"
-          />
-        </div>
+        ) : (
+          /* Standard Daily View */
+          <div className="animate-slide-in">
+            {/* Dashboard Stats - Modern Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <StatsCard 
+                title="Atendimentos" 
+                value={stats.totalClients.toString()} 
+                icon={<Users size={20} />} 
+                colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700"
+              />
+              <StatsCard 
+                title="Faturamento" 
+                value={formatCurrency(stats.totalSales)} 
+                icon={<DollarSign size={20} />} 
+                colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700 text-green-400"
+              />
+              <StatsCard 
+                title="Sua Comissão" 
+                value={formatCurrency(stats.netCommission)} 
+                subtitle={`- ${formatCurrency(stats.totalVales)} em vales`}
+                icon={<TrendingUp size={20} />} 
+                colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gold-500/30 text-gold-500 relative overflow-hidden"
+              />
+            </div>
 
-        {/* List Section */}
-        <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-700 bg-gray-900/50">
-            <button
-              onClick={() => setActiveTab('clients')}
-              className={`flex-1 py-4 text-sm md:text-base font-semibold transition-all relative ${
-                activeTab === 'clients' 
-                  ? 'text-white' 
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              Clientes
-              {activeTab === 'clients' && (
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_-2px_10px_rgba(245,158,11,0.5)]"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('vales')}
-              className={`flex-1 py-4 text-sm md:text-base font-semibold transition-all relative ${
-                activeTab === 'vales' 
-                  ? 'text-white' 
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              Vales
-              {activeTab === 'vales' && (
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-500 shadow-[0_-2px_10px_rgba(239,68,68,0.5)]"></div>
-              )}
-            </button>
-          </div>
+            {/* List Section */}
+            <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
+              {/* Tabs */}
+              <div className="flex border-b border-gray-700 bg-gray-900/50">
+                <button
+                  onClick={() => setActiveTab('clients')}
+                  className={`flex-1 py-4 text-sm md:text-base font-semibold transition-all relative ${
+                    activeTab === 'clients' 
+                      ? 'text-white' 
+                      : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  Clientes
+                  {activeTab === 'clients' && (
+                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_-2px_10px_rgba(245,158,11,0.5)]"></div>
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('vales')}
+                  className={`flex-1 py-4 text-sm md:text-base font-semibold transition-all relative ${
+                    activeTab === 'vales' 
+                      ? 'text-white' 
+                      : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  Vales
+                  {activeTab === 'vales' && (
+                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-500 shadow-[0_-2px_10px_rgba(239,68,68,0.5)]"></div>
+                  )}
+                </button>
+              </div>
 
-          {/* Content Area */}
-          <div className="min-h-[300px]">
-            {activeTab === 'clients' ? (
-              <div className="overflow-x-auto">
-                {filteredClients.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                    <Users size={48} className="mb-4 opacity-20" />
-                    <p className="text-sm">Nenhum atendimento em {selectedDate.split('-').reverse().join('/')}.</p>
+              {/* Content Area */}
+              <div className="min-h-[300px]">
+                {activeTab === 'clients' ? (
+                  <div className="overflow-x-auto">
+                    {filteredClients.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                        <Users size={48} className="mb-4 opacity-20" />
+                        <p className="text-sm">Nenhum atendimento em {selectedDate.split('-').reverse().join('/')}.</p>
+                      </div>
+                    ) : (
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
+                            <th className="p-4 font-medium rounded-tl-lg">Hora</th>
+                            <th className="p-4 font-medium">Cliente</th>
+                            <th className="p-4 font-medium hidden md:table-cell">Tipo</th>
+                            <th className="p-4 font-medium hidden md:table-cell">Barbeiro</th>
+                            <th className="p-4 font-medium">Serviço</th>
+                            <th className="p-4 font-medium text-right">Valor</th>
+                            <th className="p-4 font-medium w-24 rounded-tr-lg"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-700/50">
+                          {filteredClients.map((client) => (
+                            <tr 
+                              key={client.id} 
+                              className="hover:bg-gray-700/30 transition-colors group"
+                            >
+                              <td className="p-4 text-gray-400 font-mono text-sm">{formatTime(client.timestamp)}</td>
+                              <td className="p-4 font-medium text-white">
+                                {client.name}
+                                {/* Mobile only Type */}
+                                <div className="md:hidden mt-1">
+                                  <span className={`text-[10px] font-bold uppercase tracking-wide
+                                        ${client.clientType === ClientType.NEW ? 'text-green-400' : 'text-gold-500'}
+                                    `}>
+                                        {client.clientType === ClientType.NEW ? 'Novo' : 'Casa'}
+                                    </span>
+                                </div>
+                              </td>
+                              <td className="p-4 hidden md:table-cell">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border
+                                    ${client.clientType === ClientType.NEW 
+                                        ? 'bg-green-900/20 text-green-400 border-green-500/30' 
+                                        : 'bg-gold-500/10 text-gold-500 border-gold-500/20'}
+                                `}>
+                                    {client.clientType}
+                                </span>
+                              </td>
+                              <td className="p-4 text-gray-300 hidden md:table-cell">{client.barberName}</td>
+                              <td className="p-4">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
+                                  ${client.serviceType === ServiceType.CUT ? 'bg-blue-900/20 text-blue-400 border-blue-800/50' : ''}
+                                  ${client.serviceType === ServiceType.COMBO ? 'bg-purple-900/20 text-purple-400 border-purple-800/50' : ''}
+                                  ${client.serviceType === ServiceType.OTHER ? 'bg-gray-700/50 text-gray-300 border-gray-600/50' : ''}
+                                `}>
+                                  {client.serviceType}
+                                </span>
+                                {client.extraValue > 0 && (
+                                    <span className="ml-2 text-xs text-gray-500 block sm:inline mt-1 sm:mt-0">+ R$ {client.extraValue}</span>
+                                )}
+                              </td>
+                              <td className="p-4 text-right font-bold text-white">{formatCurrency(client.totalValue)}</td>
+                              <td className="p-4 text-right">
+                                <div className="flex gap-1 justify-end opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button 
+                                      onClick={() => handleEditClient(client)}
+                                      className="p-2 text-gray-400 hover:text-gold-500 hover:bg-gold-500/10 rounded-lg transition-colors"
+                                    >
+                                      <Pencil size={16} />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteClient(client.id)}
+                                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 ) : (
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
-                        <th className="p-4 font-medium rounded-tl-lg">Hora</th>
-                        <th className="p-4 font-medium">Cliente</th>
-                        <th className="p-4 font-medium hidden md:table-cell">Tipo</th>
-                        <th className="p-4 font-medium hidden md:table-cell">Barbeiro</th>
-                        <th className="p-4 font-medium">Serviço</th>
-                        <th className="p-4 font-medium text-right">Valor</th>
-                        <th className="p-4 font-medium w-24 rounded-tr-lg"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700/50">
-                      {filteredClients.map((client) => (
-                        <tr 
-                          key={client.id} 
-                          className="hover:bg-gray-700/30 transition-colors group"
-                        >
-                          <td className="p-4 text-gray-400 font-mono text-sm">{formatTime(client.timestamp)}</td>
-                          <td className="p-4 font-medium text-white">
-                            {client.name}
-                            {/* Mobile only Type */}
-                            <div className="md:hidden mt-1">
-                               <span className={`text-[10px] font-bold uppercase tracking-wide
-                                    ${client.clientType === ClientType.NEW ? 'text-green-400' : 'text-gold-500'}
-                                `}>
-                                    {client.clientType === ClientType.NEW ? 'Novo' : 'Casa'}
-                                </span>
-                            </div>
-                          </td>
-                          <td className="p-4 hidden md:table-cell">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border
-                                ${client.clientType === ClientType.NEW 
-                                    ? 'bg-green-900/20 text-green-400 border-green-500/30' 
-                                    : 'bg-gold-500/10 text-gold-500 border-gold-500/20'}
-                            `}>
-                                {client.clientType}
-                            </span>
-                          </td>
-                          <td className="p-4 text-gray-300 hidden md:table-cell">{client.barberName}</td>
-                          <td className="p-4">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
-                              ${client.serviceType === ServiceType.CUT ? 'bg-blue-900/20 text-blue-400 border-blue-800/50' : ''}
-                              ${client.serviceType === ServiceType.COMBO ? 'bg-purple-900/20 text-purple-400 border-purple-800/50' : ''}
-                              ${client.serviceType === ServiceType.OTHER ? 'bg-gray-700/50 text-gray-300 border-gray-600/50' : ''}
-                            `}>
-                              {client.serviceType}
-                            </span>
-                            {client.extraValue > 0 && (
-                                <span className="ml-2 text-xs text-gray-500 block sm:inline mt-1 sm:mt-0">+ R$ {client.extraValue}</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-right font-bold text-white">{formatCurrency(client.totalValue)}</td>
-                          <td className="p-4 text-right">
-                             <div className="flex gap-1 justify-end opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                  // Vales Tab
+                  <div className="overflow-x-auto">
+                    {filteredVales.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                        <MinusCircle size={48} className="mb-4 opacity-20" />
+                        <p className="text-sm">Nenhum vale em {selectedDate.split('-').reverse().join('/')}.</p>
+                      </div>
+                    ) : (
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
+                            <th className="p-4 font-medium rounded-tl-lg">Hora</th>
+                            <th className="p-4 font-medium">Barbeiro</th>
+                            <th className="p-4 font-medium">Descrição</th>
+                            <th className="p-4 font-medium text-right">Valor</th>
+                            <th className="p-4 font-medium w-16 rounded-tr-lg"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-700/50">
+                          {filteredVales.map((vale) => (
+                            <tr 
+                              key={vale.id} 
+                              className="hover:bg-gray-700/30 transition-colors group"
+                            >
+                              <td className="p-4 text-gray-400 font-mono text-sm">{formatTime(vale.timestamp)}</td>
+                              <td className="p-4 font-medium text-white">{vale.barberName}</td>
+                              <td className="p-4 text-gray-300">{vale.description}</td>
+                              <td className="p-4 text-right font-bold text-red-400">- {formatCurrency(vale.value)}</td>
+                              <td className="p-4 text-right">
                                 <button 
-                                  onClick={() => handleEditClient(client)}
-                                  className="p-2 text-gray-400 hover:text-gold-500 hover:bg-gold-500/10 rounded-lg transition-colors"
-                                >
-                                  <Pencil size={16} />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteClient(client.id)}
-                                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                  onClick={() => handleDeleteVale(vale.id)}
+                                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-100 sm:opacity-0 group-hover:opacity-100"
                                 >
                                   <Trash2 size={16} />
                                 </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            ) : (
-              // Vales Tab
-              <div className="overflow-x-auto">
-                 {filteredVales.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                    <MinusCircle size={48} className="mb-4 opacity-20" />
-                    <p className="text-sm">Nenhum vale em {selectedDate.split('-').reverse().join('/')}.</p>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
-                ) : (
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
-                        <th className="p-4 font-medium rounded-tl-lg">Hora</th>
-                        <th className="p-4 font-medium">Barbeiro</th>
-                        <th className="p-4 font-medium">Descrição</th>
-                        <th className="p-4 font-medium text-right">Valor</th>
-                        <th className="p-4 font-medium w-16 rounded-tr-lg"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700/50">
-                      {filteredVales.map((vale) => (
-                        <tr 
-                          key={vale.id} 
-                          className="hover:bg-gray-700/30 transition-colors group"
-                        >
-                          <td className="p-4 text-gray-400 font-mono text-sm">{formatTime(vale.timestamp)}</td>
-                          <td className="p-4 font-medium text-white">{vale.barberName}</td>
-                          <td className="p-4 text-gray-300">{vale.description}</td>
-                          <td className="p-4 text-right font-bold text-red-400">- {formatCurrency(vale.value)}</td>
-                          <td className="p-4 text-right">
-                            <button 
-                              onClick={() => handleDeleteVale(vale.id)}
-                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-100 sm:opacity-0 group-hover:opacity-100"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Footer Credit */}
