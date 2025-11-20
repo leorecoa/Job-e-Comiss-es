@@ -110,7 +110,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                     onClick={onSubscribeClick}
                     className="flex items-center gap-1 bg-gold-500 hover:bg-gold-600 text-black text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-lg shadow-gold-500/20 animate-pulse"
                 >
-                    <Crown size={14} /> ATIVE AGORA
+                    <Crown size={14} /> ASSINE AGORA
                 </button>
             )}
 

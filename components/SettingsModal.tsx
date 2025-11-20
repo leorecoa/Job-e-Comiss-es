@@ -54,7 +54,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                    <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Status do Plano</p>
                    <p className={`font-bold ${isPro ? 'text-gold-500' : 'text-white'}`}>
-                      {isPro ? 'Vitalício PRO' : 'Versão de Teste'}
+                      {isPro ? 'Assinatura PRO Ativa' : 'Versão de Teste'}
                    </p>
                 </div>
                 {isPro ? (
@@ -65,7 +65,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         onClick={() => { onClose(); onSubscribe(); }}
                         className="bg-gold-500 hover:bg-gold-600 text-black text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-gold-500/20 animate-pulse"
                     >
-                        ATIVAR AGORA
+                        ASSINAR AGORA
                     </button>
                 )}
              </div>

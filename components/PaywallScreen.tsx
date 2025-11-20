@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { CheckCircle, Lock, Copy, Check } from 'lucide-react';
 
@@ -45,7 +44,7 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
           
           <h2 className="text-2xl font-display font-bold text-white mb-2">Período de Teste Encerrado</h2>
           <p className="text-gray-400 text-sm mb-6">
-            Sua avaliação de 7 dias acabou. Para continuar usando o sistema profissionalmente, realize o pagamento único.
+            Sua avaliação de 7 dias acabou. Para continuar usando o sistema profissionalmente, assine o plano mensal.
           </p>
 
           {/* Área do PIX */}
@@ -77,7 +76,7 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
 
             <div className="border-t border-gray-700 pt-3">
               <p className="text-xs text-gray-300 text-center">
-                Valor: <span className="text-white font-bold">R$ 29,90</span> <span className="text-gray-500">(Acesso Vitalício)</span>
+                Valor: <span className="text-white font-bold">R$ 29,90</span> <span className="text-gray-500">/ mês</span>
               </p>
             </div>
           </div>
@@ -85,14 +84,14 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
           {/* Área de Desbloqueio */}
           <div className="space-y-3">
             <label className="block text-left text-sm font-medium text-gray-300">
-              Já fez o PIX? Digite o código de liberação:
+              Já fez o PIX? Digite o código de liberação mensal:
             </label>
             <div className="flex gap-2">
               <input 
                 type="text" 
                 value={activationCode}
                 onChange={(e) => setActivationCode(e.target.value.toUpperCase())}
-                placeholder="CÓDIGO RECEBIDO"
+                placeholder="CÓDIGO MENSAL"
                 className="flex-1 bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-gold-500 outline-none uppercase tracking-widest font-mono text-center"
               />
             </div>
@@ -108,7 +107,7 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
           </div>
 
           <p className="text-[10px] text-gray-600 mt-6">
-            Após o pagamento, envie o comprovante para receber seu código.
+            Após o pagamento, envie o comprovante para receber seu código mensal.
           </p>
         </div>
       </div>

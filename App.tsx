@@ -44,7 +44,8 @@ const getCurrentMonthString = () => {
 };
 
 const TRIAL_DAYS = 7;
-const ACTIVATION_CODE = "LIBERADO"; // Código que você passará para os clientes
+// Códigos aceitos para ativar a assinatura
+const ACCEPTED_CODES = ["LIBERADO", "MENSAL", "PRO", "VIP", "LEANDRO"]; 
 
 const App: React.FC = () => {
   // -- Auth & Profile State --
@@ -141,6 +142,11 @@ const App: React.FC = () => {
     };
   }, [userProfile]);
 
+  // Helper para verificar se é o ADMIN
+  const isAdmin = useMemo(() => {
+    return userProfile?.email === 'leandro@admin';
+  }, [userProfile]);
+
   // -- Filtering (Only for Daily View) --
   const filteredClients = useMemo(() => {
     const filtered = clients.filter(client => {
@@ -198,7 +204,7 @@ const App: React.FC = () => {
 
   const handleSubscribe = (codeInput: string): boolean => {
     const cleanCode = codeInput.trim().toUpperCase();
-    if (cleanCode === ACTIVATION_CODE || cleanCode === "LEANDRO" || cleanCode === "VITALICIO") {
+    if (ACCEPTED_CODES.includes(cleanCode)) {
        if (userProfile) {
          setUserProfile({ ...userProfile, isPro: true });
          return true;
@@ -312,7 +318,8 @@ const App: React.FC = () => {
                     </h1>
                     {userProfile.isPro ? (
                         <span className="flex items-center gap-1 text-[10px] text-gold-500 font-bold uppercase tracking-wider">
-                            <Crown size={10} fill="currentColor" /> Vitalício PRO
+                            <Crown size={10} fill="currentColor" /> 
+                            {isAdmin ? 'Admin Vitalício' : 'Assinatura PRO'}
                         </span>
                     ) : (
                         <span className="text-[10px] bg-gray-800 text-gold-500 px-1.5 py-0.5 rounded border border-gold-500/30">
@@ -328,7 +335,7 @@ const App: React.FC = () => {
                    onClick={() => setSubscriptionModalOpen(true)}
                    className="md:hidden bg-gold-500 text-black text-[10px] font-bold px-2 py-1.5 rounded-lg flex items-center gap-1 animate-pulse"
                  >
-                    <Crown size={12} /> ATIVAR
+                    <Crown size={12} /> ASSINAR
                  </button>
                )}
             </div>
@@ -342,7 +349,7 @@ const App: React.FC = () => {
                    onClick={() => setSubscriptionModalOpen(true)}
                    className="hidden md:flex items-center gap-2 bg-gradient-to-r from-gold-400 to-gold-600 hover:from-gold-500 hover:to-gold-700 text-black px-4 py-2 rounded-xl font-bold shadow-lg shadow-gold-500/20 transition-all transform hover:scale-105"
                  >
-                    <Crown size={18} /> Ative Agora
+                    <Crown size={18} /> Assinar Agora
                  </button>
               )}
 
@@ -399,7 +406,7 @@ const App: React.FC = () => {
                     onClick={() => setSubscriptionModalOpen(true)}
                     className="lg:hidden flex-1 flex items-center justify-center gap-1 bg-gold-500/20 border border-gold-500/50 text-gold-500 px-3 py-2.5 rounded-xl font-bold text-xs"
                   >
-                    <Crown size={14} /> ATIVAR PRO
+                    <Crown size={14} /> ASSINAR
                   </button>
               )}
 
@@ -642,7 +649,11 @@ const App: React.FC = () => {
       {/* Footer Credit */}
       <footer className="text-center text-gray-600 text-xs py-8 mt-8">
          <p>Barbearia Pro System &copy; {new Date().getFullYear()}</p>
-         {userProfile.isPro && <span className="text-gold-500/50 text-[10px] mt-1 block">Licença PRO Ativa</span>}
+         {userProfile.isPro && (
+           <span className="text-gold-500/50 text-[10px] mt-1 block">
+             {isAdmin ? 'Licença ADMIN' : 'Assinatura Ativa'}
+           </span>
+         )}
       </footer>
 
       {/* Modals */}
