@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Client, Vale, AppSettings } from '../types';
 import { formatCurrency } from '../utils';
 import { StatsCard } from './StatsCard';
-import { ArrowLeft, DollarSign, TrendingUp, Calendar, MinusCircle, Crown } from 'lucide-react';
+import { ArrowLeft, DollarSign, TrendingUp, Calendar, MinusCircle, Crown, Users } from 'lucide-react';
 
 interface MonthlySummaryProps {
   clients: Client[];
@@ -51,31 +51,52 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
 
     // Agrupar por dia
     const daysMap: Record<string, { sales: number; commission: number; vales: number; count: number }> = {};
+    // Agrupar por Barbeiro (Para VIP/Equipe)
+    const barbersMap: Record<string, { sales: number; commission: number; vales: number; count: number }> = {};
 
+    // Processar Clientes
     filteredClients.forEach(c => {
+      // Por dia
       const dayKey = new Date(c.timestamp).toLocaleDateString('pt-BR');
       if (!daysMap[dayKey]) daysMap[dayKey] = { sales: 0, commission: 0, vales: 0, count: 0 };
-      
       daysMap[dayKey].sales += c.totalValue;
       daysMap[dayKey].commission += (c.totalValue * (settings.commissionRate / 100));
       daysMap[dayKey].count += 1;
+
+      // Por Barbeiro
+      const barberName = c.barberName || 'Desconhecido';
+      if (!barbersMap[barberName]) barbersMap[barberName] = { sales: 0, commission: 0, vales: 0, count: 0 };
+      barbersMap[barberName].sales += c.totalValue;
+      barbersMap[barberName].commission += (c.totalValue * (settings.commissionRate / 100));
+      barbersMap[barberName].count += 1;
     });
 
+    // Processar Vales
     filteredVales.forEach(v => {
+      // Por dia
       const dayKey = new Date(v.timestamp).toLocaleDateString('pt-BR');
       if (!daysMap[dayKey]) daysMap[dayKey] = { sales: 0, commission: 0, vales: 0, count: 0 };
       daysMap[dayKey].vales += v.value;
+
+      // Por Barbeiro
+      const barberName = v.barberName || 'Desconhecido';
+      if (!barbersMap[barberName]) barbersMap[barberName] = { sales: 0, commission: 0, vales: 0, count: 0 };
+      barbersMap[barberName].vales += v.value;
     });
 
-    // Converter para array e ordenar
+    // Converter para array e ordenar (Dias)
     const dailyBreakdown = Object.entries(daysMap)
       .map(([date, data]) => ({ date, ...data }))
       .sort((a, b) => {
-        // Converter dd/mm/yyyy para comparação
         const [da, ma, ya] = a.date.split('/').map(Number);
         const [db, mb, yb] = b.date.split('/').map(Number);
-        return new Date(yb, mb - 1, db).getTime() - new Date(ya, ma - 1, da).getTime(); // Mais recente primeiro
+        return new Date(yb, mb - 1, db).getTime() - new Date(ya, ma - 1, da).getTime(); 
       });
+
+    // Converter para array (Barbeiros)
+    const teamBreakdown = Object.entries(barbersMap)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.sales - a.sales); // Quem vendeu mais primeiro
 
     return {
       totalSales,
@@ -83,7 +104,8 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
       totalVales,
       netCommission,
       totalClients: filteredClients.length,
-      dailyBreakdown
+      dailyBreakdown,
+      teamBreakdown
     };
   }, [clients, vales, selectedMonth, settings.commissionRate]);
 
@@ -128,7 +150,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
         </div>
       </div>
 
-      {/* Cards Totais */}
+      {/* Cards Totais (Loja Inteira) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatsCard 
           title="Faturamento Total" 
@@ -144,20 +166,62 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
           colorClass="bg-gradient-to-br from-red-900/40 to-gray-800 border-red-500/30 text-red-400"
         />
         <StatsCard 
-          title="Líquido no Bolso" 
+          title="Comissões a Pagar" 
           value={formatCurrency(monthlyData.netCommission)} 
-          subtitle="Comissão - Vales"
+          subtitle="Total líquido da equipe"
           icon={<TrendingUp size={20} />} 
           colorClass="bg-gradient-to-br from-gold-500/20 to-gray-800 border-gold-500/50 text-gold-500"
         />
       </div>
 
+      {/* TABELA DE EQUIPE (Somente se houver dados de equipe ou múltiplos nomes) */}
+      {monthlyData.teamBreakdown.length > 0 && (
+         <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
+            <div className="p-4 border-b border-gray-700 bg-gray-900/50 flex justify-between items-center">
+                <h3 className="font-bold text-white flex items-center gap-2">
+                    <Users size={18} className="text-blue-400"/>
+                    Desempenho da Equipe
+                </h3>
+                <span className="text-[10px] text-gray-500 bg-gray-800 px-2 py-1 rounded border border-gray-700">
+                    Taxa Base: {settings.commissionRate}%
+                </span>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                <thead>
+                    <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
+                    <th className="p-4 font-medium">Barbeiro</th>
+                    <th className="p-4 font-medium text-center">Cortes</th>
+                    <th className="p-4 font-medium text-right text-blue-400">Vendas</th>
+                    <th className="p-4 font-medium text-right text-red-400">Vales</th>
+                    <th className="p-4 font-medium text-right text-gold-500">A Receber (Líq)</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700/50">
+                    {monthlyData.teamBreakdown.map((barber) => {
+                        const net = barber.commission - barber.vales;
+                        return (
+                            <tr key={barber.name} className="hover:bg-gray-700/30 transition-colors">
+                                <td className="p-4 text-white font-bold">{barber.name}</td>
+                                <td className="p-4 text-center text-gray-300">{barber.count}</td>
+                                <td className="p-4 text-right text-gray-300">{formatCurrency(barber.sales)}</td>
+                                <td className="p-4 text-right text-red-300">{barber.vales > 0 ? `- ${formatCurrency(barber.vales)}` : '-'}</td>
+                                <td className="p-4 text-right font-bold text-gold-500 text-lg">{formatCurrency(net)}</td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+                </table>
+            </div>
+         </div>
+      )}
+
       {/* Tabela Detalhada por Dia */}
       <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
         <div className="p-4 border-b border-gray-700 bg-gray-900/50">
           <h3 className="font-bold text-white flex items-center gap-2">
-            <Calendar size={18} className="text-gold-500"/>
-            Detalhamento Diário
+            <Calendar size={18} className="text-gray-400"/>
+            Histórico Diário (Loja)
           </h3>
         </div>
         
@@ -172,21 +236,18 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                 <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
                   <th className="p-4 font-medium">Data</th>
                   <th className="p-4 font-medium text-center">Atend.</th>
-                  <th className="p-4 font-medium text-right text-blue-400">Faturamento</th>
-                  <th className="p-4 font-medium text-right text-red-400">Vales</th>
-                  <th className="p-4 font-medium text-right text-gold-500">Comissão Líq.</th>
+                  <th className="p-4 font-medium text-right text-gray-300">Faturamento</th>
+                  <th className="p-4 font-medium text-right text-gray-400">Vales</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/50">
                 {monthlyData.dailyBreakdown.map((day) => {
-                    const net = day.commission - day.vales;
                     return (
                         <tr key={day.date} className="hover:bg-gray-700/30 transition-colors">
-                        <td className="p-4 text-white font-medium">{day.date}</td>
-                        <td className="p-4 text-center text-gray-300">{day.count}</td>
-                        <td className="p-4 text-right text-gray-300">{formatCurrency(day.sales)}</td>
-                        <td className="p-4 text-right text-gray-300">{day.vales > 0 ? `- ${formatCurrency(day.vales)}` : '-'}</td>
-                        <td className="p-4 text-right font-bold text-gold-500">{formatCurrency(net)}</td>
+                            <td className="p-4 text-white font-medium">{day.date}</td>
+                            <td className="p-4 text-center text-gray-300">{day.count}</td>
+                            <td className="p-4 text-right text-gray-300">{formatCurrency(day.sales)}</td>
+                            <td className="p-4 text-right text-gray-400">{day.vales > 0 ? `- ${formatCurrency(day.vales)}` : '-'}</td>
                         </tr>
                     );
                 })}

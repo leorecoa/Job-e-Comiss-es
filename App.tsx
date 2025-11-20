@@ -29,7 +29,8 @@ import {
   Sparkles,
   UsersRound,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Filter
 } from 'lucide-react';
 
 const getTodayString = () => {
@@ -107,6 +108,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'clients' | 'vales'>('clients');
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthString());
+  const [selectedBarberFilter, setSelectedBarberFilter] = useState<string>('TODOS');
   
   // Modals State
   const [isClientModalOpen, setClientModalOpen] = useState(false);
@@ -169,35 +171,45 @@ const App: React.FC = () => {
   // -- Filtering (Only for Daily View) --
   const filteredClients = useMemo(() => {
     const filtered = clients.filter(client => {
+      // Date Filter
       if (!client.timestamp) return false;
       const d = new Date(client.timestamp);
       if (isNaN(d.getTime())) return false;
-
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
-      return dateString === selectedDate;
+      if (dateString !== selectedDate) return false;
+
+      // Barber Filter
+      if (selectedBarberFilter !== 'TODOS' && client.barberName !== selectedBarberFilter) return false;
+
+      return true;
     });
     // Sort by timestamp descending (Newest/Latest first)
     return filtered.sort((a, b) => b.timestamp - a.timestamp);
-  }, [clients, selectedDate]);
+  }, [clients, selectedDate, selectedBarberFilter]);
 
   const filteredVales = useMemo(() => {
     const filtered = vales.filter(vale => {
+      // Date Filter
       if (!vale.timestamp) return false;
       const d = new Date(vale.timestamp);
       if (isNaN(d.getTime())) return false;
-
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
-      return dateString === selectedDate;
+      if (dateString !== selectedDate) return false;
+
+      // Barber Filter
+      if (selectedBarberFilter !== 'TODOS' && vale.barberName !== selectedBarberFilter) return false;
+
+      return true;
     });
     // Sort by timestamp descending
     return filtered.sort((a, b) => b.timestamp - a.timestamp);
-  }, [vales, selectedDate]);
+  }, [vales, selectedDate, selectedBarberFilter]);
 
   // -- Calculations --
   const stats = useMemo(() => {
@@ -429,69 +441,88 @@ const App: React.FC = () => {
         
         {/* Toolbar (Conditional based on View Mode) */}
         {viewMode === 'daily' && (
-          <div className="flex flex-col lg:flex-row gap-4 mb-6 justify-between items-start lg:items-center animate-slide-in">
-            <div className="flex gap-2 flex-wrap w-full lg:w-auto">
-              <button 
-                onClick={handleOpenAddClient}
-                className="hidden md:flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
-              >
-                <Plus size={18} /> <span className="hidden sm:inline">Novo</span> Atendimento
-              </button>
-              <button 
-                onClick={() => setValeModalOpen(true)}
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95"
-              >
-                <MinusCircle size={18} /> <span className="hidden xs:inline">Vale</span>
-              </button>
-              <button 
-                onClick={() => setSettingsModalOpen(true)}
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors"
-                title="Configurações"
-              >
-                <Settings size={18} />
-              </button>
-            </div>
+          <div className="flex flex-col gap-4 mb-6 animate-slide-in">
+            
+            {/* Top Row Controls */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div className="flex gap-2 flex-wrap w-full lg:w-auto">
+                    <button 
+                        onClick={handleOpenAddClient}
+                        className="hidden md:flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
+                    >
+                        <Plus size={18} /> <span className="hidden sm:inline">Novo</span> Atendimento
+                    </button>
+                    <button 
+                        onClick={() => setValeModalOpen(true)}
+                        className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95"
+                    >
+                        <MinusCircle size={18} /> <span className="hidden xs:inline">Vale</span>
+                    </button>
+                    <button 
+                        onClick={() => setSettingsModalOpen(true)}
+                        className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors"
+                        title="Configurações"
+                    >
+                        <Settings size={18} />
+                    </button>
 
-            <div className="flex flex-wrap gap-3 w-full lg:w-auto lg:justify-end items-center">
-              
-              {/* View Switcher Button */}
-              <button 
-                onClick={() => setViewMode('monthly')}
-                className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-blue-400 px-4 py-2.5 rounded-xl font-medium transition-colors"
-                title="Ver Resumo Mensal"
-              >
-                <BarChart3 size={18} /> <span className="hidden sm:inline">Mensal</span>
-              </button>
+                    {/* Barber Filter (VIP Only) */}
+                    {(isVip && settings.barbers && settings.barbers.length > 0) && (
+                        <div className="flex items-center bg-gray-800 rounded-xl border border-gray-700 px-3 relative">
+                            <Filter size={16} className="text-gray-400 mr-2" />
+                            <select
+                                value={selectedBarberFilter}
+                                onChange={(e) => setSelectedBarberFilter(e.target.value)}
+                                className="bg-transparent text-white text-sm py-2.5 outline-none appearance-none pr-6"
+                            >
+                                <option value="TODOS">Todos da Equipe</option>
+                                {settings.barbers.map(b => (
+                                    <option key={b} value={b}>{b}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
 
-              {/* Date Navigation */}
-              <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5">
-                <button 
-                    onClick={() => changeDate(-1)}
-                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                >
-                    <ChevronLeft size={20} />
-                </button>
-                <input 
-                    type="date" 
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="bg-transparent border-none text-white text-sm font-medium focus:ring-0 text-center w-32 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
-                />
-                <button 
-                    onClick={() => changeDate(1)}
-                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                >
-                    <ChevronRight size={20} />
-                </button>
-              </div>
-              
-              <button 
-                onClick={handleDownloadReport}
-                className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 text-white px-4 py-2.5 rounded-xl border border-gray-700 font-medium transition-colors"
-                title="Baixar Relatório do Dia"
-              >
-                <Download size={18} />
-              </button>
+                <div className="flex flex-wrap gap-3 w-full lg:w-auto lg:justify-end items-center">
+                    <button 
+                        onClick={() => setViewMode('monthly')}
+                        className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-blue-400 px-4 py-2.5 rounded-xl font-medium transition-colors"
+                        title="Ver Resumo Mensal"
+                    >
+                        <BarChart3 size={18} /> <span className="hidden sm:inline">Mensal</span>
+                    </button>
+
+                    {/* Date Navigation */}
+                    <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5">
+                        <button 
+                            onClick={() => changeDate(-1)}
+                            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
+                        <input 
+                            type="date" 
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="bg-transparent border-none text-white text-sm font-medium focus:ring-0 text-center w-32 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                        />
+                        <button 
+                            onClick={() => changeDate(1)}
+                            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                        >
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                    
+                    <button 
+                        onClick={handleDownloadReport}
+                        className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 text-white px-4 py-2.5 rounded-xl border border-gray-700 font-medium transition-colors"
+                        title="Baixar Relatório do Dia"
+                    >
+                        <Download size={18} />
+                    </button>
+                </div>
             </div>
           </div>
         )}
@@ -513,19 +544,19 @@ const App: React.FC = () => {
             {/* Dashboard Stats - Modern Layout */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <StatsCard 
-                title="Atendimentos" 
+                title={selectedBarberFilter === 'TODOS' ? "Atendimentos (Total)" : `Atendimentos (${selectedBarberFilter})`}
                 value={stats.totalClients.toString()} 
                 icon={<Users size={20} />} 
                 colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700"
               />
               <StatsCard 
-                title="Faturamento" 
+                title={selectedBarberFilter === 'TODOS' ? "Faturamento Loja" : `Vendas de ${selectedBarberFilter}`}
                 value={formatCurrency(stats.totalSales)} 
                 icon={<DollarSign size={20} />} 
                 colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700 text-green-400"
               />
               <StatsCard 
-                title="Sua Comissão" 
+                title={selectedBarberFilter === 'TODOS' ? "Comissão Total" : `A Pagar para ${selectedBarberFilter}`}
                 value={formatCurrency(stats.netCommission)} 
                 subtitle={`- ${formatCurrency(stats.totalVales)} em vales`}
                 icon={<TrendingUp size={20} />} 
@@ -574,8 +605,10 @@ const App: React.FC = () => {
                         <div className="bg-gray-800/50 p-6 rounded-full mb-4 border border-gray-700">
                              <Scissors size={48} className="text-gray-600" />
                         </div>
-                        <h3 className="text-lg font-medium text-gray-400">Nenhum corte hoje</h3>
-                        <p className="text-sm text-gray-600">Clique no botão + para iniciar</p>
+                        <h3 className="text-lg font-medium text-gray-400">Nenhum corte encontrado</h3>
+                        <p className="text-sm text-gray-600">
+                            {selectedBarberFilter !== 'TODOS' ? `Nenhum registro para ${selectedBarberFilter}` : 'Clique no botão + para iniciar'}
+                        </p>
                       </div>
                     ) : (
                       <table className="w-full text-left border-collapse">
@@ -661,7 +694,7 @@ const App: React.FC = () => {
                         <div className="bg-gray-800/50 p-6 rounded-full mb-4 border border-gray-700">
                             <MinusCircle size={48} className="text-gray-600" />
                         </div>
-                        <p className="text-sm">Nenhum vale registrado hoje.</p>
+                        <p className="text-sm">Nenhum vale encontrado.</p>
                       </div>
                     ) : (
                       <table className="w-full text-left border-collapse">
