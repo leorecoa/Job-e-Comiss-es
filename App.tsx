@@ -355,359 +355,391 @@ const App: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  {/* Top Row Controls */ }
-  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-    <div className="flex gap-2 flex-wrap w-full lg:w-auto">
-      <button
-        onClick={handleOpenAddClient}
-        className="hidden md:flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
-      >
-        <Plus size={18} /> <span className="hidden sm:inline">Novo</span> Atendimento
-      </button>
-      <button
-        onClick={() => setValeModalOpen(true)}
-        className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95"
-      >
-        <MinusCircle size={18} /> <span className="hidden xs:inline">Vale</span>
-      </button>
-      <button
-        onClick={() => setSettingsModalOpen(true)}
-        className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors"
-        title="Configurações"
-      >
-        <Settings size={18} />
-      </button>
-
-      {/* Barber Filter (VIP Only) */}
-      {(isVip && settings.barbers && settings.barbers.length > 0) && (
-        <div className="flex items-center bg-gray-800 rounded-xl border border-gray-700 px-3 relative">
-          <Filter size={16} className="text-gray-400 mr-2" />
-          <select
-            value={selectedBarberFilter}
-            onChange={(e) => setSelectedBarberFilter(e.target.value)}
-            className="bg-transparent text-white text-sm py-2.5 outline-none appearance-none pr-6"
-          >
-            <option value="TODOS">Todos da Equipe</option>
-            {settings.barbers.map(b => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
-        </div>
-      )}
-    </div>
-
-    <div className="flex flex-wrap gap-3 w-full lg:w-auto lg:justify-end items-center">
-      <button
-        onClick={() => setViewMode('monthly')}
-        className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-blue-400 px-4 py-2.5 rounded-xl font-medium transition-colors"
-        title="Ver Resumo Mensal"
-      >
-        <BarChart3 size={18} /> <span className="hidden sm:inline">Mensal</span>
-      </button>
-
-      {/* Date Navigation */}
-      <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5">
-        <button
-          onClick={() => changeDate(-1)}
-          className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="bg-transparent border-none text-white text-sm font-medium focus:ring-0 text-center w-32 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
-        />
-        <button
-          onClick={() => changeDate(1)}
-          className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-
-      <button
-        onClick={handleDownloadReport}
-        className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 text-white px-4 py-2.5 rounded-xl border border-gray-700 font-medium transition-colors"
-        title="Baixar Relatório do Dia"
-      >
-        <Download size={18} />
-      </button>
-    </div>
-  </div>
-          </div >
-        )}
-
-{
-  viewMode === 'monthly' ? (
-    <MonthlySummary
-      clients={clients}
-      vales={vales}
-      settings={settings}
-      onBack={() => setViewMode('daily')}
-      selectedMonth={selectedMonth}
-      onMonthChange={setSelectedMonth}
-      isPro={userProfile.isPro}
-      onSubscribeClick={() => setSubscriptionModalOpen(true)}
-    />
-  ) : (
-  /* Standard Daily View */
-  <div className="animate-slide-in space-y-6">
-    {/* Dashboard Stats - Modern Layout */}
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <StatsCard
-        title={selectedBarberFilter === 'TODOS' ? "Atendimentos (Total)" : `Atendimentos (${selectedBarberFilter})`}
-        value={stats.totalClients.toString()}
-        icon={<Users size={20} />}
-        colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700"
-      />
-      <StatsCard
-        title={selectedBarberFilter === 'TODOS' ? "Faturamento Loja" : `Vendas de ${selectedBarberFilter}`}
-        value={formatCurrency(stats.totalSales)}
-        icon={<DollarSign size={20} />}
-        colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700 text-green-400"
-      />
-      <StatsCard
-        title={selectedBarberFilter === 'TODOS' ? "Comissão Total" : `A Pagar para ${selectedBarberFilter}`}
-        value={formatCurrency(stats.netCommission)}
-        subtitle={`- ${formatCurrency(stats.totalVales)} em vales`}
-        icon={<TrendingUp size={20} />}
-        colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gold-500/30 text-gold-500 relative overflow-hidden"
-      />
-    </div>
-
-    {/* List Section */}
-    <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
-      {/* Tabs */}
-      <div className="flex border-b border-gray-700 bg-gray-900/50">
-        <button
-          onClick={() => setActiveTab('clients')}
-          className={`flex-1 py-4 text-sm md:text-base font-semibold transition-all relative ${activeTab === 'clients'
-              ? 'text-white'
-              : 'text-gray-500 hover:text-gray-300'
-            }`}
-        >
-          Clientes
-          {activeTab === 'clients' && (
-            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_-2px_10px_rgba(245,158,11,0.5)]"></div>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('vales')}
-          className={`flex-1 py-4 text-sm md:text-base font-semibold transition-all relative ${activeTab === 'vales'
-              ? 'text-white'
-              : 'text-gray-500 hover:text-gray-300'
-            }`}
-        >
-          Vales
-          {activeTab === 'vales' && (
-            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-500 shadow-[0_-2px_10px_rgba(239,68,68,0.5)]"></div>
-          )}
-        </button>
-      </div>
-
-      {/* Content Area */}
-      <div className="min-h-[300px] bg-gray-900/30">
-        {activeTab === 'clients' ? (
-          <div className="overflow-x-auto">
-            {filteredClients.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                <div className="bg-gray-800/50 p-6 rounded-full mb-4 border border-gray-700">
-                  <Scissors size={48} className="text-gray-600" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-400">Nenhum corte encontrado</h3>
-                <p className="text-sm text-gray-600">
-                  {selectedBarberFilter !== 'TODOS' ? `Nenhum registro para ${selectedBarberFilter}` : 'Clique no botão + para iniciar'}
-                </p>
+  return (
+    <div className="min-h-screen bg-gray-950 text-gray-100 font-sans selection:bg-gold-500/30 selection:text-gold-200 pb-20 md:pb-0">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/5 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-center h-auto md:h-20 py-4 md:py-0 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-to-br from-gold-400 to-gold-600 p-2 rounded-lg shadow-glow">
+                <Scissors size={24} className="text-black" />
               </div>
+              <div>
+                <h1 className="text-2xl font-bold font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                  {settings.shopName || 'Barber Pro'}
+                </h1>
+                <p className="text-xs text-gold-500 font-medium tracking-wider uppercase">Gestão Premium</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="hidden md:block text-right">
+                <p className="text-sm text-gray-300">Olá, <span className="text-white font-bold">{userProfile.email.split('@')[0]}</span></p>
+                <p className="text-xs text-gray-500">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+              </div>
+
+              <button
+                onClick={() => setSubscriptionModalOpen(true)}
+                className="hidden md:flex items-center gap-2 bg-gradient-to-r from-gold-400 to-gold-600 hover:from-gold-300 hover:to-gold-500 text-black px-5 py-2 rounded-full font-bold shadow-glow hover:shadow-glow-lg transition-all transform hover:-translate-y-0.5"
+              >
+                <Crown size={18} /> Assinar Agora
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                title="Sair"
+              >
+                <LogOut size={20} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 md:pt-24 relative z-10 space-y-8">
+        {/* Top Row Controls */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="flex gap-2 flex-wrap w-full lg:w-auto">
+            <button
+              onClick={handleOpenAddClient}
+              className="hidden md:flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
+            >
+              <Plus size={18} /> <span className="hidden sm:inline">Novo</span> Atendimento
+            </button>
+            <button
+              onClick={() => setValeModalOpen(true)}
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95"
+            >
+              <MinusCircle size={18} /> <span className="hidden xs:inline">Vale</span>
+            </button>
+            <button
+              onClick={() => setSettingsModalOpen(true)}
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors"
+              title="Configurações"
+            >
+              <Settings size={18} />
+            </button>
+
+            {/* Barber Filter (VIP Only) */}
+            {(isVip && settings.barbers && settings.barbers.length > 0) && (
+              <div className="flex items-center bg-gray-800 rounded-xl border border-gray-700 px-3 relative">
+                <Filter size={16} className="text-gray-400 mr-2" />
+                <select
+                  value={selectedBarberFilter}
+                  onChange={(e) => setSelectedBarberFilter(e.target.value)}
+                  className="bg-transparent text-white text-sm py-2.5 outline-none appearance-none pr-6"
+                >
+                  <option value="TODOS">Todos da Equipe</option>
+                  {settings.barbers.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-3 w-full lg:w-auto lg:justify-end items-center">
+            <button
+              onClick={() => setViewMode('monthly')}
+              className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-blue-400 px-4 py-2.5 rounded-xl font-medium transition-colors"
+              title="Ver Resumo Mensal"
+            >
+              <BarChart3 size={18} /> <span className="hidden sm:inline">Mensal</span>
+            </button>
+
+            {/* Date Navigation */}
+            <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5">
+              <button
+                onClick={() => changeDate(-1)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent border-none text-white text-sm font-medium focus:ring-0 text-center w-32 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+              />
+              <button
+                onClick={() => changeDate(1)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+
+            <button
+              onClick={handleDownloadReport}
+              className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 text-white px-4 py-2.5 rounded-xl border border-gray-700 font-medium transition-colors"
+              title="Baixar Relatório do Dia"
+              vales={vales}
+              settings={settings}
+              onBack={() => setViewMode('daily')}
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              isPro={userProfile.isPro}
+              onSubscribeClick={() => setSubscriptionModalOpen(true)}
+            />
             ) : (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="p-4 font-medium rounded-tl-lg">Hora</th>
-                    <th className="p-4 font-medium">Cliente</th>
-                    <th className="p-4 font-medium hidden md:table-cell">Tipo</th>
-                    <th className="p-4 font-medium hidden md:table-cell">Barbeiro</th>
-                    <th className="p-4 font-medium">Serviço</th>
-                    <th className="p-4 font-medium text-right">Valor</th>
-                    <th className="p-4 font-medium w-24 rounded-tr-lg"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700/50">
-                  {filteredClients.map((client) => (
-                    <tr
-                      key={client.id}
-                      className="hover:bg-gray-700/30 transition-colors group"
-                    >
-                      <td className="p-4 text-gray-400 font-mono text-sm">{formatTime(client.timestamp)}</td>
-                      <td className="p-4 font-medium text-white">
-                        {client.name}
-                        {/* Mobile only Type */}
-                        <div className="md:hidden mt-1">
-                          <span className={`text-[10px] font-bold uppercase tracking-wide
+            /* Standard Daily View */
+            <div className="animate-slide-in space-y-6">
+              {/* Dashboard Stats - Modern Layout */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatsCard
+                  title={selectedBarberFilter === 'TODOS' ? "Atendimentos (Total)" : `Atendimentos (${selectedBarberFilter})`}
+                  value={stats.totalClients.toString()}
+                  icon={<Users size={20} />}
+                  colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700"
+                />
+                <StatsCard
+                  title={selectedBarberFilter === 'TODOS' ? "Faturamento Loja" : `Vendas de ${selectedBarberFilter}`}
+                  value={formatCurrency(stats.totalSales)}
+                  icon={<DollarSign size={20} />}
+                  colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gray-700 text-green-400"
+                />
+                <StatsCard
+                  title={selectedBarberFilter === 'TODOS' ? "Comissão Total" : `A Pagar para ${selectedBarberFilter}`}
+                  value={formatCurrency(stats.netCommission)}
+                  subtitle={`- ${formatCurrency(stats.totalVales)} em vales`}
+                  icon={<TrendingUp size={20} />}
+                  colorClass="bg-gradient-to-br from-gray-800 to-gray-800/50 border-gold-500/30 text-gold-500 relative overflow-hidden"
+                />
+              </div>
+
+              {/* List Section */}
+              <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
+                {/* Tabs */}
+                <div className="flex border-b border-gray-700 bg-gray-900/50">
+                  <button
+                    onClick={() => setActiveTab('clients')}
+                    className={`flex-1 py-4 text-sm md:text-base font-semibold transition-all relative ${activeTab === 'clients'
+                      ? 'text-white'
+                      : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                  >
+                    Clientes
+                    {activeTab === 'clients' && (
+                      <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_-2px_10px_rgba(245,158,11,0.5)]"></div>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('vales')}
+                    className={`flex-1 py-4 text-sm md:text-base font-semibold transition-all relative ${activeTab === 'vales'
+                      ? 'text-white'
+                      : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                  >
+                    Vales
+                    {activeTab === 'vales' && (
+                      <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-500 shadow-[0_-2px_10px_rgba(239,68,68,0.5)]"></div>
+                    )}
+                  </button>
+                </div>
+
+                {/* Content Area */}
+                <div className="min-h-[300px] bg-gray-900/30">
+                  {activeTab === 'clients' ? (
+                    <div className="overflow-x-auto">
+                      {filteredClients.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                          <div className="bg-gray-800/50 p-6 rounded-full mb-4 border border-gray-700">
+                            <Scissors size={48} className="text-gray-600" />
+                          </div>
+                          <h3 className="text-lg font-medium text-gray-400">Nenhum corte encontrado</h3>
+                          <p className="text-sm text-gray-600">
+                            {selectedBarberFilter !== 'TODOS' ? `Nenhum registro para ${selectedBarberFilter}` : 'Clique no botão + para iniciar'}
+                          </p>
+                        </div>
+                      ) : (
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
+                              <th className="p-4 font-medium rounded-tl-lg">Hora</th>
+                              <th className="p-4 font-medium">Cliente</th>
+                              <th className="p-4 font-medium hidden md:table-cell">Tipo</th>
+                              <th className="p-4 font-medium hidden md:table-cell">Barbeiro</th>
+                              <th className="p-4 font-medium">Serviço</th>
+                              <th className="p-4 font-medium text-right">Valor</th>
+                              <th className="p-4 font-medium w-24 rounded-tr-lg"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-700/50">
+                            {filteredClients.map((client) => (
+                              <tr
+                                key={client.id}
+                                className="hover:bg-gray-700/30 transition-colors group"
+                              >
+                                <td className="p-4 text-gray-400 font-mono text-sm">{formatTime(client.timestamp)}</td>
+                                <td className="p-4 font-medium text-white">
+                                  {client.name}
+                                  {/* Mobile only Type */}
+                                  <div className="md:hidden mt-1">
+                                    <span className={`text-[10px] font-bold uppercase tracking-wide
                                         ${client.clientType === ClientType.NEW ? 'text-green-400' : 'text-gold-500'}
                                     `}>
-                            {client.clientType === ClientType.NEW ? 'Novo' : 'Casa'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4 hidden md:table-cell">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border
+                                      {client.clientType === ClientType.NEW ? 'Novo' : 'Casa'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="p-4 hidden md:table-cell">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border
                                     ${client.clientType === ClientType.NEW
-                            ? 'bg-green-900/20 text-green-400 border-green-500/30'
-                            : 'bg-gold-500/10 text-gold-500 border-gold-500/20'}
+                                      ? 'bg-green-900/20 text-green-400 border-green-500/30'
+                                      : 'bg-gold-500/10 text-gold-500 border-gold-500/20'}
                                 `}>
-                          {client.clientType}
-                        </span>
-                      </td>
-                      <td className="p-4 text-gray-300 hidden md:table-cell">{client.barberName}</td>
-                      <td className="p-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
+                                    {client.clientType}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-gray-300 hidden md:table-cell">{client.barberName}</td>
+                                <td className="p-4">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
                                   ${client.serviceType === ServiceType.CUT ? 'bg-blue-900/20 text-blue-400 border-blue-800/50' : ''}
                                   ${client.serviceType === ServiceType.COMBO ? 'bg-purple-900/20 text-purple-400 border-purple-800/50' : ''}
                                   ${client.serviceType === ServiceType.OTHER ? 'bg-gray-700/50 text-gray-300 border-gray-600/50' : ''}
                                 `}>
-                          {client.serviceType}
-                        </span>
-                        {client.extraValue > 0 && (
-                          <span className="ml-2 text-xs text-gray-500 block sm:inline mt-1 sm:mt-0">+ R$ {client.extraValue}</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-right font-bold text-white">{formatCurrency(client.totalValue)}</td>
-                      <td className="p-4 text-right">
-                        <div className="flex gap-1 justify-end opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => handleEditClient(client)}
-                            className="p-2 text-gray-400 hover:text-gold-500 hover:bg-gold-500/10 rounded-lg transition-colors"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClient(client.id)}
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                                    {client.serviceType}
+                                  </span>
+                                  {client.extraValue > 0 && (
+                                    <span className="ml-2 text-xs text-gray-500 block sm:inline mt-1 sm:mt-0">+ R$ {client.extraValue}</span>
+                                  )}
+                                </td>
+                                <td className="p-4 text-right font-bold text-white">{formatCurrency(client.totalValue)}</td>
+                                <td className="p-4 text-right">
+                                  <div className="flex gap-1 justify-end opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={() => handleEditClient(client)}
+                                      className="p-2 text-gray-400 hover:text-gold-500 hover:bg-gold-500/10 rounded-lg transition-colors"
+                                    >
+                                      <Pencil size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteClient(client.id)}
+                                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  ) : (
+                    // Vales Tab
+                    <div className="overflow-x-auto">
+                      {filteredVales.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                          <div className="bg-gray-800/50 p-6 rounded-full mb-4 border border-gray-700">
+                            <MinusCircle size={48} className="text-gray-600" />
+                          </div>
+                          <p className="text-sm">Nenhum vale encontrado.</p>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        ) : (
-          // Vales Tab
-          <div className="overflow-x-auto">
-            {filteredVales.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                <div className="bg-gray-800/50 p-6 rounded-full mb-4 border border-gray-700">
-                  <MinusCircle size={48} className="text-gray-600" />
+                      ) : (
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
+                              <th className="p-4 font-medium rounded-tl-lg">Hora</th>
+                              <th className="p-4 font-medium">Barbeiro</th>
+                              <th className="p-4 font-medium">Descrição</th>
+                              <th className="p-4 font-medium text-right">Valor</th>
+                              <th className="p-4 font-medium w-16 rounded-tr-lg"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-700/50">
+                            {filteredVales.map((vale) => (
+                              <tr
+                                key={vale.id}
+                                className="hover:bg-gray-700/30 transition-colors group"
+                              >
+                                <td className="p-4 text-gray-400 font-mono text-sm">{formatTime(vale.timestamp)}</td>
+                                <td className="p-4 font-medium text-white">{vale.barberName}</td>
+                                <td className="p-4 text-gray-300">{vale.description}</td>
+                                <td className="p-4 text-right font-bold text-red-400">- {formatCurrency(vale.value)}</td>
+                                <td className="p-4 text-right">
+                                  <button
+                                    onClick={() => handleDeleteVale(vale.id)}
+                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-100 sm:opacity-0 group-hover:opacity-100"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <p className="text-sm">Nenhum vale encontrado.</p>
               </div>
-            ) : (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="p-4 font-medium rounded-tl-lg">Hora</th>
-                    <th className="p-4 font-medium">Barbeiro</th>
-                    <th className="p-4 font-medium">Descrição</th>
-                    <th className="p-4 font-medium text-right">Valor</th>
-                    <th className="p-4 font-medium w-16 rounded-tr-lg"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700/50">
-                  {filteredVales.map((vale) => (
-                    <tr
-                      key={vale.id}
-                      className="hover:bg-gray-700/30 transition-colors group"
-                    >
-                      <td className="p-4 text-gray-400 font-mono text-sm">{formatTime(vale.timestamp)}</td>
-                      <td className="p-4 font-medium text-white">{vale.barberName}</td>
-                      <td className="p-4 text-gray-300">{vale.description}</td>
-                      <td className="p-4 text-right font-bold text-red-400">- {formatCurrency(vale.value)}</td>
-                      <td className="p-4 text-right">
-                        <button
-                          onClick={() => handleDeleteVale(vale.id)}
-                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-100 sm:opacity-0 group-hover:opacity-100"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-)
+            </div>
+            )
 }
 
-{/* Floating Action Button (FAB) - Mobile Only */ }
-{
-  viewMode === 'daily' && (
-    <button
-      onClick={handleOpenAddClient}
-      className="md:hidden fixed bottom-6 right-6 z-50 bg-gold-500 hover:bg-gold-600 text-black p-4 rounded-full shadow-2xl shadow-gold-500/40 transition-transform hover:scale-110 active:scale-95 flex items-center justify-center"
-      title="Novo Atendimento"
-    >
-      <Plus size={28} strokeWidth={2.5} />
-    </button>
-  )
-}
+            {/* Floating Action Button (FAB) - Mobile Only */}
+            {
+              viewMode === 'daily' && (
+                <button
+                  onClick={handleOpenAddClient}
+                  className="md:hidden fixed bottom-6 right-6 z-50 bg-gold-500 hover:bg-gold-600 text-black p-4 rounded-full shadow-2xl shadow-gold-500/40 transition-transform hover:scale-110 active:scale-95 flex items-center justify-center"
+                  title="Novo Atendimento"
+                >
+                  <Plus size={28} strokeWidth={2.5} />
+                </button>
+              )
+            }
 
-      </main >
+          </main >
 
-  {/* Footer Credit */ }
-  < footer className = "text-center text-gray-600 text-xs py-8 mt-8" >
-    <p>Barbearia Pro System &copy; {new Date().getFullYear()}</p>
-{
-  userProfile.isPro && (
-    <span className="text-gold-500/50 text-[10px] mt-1 block">
-      {isAdmin ? 'Licença ADMIN' : (isVip ? 'Assinatura VIP Multi' : 'Assinatura PRO Standard')}
-    </span>
-  )
-}
-      </footer >
+          {/* Footer Credit */}
+          < footer className="text-center text-gray-600 text-xs py-8 mt-8" >
+            <p>Barbearia Pro System &copy; {new Date().getFullYear()}</p>
+            {
+              userProfile.isPro && (
+                <span className="text-gold-500/50 text-[10px] mt-1 block">
+                  {isAdmin ? 'Licença ADMIN' : (isVip ? 'Assinatura VIP Multi' : 'Assinatura PRO Standard')}
+                </span>
+              )
+            }
+          </footer >
 
-  {/* Modals */ }
-  < AddClientModal
-isOpen = { isClientModalOpen }
-onClose = {() => setClientModalOpen(false)}
-settings = { settings }
-onSave = { handleSaveClient }
-initialData = { editingClient }
-  />
+          {/* Modals */}
+          < AddClientModal
+            isOpen={isClientModalOpen}
+            onClose={() => setClientModalOpen(false)}
+            settings={settings}
+            onSave={handleSaveClient}
+            initialData={editingClient}
+          />
 
-      <AddValeModal 
-        isOpen={isValeModalOpen}
-        onClose={() => setValeModalOpen(false)}
-        onAdd={handleAddVale}
-        settings={settings}
-      />
+          <AddValeModal
+            isOpen={isValeModalOpen}
+            onClose={() => setValeModalOpen(false)}
+            onAdd={handleAddVale}
+            settings={settings}
+          />
 
-      <SettingsModal 
-        isOpen={isSettingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
-        settings={settings}
-        onSave={setSettings}
-        userProfile={userProfile}
-        onSubscribe={() => setSubscriptionModalOpen(true)}
-      />
+          <SettingsModal
+            isOpen={isSettingsModalOpen}
+            onClose={() => setSettingsModalOpen(false)}
+            settings={settings}
+            onSave={setSettings}
+            userProfile={userProfile}
+            onSubscribe={() => setSubscriptionModalOpen(true)}
+          />
 
-      <SubscriptionModal
-        isOpen={isSubscriptionModalOpen}
-        onClose={() => setSubscriptionModalOpen(false)}
-        onSubscribe={handleSubscribe}
-      />
-    </div >
-  );
+          <SubscriptionModal
+            isOpen={isSubscriptionModalOpen}
+            onClose={() => setSubscriptionModalOpen(false)}
+            onSubscribe={handleSubscribe}
+          />
+        </div >
+        );
 };
 
-export default App;
+        export default App;
