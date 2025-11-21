@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { CheckCircle, Lock, Copy, Check, Users } from 'lucide-react';
+import { CheckCircle, Lock, Copy, Check, Users, Crown, Star } from 'lucide-react';
 
 interface PaywallScreenProps {
   onSubscribe: (code: string) => boolean; // Agora retorna boleano se deu certo
@@ -32,86 +32,114 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background decoration */}
-      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-gold-500/5 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-gold-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none"></div>
 
-      <div className="bg-gray-900 rounded-3xl shadow-2xl border border-gray-800 w-full max-w-3xl overflow-hidden animate-slide-in relative z-10">
-        <div className="bg-gold-500 p-1 h-2 w-full"></div>
-        
-        <div className="p-8 text-center">
-          <div className="bg-gray-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-gold-500 shadow-xl shadow-gold-500/20">
-            <Lock size={24} className="text-gold-500" />
+      <div className="glass-card rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden animate-scale-in relative z-10 flex flex-col md:flex-row">
+
+        {/* Left Side - Info */}
+        <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900/90 to-black/90 z-0"></div>
+          <div className="relative z-10">
+            <div className="bg-gradient-to-br from-gray-800 to-black w-16 h-16 rounded-2xl flex items-center justify-center mb-6 border border-gold-500/30 shadow-glow">
+              <Lock size={28} className="text-gold-500" />
+            </div>
+
+            <h2 className="text-3xl font-display font-bold text-white mb-3">Período de Teste Encerrado</h2>
+            <p className="text-gray-400 mb-8 leading-relaxed">
+              Sua barbearia atingiu o limite do período gratuito. Para continuar gerenciando seus clientes, comissões e equipe com excelência, escolha um de nossos planos premium.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 text-gray-300">
+                <div className="p-2 bg-gold-500/10 rounded-lg text-gold-500"><Star size={18} /></div>
+                <span className="text-sm">Gestão financeira completa</span>
+              </div>
+              <div className="flex items-center gap-3 text-gray-300">
+                <div className="p-2 bg-gold-500/10 rounded-lg text-gold-500"><Users size={18} /></div>
+                <span className="text-sm">Controle de comissões automático</span>
+              </div>
+              <div className="flex items-center gap-3 text-gray-300">
+                <div className="p-2 bg-gold-500/10 rounded-lg text-gold-500"><Crown size={18} /></div>
+                <span className="text-sm">Suporte prioritário</span>
+              </div>
+            </div>
           </div>
-          
-          <h2 className="text-2xl font-display font-bold text-white mb-2">Período de Teste Encerrado</h2>
-          <p className="text-gray-400 text-sm mb-8">
-            Escolha o plano ideal para continuar gerenciando sua barbearia profissionalmente.
-          </p>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-             {/* Plano PRO */}
-             <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 hover:border-gold-500/50 transition-colors">
-                <h3 className="text-lg font-bold text-white mb-1">PRO Individual</h3>
-                <p className="text-gold-500 font-bold text-xl mb-3">R$ 29,90 <span className="text-xs font-normal text-gray-500">/mês</span></p>
-                <p className="text-xs text-gray-400 mb-4">Para barbeiros autônomos.</p>
-                <ul className="text-left text-xs text-gray-300 space-y-2">
-                    <li className="flex gap-2"><Check size={12} className="text-gold-500"/> 1 Usuário</li>
-                    <li className="flex gap-2"><Check size={12} className="text-gold-500"/> Gestão Completa</li>
-                </ul>
-             </div>
-
-             {/* Plano VIP */}
-             <div className="bg-blue-900/10 border border-blue-500/30 rounded-xl p-5 hover:bg-blue-900/20 transition-colors relative">
-                <div className="absolute top-3 right-3">
-                    <Users size={16} className="text-blue-400"/>
+        {/* Right Side - Plans & Payment */}
+        <div className="w-full md:w-1/2 bg-black/40 p-8 md:p-10 border-l border-white/5">
+          <div className="space-y-4 mb-8">
+            {/* Plano PRO */}
+            <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-4 hover:border-gold-500/50 hover:bg-white/10 transition-all cursor-pointer">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-white group-hover:text-gold-400 transition-colors">PRO Individual</h3>
+                  <p className="text-xs text-gray-400">Para barbeiros autônomos</p>
                 </div>
-                <h3 className="text-lg font-bold text-white mb-1">VIP Equipe</h3>
-                <p className="text-blue-400 font-bold text-xl mb-3">R$ 59,90 <span className="text-xs font-normal text-gray-500">/mês</span></p>
-                <p className="text-xs text-gray-400 mb-4">Para barbearias com equipe.</p>
-                <ul className="text-left text-xs text-gray-300 space-y-2">
-                    <li className="flex gap-2"><Check size={12} className="text-blue-400"/> Até 4 Barbeiros</li>
-                    <li className="flex gap-2"><Check size={12} className="text-blue-400"/> Seleção Rápida</li>
-                </ul>
-             </div>
+                <div className="text-right">
+                  <p className="text-gold-500 font-bold text-xl">R$ 29,90</p>
+                  <p className="text-[10px] text-gray-500">/mês</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Plano VIP */}
+            <div className="group relative overflow-hidden rounded-xl border border-blue-500/30 bg-blue-900/10 p-4 hover:border-blue-400 hover:bg-blue-900/20 transition-all cursor-pointer">
+              <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">RECOMENDADO</div>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-white group-hover:text-blue-400 transition-colors">VIP Equipe</h3>
+                  <p className="text-xs text-gray-400">Para barbearias com equipe</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-blue-400 font-bold text-xl">R$ 59,90</p>
+                  <p className="text-[10px] text-gray-500">/mês</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Área do PIX */}
-          <div className="bg-gray-800/80 rounded-xl p-5 mb-6 border border-gray-700 text-left relative overflow-hidden">
-            <div className="flex justify-between items-start">
-                <div className="space-y-2 mb-2 w-full">
-                    <div>
-                        <p className="text-xs text-gray-400">Chave PIX (CPF) - Leandro Jesse da Silva:</p>
-                        <div className="flex items-center gap-2 mt-1">
-                            <code className="bg-gray-900 px-2 py-1 rounded text-gold-500 font-mono font-bold text-sm">{pixKey}</code>
-                            <button onClick={handleCopyPix} className="text-gray-400 hover:text-white transition-colors" title="Copiar">
-                                {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+          <div className="mb-8">
+            <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wider">Pagamento via PIX</p>
+            <div className="bg-black/50 rounded-xl p-4 border border-white/10 flex items-center justify-between gap-3 group hover:border-gold-500/30 transition-colors">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-gray-500 mb-1">Chave CPF - Leandro Jesse</p>
+                <code className="text-gold-500 font-mono font-bold text-sm truncate block">{pixKey}</code>
+              </div>
+              <button
+                onClick={handleCopyPix}
+                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-all active:scale-95"
+                title="Copiar"
+              >
+                {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+              </button>
             </div>
-            <p className="text-[10px] text-gray-500 italic mt-2 border-t border-gray-700 pt-2">Faça o PIX do valor correspondente ao plano escolhido.</p>
+            <p className="text-[10px] text-gray-500 mt-2 text-center">
+              Após o pagamento, envie o comprovante para receber seu código.
+            </p>
           </div>
 
           {/* Área de Desbloqueio */}
-          <div className="space-y-3 max-w-md mx-auto">
-            <label className="block text-left text-sm font-medium text-gray-300">
-              Digite o código recebido:
+          <div className="space-y-3">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+              Já tem o código?
             </label>
             <div className="flex gap-2">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={activationCode}
                 onChange={(e) => setActivationCode(e.target.value.toUpperCase())}
-                placeholder="SEU CÓDIGO DE ATIVAÇÃO"
-                className="flex-1 bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-gold-500 outline-none uppercase tracking-widest font-mono text-center"
+                placeholder="DIGITE SEU CÓDIGO"
+                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500/50 outline-none uppercase tracking-widest font-mono text-center placeholder:text-gray-700 transition-all"
               />
             </div>
-             {error && <p className="text-red-400 text-xs text-center">{error}</p>}
-            
+            {error && <p className="text-red-400 text-xs text-center bg-red-500/10 py-2 rounded-lg border border-red-500/20">{error}</p>}
+
             <button
               onClick={handleUnlock}
-              className="w-full bg-gold-500 hover:bg-gold-600 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-gold-500/20"
+              className="w-full bg-gradient-to-r from-gold-400 to-gold-600 hover:from-gold-300 hover:to-gold-500 text-black font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-glow hover:shadow-glow-lg transform hover:-translate-y-0.5"
             >
               <CheckCircle size={20} />
               Liberar Acesso
