@@ -27,10 +27,10 @@ export const generateId = (): string => {
 
 export const generateReportContent = (date: number, clients: any[], vales: any[], stats: any) => {
   const lines: string[] = [];
-  lines.push("=================================");
-  lines.push(`RELATÓRIO DIÁRIO - BARBEARIA PRO`);
+  lines.push("========================================");
+  lines.push(`RELATÓRIO - GESTÃO MÁXIMA`);
   lines.push(`Data: ${formatDate(date)}`);
-  lines.push("=================================");
+  lines.push("========================================");
   lines.push("");
   lines.push("RESUMO FINANCEIRO");
   lines.push(`Total Clientes: ${stats.totalClients}`);
@@ -38,23 +38,23 @@ export const generateReportContent = (date: number, clients: any[], vales: any[]
   lines.push(`Total Vales: ${formatCurrency(stats.totalVales)}`);
   lines.push(`Comissão Líquida: ${formatCurrency(stats.netCommission)}`);
   lines.push("");
-  lines.push("---------------------------------");
+  lines.push("----------------------------------------");
   lines.push("CLIENTES ATENDIDOS");
-  lines.push("---------------------------------");
+  lines.push("----------------------------------------");
   
   if (clients.length === 0) lines.push("Nenhum cliente registrado.");
   
   clients.forEach((c: any) => {
     lines.push(`[${formatTime(c.timestamp)}] ${c.name} (${c.clientType})`);
-    lines.push(`   Serviço: ${c.serviceType} | Barbeiro: ${c.barberName}`);
+    lines.push(`   Serviço: ${c.serviceType} | Profissional: ${c.barberName}`);
     lines.push(`   Valor: ${formatCurrency(c.totalValue)}`);
     lines.push("- - - - - - - - - - - - - - - - -");
   });
 
   lines.push("");
-  lines.push("---------------------------------");
+  lines.push("----------------------------------------");
   lines.push("VALES E RETIRADAS");
-  lines.push("---------------------------------");
+  lines.push("----------------------------------------");
 
   if (vales.length === 0) lines.push("Nenhum vale registrado.");
 

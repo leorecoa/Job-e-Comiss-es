@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
 import { formatCurrency, formatTime, generateId, generateReportContent, formatDate } from './utils';
@@ -334,7 +335,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Relatorio-Barbearia-${selectedDate}.txt`;
+    link.download = `Relatorio-Financeiro-${selectedDate}.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -399,7 +400,11 @@ const App: React.FC = () => {
                     <img src={settings.logoUrl} alt="Logo" className="h-10 w-auto object-contain" />
                 ) : (
                     <div className="bg-gradient-to-br from-gold-400 to-gold-600 p-2 rounded-lg shadow-lg shadow-gold-500/20">
-                    <Scissors className="text-gray-900 w-5 h-5" />
+                         {/* Header Logo Hexagonal */}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            <polyline points="7.5 12 10 14.5 16.5 8"></polyline>
+                        </svg>
                     </div>
                 )}
                 <div>
@@ -409,7 +414,7 @@ const App: React.FC = () => {
                     {userProfile.isPro ? (
                         <span className="flex items-center gap-1 text-[10px] text-gold-500 font-bold uppercase tracking-wider">
                             {isVip ? <UsersRound size={10} fill="currentColor" /> : <Crown size={10} fill="currentColor" />}
-                            {userProfile.planType === 'admin_life' ? 'Admin Vitalício' : (isVip ? 'VIP Multi-Barbeiro' : 'Assinatura PRO')}
+                            {userProfile.planType === 'admin_life' ? 'Admin Vitalício' : (isVip ? 'VIP Multi-Profissional' : 'Assinatura PRO')}
                         </span>
                     ) : (
                         <span className="text-[10px] bg-gray-800 text-gold-500 px-1.5 py-0.5 rounded border border-gold-500/30">
@@ -629,7 +634,7 @@ const App: React.FC = () => {
                         <div className="bg-gray-800/50 p-6 rounded-full mb-4 border border-gray-700">
                              <Scissors size={48} className="text-gray-600" />
                         </div>
-                        <h3 className="text-lg font-medium text-gray-400">Nenhum corte encontrado</h3>
+                        <h3 className="text-lg font-medium text-gray-400">Nenhum atendimento encontrado</h3>
                         <p className="text-sm text-gray-600">
                             {selectedBarberFilter !== 'TODOS' ? `Nenhum registro para ${selectedBarberFilter}` : 'Clique no botão + para iniciar'}
                         </p>
@@ -641,7 +646,7 @@ const App: React.FC = () => {
                             <th className="p-4 font-medium rounded-tl-lg">Hora</th>
                             <th className="p-4 font-medium">Cliente</th>
                             <th className="p-4 font-medium hidden md:table-cell">Tipo</th>
-                            <th className="p-4 font-medium hidden md:table-cell">Barbeiro</th>
+                            <th className="p-4 font-medium hidden md:table-cell">Profissional</th>
                             <th className="p-4 font-medium">Serviço</th>
                             <th className="p-4 font-medium text-right">Valor</th>
                             <th className="p-4 font-medium w-24 rounded-tr-lg"></th>
@@ -725,7 +730,7 @@ const App: React.FC = () => {
                         <thead>
                           <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
                             <th className="p-4 font-medium rounded-tl-lg">Hora</th>
-                            <th className="p-4 font-medium">Barbeiro</th>
+                            <th className="p-4 font-medium">Profissional</th>
                             <th className="p-4 font-medium">Descrição</th>
                             <th className="p-4 font-medium text-right">Valor</th>
                             <th className="p-4 font-medium w-16 rounded-tr-lg"></th>
@@ -776,7 +781,7 @@ const App: React.FC = () => {
 
       {/* Footer Credit */}
       <footer className="text-center text-gray-600 text-xs py-8 mt-8">
-         <p>Barbearia Pro System &copy; {new Date().getFullYear()}</p>
+         <p>Gestão Máxima &copy; {new Date().getFullYear()}</p>
          {userProfile.isPro && (
            <span className="text-gold-500/50 text-[10px] mt-1 block">
              {isAdmin ? 'Licença ADMIN' : (isVip ? 'Assinatura VIP Multi' : 'Assinatura PRO Standard')}
