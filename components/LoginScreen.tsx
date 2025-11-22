@@ -17,8 +17,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     if (!shopName || !ownerName) return;
 
     // Lógica de "Backdoor" para o Administrador (Você)
-    // Se o email for leandro@admin, já entra como PRO (Vitalício)
-    const isAdmin = email.toLowerCase().trim() === 'leandro@admin';
+    // Se o email for leandro@admin ou gabriel@admin, já entra como PRO (Vitalício)
+    const cleanEmail = email.toLowerCase().trim();
+    const isAdmin = cleanEmail === 'leandro@admin' || cleanEmail === 'gabriel@admin';
 
     const newProfile: UserProfile = {
       shopName,
@@ -85,7 +86,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-gold-500 outline-none transition-all"
               placeholder="seu@email.com"
             />
-            <p className="text-[10px] text-gray-600 mt-1">Dica ADM: use leandro@admin para acesso total.</p>
           </div>
 
           <div className="pt-4">
