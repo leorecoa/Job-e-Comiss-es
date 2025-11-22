@@ -12,6 +12,7 @@ import { PaywallScreen } from './components/PaywallScreen';
 import { MonthlySummary } from './components/MonthlySummary';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
+import { TourOverlay, TourStep } from './components/TourOverlay';
 import { 
   Scissors, 
   Users, 
@@ -133,6 +134,9 @@ const App: React.FC = () => {
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
   const [isSubscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
 
+  // Tour State
+  const [isTourOpen, setTourOpen] = useState(false);
+
   // -- Notification State --
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -161,6 +165,22 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('barbearia_settings', JSON.stringify(settings));
   }, [settings]);
+
+  // Check for First Time Tour
+  useEffect(() => {
+    if (userProfile) {
+        const hasSeenTour = localStorage.getItem('hasSeenTour');
+        if (!hasSeenTour) {
+            // Pequeno delay para garantir que a UI renderizou
+            setTimeout(() => setTourOpen(true), 1000);
+        }
+    }
+  }, [userProfile]);
+
+  const handleTourComplete = () => {
+    setTourOpen(false);
+    localStorage.setItem('hasSeenTour', 'true');
+  };
 
   // -- Derived State (Trial Logic) --
   const trialStatus = useMemo(() => {
@@ -366,6 +386,40 @@ const App: React.FC = () => {
     setSelectedDate(`${newYear}-${newMonth}-${newDay}`);
   };
 
+  // TOUR STEPS CONFIG
+  const tourSteps: TourStep[] = [
+    {
+        targetId: 'tour-stats',
+        title: 'Resumo do Dia',
+        content: 'Aqui você acompanha o total de atendimentos, faturamento bruto e quanto sobra líquido para você (descontando os vales).',
+        position: 'bottom'
+    },
+    {
+        targetId: 'tour-actions',
+        title: 'Ações Rápidas',
+        content: 'Use estes botões para lançar novos cortes, registrar vales/despesas do dia ou acessar configurações.',
+        position: 'bottom'
+    },
+    {
+        targetId: 'tour-filters',
+        title: 'Navegação',
+        content: 'Alterne entre as datas para ver o histórico, baixe o relatório em PDF ou veja o resumo mensal completo.',
+        position: 'bottom'
+    },
+    {
+        targetId: 'tour-list',
+        title: 'Lista de Lançamentos',
+        content: 'Seus atendimentos e vales aparecerão aqui. Você pode alternar as abas para ver detalhes de cada um.',
+        position: 'top'
+    },
+    {
+        targetId: 'tour-settings-btn',
+        title: 'Configurações',
+        content: 'Clique aqui para definir seus preços, comissão, cadastrar sua equipe (se for VIP) e personalizar a loja.',
+        position: 'bottom'
+    }
+  ];
+
   // -- Render Logic --
 
   if (!userProfile) {
@@ -389,6 +443,12 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-transparent pb-24 font-sans selection:bg-gold-500/30">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
+      
+      <TourOverlay 
+        steps={tourSteps} 
+        isOpen={isTourOpen} 
+        onComplete={handleTourComplete} 
+      />
 
       {/* Modern Horizontal Header */}
       <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-gray-900/90">
@@ -476,8 +536,9 @@ const App: React.FC = () => {
             
             {/* Top Row Controls */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                <div className="flex gap-2 flex-wrap w-full lg:w-auto">
+                <div id="tour-actions" className="flex gap-2 flex-wrap w-full lg:w-auto p-1 rounded-xl">
                     <button 
+                        id="tour-new-client-btn"
                         onClick={handleOpenAddClient}
                         className="hidden md:flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
                     >
@@ -490,6 +551,7 @@ const App: React.FC = () => {
                         <MinusCircle size={18} /> <span className="hidden xs:inline">Vale</span>
                     </button>
                     <button 
+                        id="tour-settings-btn"
                         onClick={() => setSettingsModalOpen(true)}
                         className="flex items-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors"
                         title="Configurações"
@@ -515,7 +577,7 @@ const App: React.FC = () => {
                     )}
                 </div>
 
-                <div className="flex flex-wrap gap-3 w-full lg:w-auto lg:justify-end items-center">
+                <div id="tour-filters" className="flex flex-wrap gap-3 w-full lg:w-auto lg:justify-end items-center p-1 rounded-xl">
                     <button 
                         onClick={() => setViewMode('monthly')}
                         className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-blue-400 px-4 py-2.5 rounded-xl font-medium transition-colors"
@@ -573,7 +635,7 @@ const App: React.FC = () => {
           /* Standard Daily View */
           <div className="animate-slide-in space-y-6">
             {/* Dashboard Stats - Modern Layout */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div id="tour-stats" className="grid grid-cols-1 md:grid-cols-3 gap-4 p-1 rounded-2xl">
               <StatsCard 
                 title={selectedBarberFilter === 'TODOS' ? "Atendimentos (Total)" : `Atendimentos (${selectedBarberFilter})`}
                 value={stats.totalClients.toString()} 
@@ -596,7 +658,7 @@ const App: React.FC = () => {
             </div>
 
             {/* List Section */}
-            <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
+            <div id="tour-list" className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
               {/* Tabs */}
               <div className="flex border-b border-gray-700 bg-gray-900/50">
                 <button
@@ -633,9 +695,6 @@ const App: React.FC = () => {
                   <div className="overflow-x-auto">
                     {filteredClients.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                        <div className="bg-gray-800/50 p-6 rounded-full mb-4 border border-gray-700">
-                             <Scissors size={48} className="text-gray-600" />
-                        </div>
                         <h3 className="text-lg font-medium text-gray-400">Nenhum atendimento encontrado</h3>
                         <p className="text-sm text-gray-600">
                             {selectedBarberFilter !== 'TODOS' ? `Nenhum registro para ${selectedBarberFilter}` : 'Clique no botão + para iniciar'}
