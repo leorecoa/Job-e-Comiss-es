@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
-import { formatCurrency, formatTime, generateId, generateReportContent, formatDate } from './utils';
+import { formatCurrency, formatTime, generateId, formatDate } from './utils';
+import { generateDailyReportPDF } from './services/pdfService';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
 import { AddValeModal } from './components/AddValeModal';
@@ -328,18 +329,19 @@ const App: React.FC = () => {
   };
 
   const handleDownloadReport = () => {
-    const [year, month, day] = selectedDate.split('-').map(Number);
-    const reportDate = new Date(year, month - 1, day, 12, 0, 0).getTime();
-    const content = generateReportContent(reportDate, filteredClients, filteredVales, stats);
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Relatorio-Financeiro-${selectedDate}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast('Relatório baixado!', 'success');
+    try {
+      generateDailyReportPDF(
+        settings.shopName,
+        selectedDate,
+        stats,
+        filteredClients,
+        filteredVales
+      );
+      addToast('Relatório PDF gerado!', 'success');
+    } catch (error) {
+      console.error(error);
+      addToast('Erro ao gerar relatório.', 'error');
+    }
   };
 
   const handleOpenAddClient = () => {
@@ -547,7 +549,7 @@ const App: React.FC = () => {
                     <button 
                         onClick={handleDownloadReport}
                         className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-750 text-white px-4 py-2.5 rounded-xl border border-gray-700 font-medium transition-colors"
-                        title="Baixar Relatório do Dia"
+                        title="Baixar Relatório do Dia (PDF)"
                     >
                         <Download size={18} />
                     </button>
