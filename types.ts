@@ -1,6 +1,7 @@
 
 export enum ServiceType {
   CUT = 'Corte',
+  BEARD = 'Barba',
   COMBO = 'Combo', // Cut + Beard
   OTHER = 'Outros'
 }
@@ -46,6 +47,7 @@ export interface AppSettings {
   shopName: string;
   logoUrl: string;
   priceCut: number;
+  priceBeard: number;
   priceCombo: number;
   commissionRate: number; // Percentage (e.g., 40)
   barbers: string[]; // Lista de barbeiros cadastrados (VIP)
@@ -65,8 +67,9 @@ export interface UserProfile {
 export const DEFAULT_SETTINGS: AppSettings = {
   shopName: 'Gestão Máxima',
   logoUrl: '',
-  priceCut: 60,
-  priceCombo: 90,
+  priceCut: 50,
+  priceBeard: 30,
+  priceCombo: 70,
   commissionRate: 40,
   barbers: []
 };

@@ -64,6 +64,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
   const getBasePrice = () => {
     if (service === ServiceType.CUT) return settings.priceCut;
+    if (service === ServiceType.BEARD) return settings.priceBeard || 0;
     if (service === ServiceType.COMBO) return settings.priceCombo;
     return Number(customPrice) || 0;
   };
@@ -88,8 +89,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 animate-slide-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-slide-in">
+      <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700">
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white font-display">
             {initialData ? 'Editar Atendimento' : 'Novo Atendimento'}
@@ -186,7 +187,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">Tipo de Serviço</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {Object.values(ServiceType).map((type) => (
                 <button
                   key={type}

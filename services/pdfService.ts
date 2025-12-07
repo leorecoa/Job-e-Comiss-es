@@ -1,11 +1,12 @@
+
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatCurrency, formatTime } from "../utils";
 import { Client, Vale } from "../types";
 
-export const generateDailyReportPDF = (
+export const generateReportPDF = (
   shopName: string,
-  dateStr: string, // Format: YYYY-MM-DD
+  dateRangeStr: string,
   stats: {
     totalClients: number;
     totalSales: number;
@@ -17,17 +18,16 @@ export const generateDailyReportPDF = (
 ) => {
   const doc = new jsPDF();
   
-  // Cores da Marca
-  const colorDark = "#111827"; // Gray 900
-  const colorGold = "#f59e0b"; // Gold 500
-  const colorGray = "#6b7280"; // Gray 500
+  // Brand Colors
+  const colorDark = "#111827"; 
+  const colorGold = "#f59e0b"; 
+  const colorGray = "#6b7280"; 
 
-  // --- CABEÇALHO ---
-  // Fundo Escuro
+  // --- HEADER ---
   doc.setFillColor(colorDark);
   doc.rect(0, 0, 210, 40, 'F');
 
-  // Logo / Ícone (Hexágono Simplificado)
+  // Logo Icon
   doc.setDrawColor(colorGold);
   doc.setLineWidth(1);
   doc.line(15, 12, 20, 8);
@@ -37,34 +37,39 @@ export const generateDailyReportPDF = (
   doc.line(20, 24, 15, 20);
   doc.line(15, 20, 15, 12);
   
-  // Nome da Loja
+  // Shop Name
   doc.setTextColor(colorGold);
   doc.setFontSize(22);
   doc.setFont("helvetica", "bold");
   doc.text(shopName, 32, 18);
 
-  // Subtítulo
+  // Subtitle
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text("RELATÓRIO DE GESTÃO DIÁRIA", 32, 25);
+  doc.text("RELATÓRIO DE GESTÃO", 32, 25);
 
-  // Data Formatada
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const formattedDate = new Date(year, month - 1, day).toLocaleDateString('pt-BR', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-  });
-  
+  // Date/Range Display
   doc.setFontSize(10);
-  doc.text(formattedDate.toUpperCase(), 200, 20, { align: 'right' });
+  let displayDate = dateRangeStr;
+  
+  // Check if it looks like YYYY-MM-DD
+  if (dateRangeStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+     const [year, month, day] = dateRangeStr.split('-').map(Number);
+     displayDate = new Date(year, month - 1, day).toLocaleDateString('pt-BR', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+     }).toUpperCase();
+  }
+  
+  doc.text(displayDate, 200, 20, { align: 'right' });
 
   let currentY = 50;
 
-  // --- RESUMO FINANCEIRO (CARDS) ---
+  // --- STATS CARDS ---
   doc.setFontSize(12);
   doc.setTextColor(colorDark);
   doc.setFont("helvetica", "bold");
-  doc.text("RESUMO DO DIA", 14, currentY);
+  doc.text("RESUMO DO PERÍODO", 14, currentY);
   
   currentY += 5;
 
@@ -73,7 +78,6 @@ export const generateDailyReportPDF = (
   const gap = 4;
   const startX = 14;
 
-  // Helper para desenhar card
   const drawCard = (x: number, title: string, value: string, isGold = false) => {
     doc.setDrawColor(200, 200, 200);
     doc.setFillColor(isGold ? colorGold : 250, 250, 250);
@@ -92,34 +96,39 @@ export const generateDailyReportPDF = (
   drawCard(startX, "Atendimentos", stats.totalClients.toString());
   drawCard(startX + cardWidth + gap, "Faturamento", formatCurrency(stats.totalSales));
   drawCard(startX + (cardWidth + gap) * 2, "Vales / Retiradas", formatCurrency(stats.totalVales));
-  drawCard(startX + (cardWidth + gap) * 3, "Líquido (Comissão)", formatCurrency(stats.netCommission), true); // Gold Card
+  drawCard(startX + (cardWidth + gap) * 3, "Líquido (Comissão)", formatCurrency(stats.netCommission), true);
 
   currentY += 35;
 
-  // --- TABELA DE CLIENTES ---
+  // --- CLIENT TABLE ---
   doc.setFontSize(12);
   doc.setTextColor(colorDark);
   doc.text("DETALHAMENTO DE ATENDIMENTOS", 14, currentY);
   
-  const clientRows = clients.map(c => [
-    formatTime(c.timestamp),
-    c.name,
-    c.serviceType + (c.extraValue > 0 ? ' (+Adic)' : ''),
-    c.barberName,
-    c.clientType,
-    formatCurrency(c.totalValue)
-  ]);
+  const sortedClients = [...clients].sort((a, b) => b.timestamp - a.timestamp);
+
+  const clientRows = sortedClients.map(c => {
+    const datePart = new Date(c.timestamp).toLocaleDateString('pt-BR');
+    return [
+        `${datePart} ${formatTime(c.timestamp)}`,
+        c.name,
+        c.serviceType + (c.extraValue > 0 ? ' (+Adic)' : ''),
+        c.barberName,
+        c.clientType,
+        formatCurrency(c.totalValue)
+    ];
+  });
 
   autoTable(doc, {
     startY: currentY + 3,
-    head: [['Hora', 'Cliente', 'Serviço', 'Profissional', 'Tipo', 'Valor']],
+    head: [['Data/Hora', 'Cliente', 'Serviço', 'Profissional', 'Tipo', 'Valor']],
     body: clientRows,
     theme: 'grid',
     headStyles: { fillColor: [31, 41, 55], textColor: [255, 255, 255], fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [245, 245, 245] },
-    styles: { fontSize: 9, cellPadding: 3 },
+    styles: { fontSize: 8, cellPadding: 2 },
     columnStyles: {
-        0: { cellWidth: 20 },
+        0: { cellWidth: 30 },
         5: { fontStyle: 'bold', halign: 'right' }
     }
   });
@@ -127,39 +136,44 @@ export const generateDailyReportPDF = (
   // @ts-ignore
   currentY = doc.lastAutoTable.finalY + 15;
 
-  // --- TABELA DE VALES ---
+  // --- VALE TABLE ---
   if (vales.length > 0) {
     doc.setFontSize(12);
     doc.setTextColor(colorDark);
     doc.text("VALES E RETIRADAS", 14, currentY);
 
-    const valeRows = vales.map(v => [
-      formatTime(v.timestamp),
-      v.barberName,
-      v.description,
-      formatCurrency(v.value)
-    ]);
+    const sortedVales = [...vales].sort((a, b) => b.timestamp - a.timestamp);
+
+    const valeRows = sortedVales.map(v => {
+        const datePart = new Date(v.timestamp).toLocaleDateString('pt-BR');
+        return [
+            `${datePart} ${formatTime(v.timestamp)}`,
+            v.barberName,
+            v.description,
+            formatCurrency(v.value)
+        ];
+    });
 
     autoTable(doc, {
       startY: currentY + 3,
-      head: [['Hora', 'Profissional', 'Descrição', 'Valor']],
+      head: [['Data/Hora', 'Profissional', 'Descrição', 'Valor']],
       body: valeRows,
       theme: 'grid',
-      headStyles: { fillColor: [220, 38, 38], textColor: [255, 255, 255], fontStyle: 'bold' }, // Red header for vales
+      headStyles: { fillColor: [220, 38, 38], textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [254, 242, 242] },
-      styles: { fontSize: 9, cellPadding: 3 },
+      styles: { fontSize: 8, cellPadding: 2 },
       columnStyles: {
-          0: { cellWidth: 20 },
+          0: { cellWidth: 30 },
           3: { fontStyle: 'bold', halign: 'right' }
       }
     });
   } else {
     doc.setFontSize(10);
     doc.setTextColor(colorGray);
-    doc.text("Nenhum vale registrado hoje.", 14, currentY + 5);
+    doc.text("Nenhum vale registrado no período.", 14, currentY + 5);
   }
 
-  // --- RODAPÉ ---
+  // --- FOOTER ---
   const pageHeight = doc.internal.pageSize.height;
   doc.setFillColor(245, 245, 245);
   doc.rect(0, pageHeight - 15, 210, 15, 'F');
@@ -168,6 +182,7 @@ export const generateDailyReportPDF = (
   doc.setTextColor(150, 150, 150);
   doc.text("Gerado via Gestão Máxima - Sistema Profissional", 105, pageHeight - 6, { align: 'center' });
 
-  // Save
-  doc.save(`Relatorio_${dateStr}.pdf`);
+  // Safe Filename
+  const safeName = dateRangeStr.replace(/\//g, '-').replace(/ /g, '_');
+  doc.save(`Relatorio_${safeName}.pdf`);
 };

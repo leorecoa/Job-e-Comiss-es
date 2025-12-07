@@ -58,7 +58,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-slide-in">
       <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white font-display">Configurações</h2>
@@ -161,28 +161,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-2">
+             <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Barba (R$)</label>
+              <input
+                type="number"
+                value={formData.priceBeard || 0}
+                onChange={(e) => handleChange('priceBeard', e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+              />
+            </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Preço Corte (R$)</label>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Corte (R$)</label>
               <input
                 type="number"
                 value={formData.priceCut}
                 onChange={(e) => handleChange('priceCut', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Preço Combo (R$)</label>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Combo (R$)</label>
               <input
                 type="number"
                 value={formData.priceCombo}
                 onChange={(e) => handleChange('priceCombo', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
               />
             </div>
           </div>
 
-          <div>
+          <div className="mt-2">
             <label className="block text-sm font-medium text-gray-400 mb-1">Taxa de Comissão (%)</label>
             <input
               type="number"
