@@ -24,3 +24,64 @@ export const formatTime = (timestamp: number): string => {
 export const generateId = (): string => {
   return Math.random().toString(36).substr(2, 9);
 };
+
+export const generateAndDownloadCSV = (
+  filename: string, 
+  clients: any[], 
+  vales: any[]
+) => {
+  // Cabeçalho do CSV
+  const headers = ["Data", "Hora", "Tipo Movimento", "Descrição/Cliente", "Profissional", "Serviço", "Valor (R$)"];
+  
+  const rows: string[] = [];
+  rows.push(headers.join(";")); // Usando ponto e vírgula para Excel em PT-BR
+
+  // Adicionar Clientes (Entradas)
+  clients.forEach(c => {
+    const date = new Date(c.timestamp);
+    const dateStr = date.toLocaleDateString('pt-BR');
+    const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const valueStr = c.totalValue.toFixed(2).replace('.', ','); // Formato Excel PT-BR
+
+    rows.push([
+      dateStr,
+      timeStr,
+      "RECEITA",
+      c.name,
+      c.barberName,
+      c.serviceType,
+      valueStr
+    ].join(";"));
+  });
+
+  // Adicionar Vales (Saídas)
+  vales.forEach(v => {
+    const date = new Date(v.timestamp);
+    const dateStr = date.toLocaleDateString('pt-BR');
+    const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const valueStr = `-${v.value.toFixed(2).replace('.', ',')}`; // Valor negativo
+
+    rows.push([
+      dateStr,
+      timeStr,
+      "DESPESA",
+      v.description,
+      v.barberName,
+      "Vale/Retirada",
+      valueStr
+    ].join(";"));
+  });
+
+  // Criar o Blob com BOM para suportar acentos no Excel
+  const csvContent = "\uFEFF" + rows.join("\n");
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  
+  // Link de Download
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", `${filename}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};

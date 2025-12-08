@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
-import { X, Download, Calendar } from 'lucide-react';
+import { X, Download, Calendar, FileText, FileSpreadsheet } from 'lucide-react';
 
 interface ReportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onDownload: (startDate: string, endDate: string) => void;
+  onDownload: (startDate: string, endDate: string, format: 'pdf' | 'csv') => void;
   initialDate: string; // YYYY-MM-DD
 }
 
@@ -15,9 +15,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onDow
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onDownload(startDate, endDate);
+  const handleDownload = (format: 'pdf' | 'csv') => {
+    onDownload(startDate, endDate, format);
     onClose();
   };
 
@@ -31,8 +30,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onDow
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <p className="text-sm text-gray-400">Selecione o período que deseja incluir no PDF.</p>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-400">Selecione o período e o formato para exportação.</p>
 
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Data Inicial</label>
@@ -66,16 +65,23 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onDow
             </div>
           </div>
 
-          <div className="pt-4">
+          <div className="pt-2 flex gap-3">
             <button
-              type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-black font-bold py-3 rounded-xl transition-colors shadow-lg shadow-gold-500/20"
+              onClick={() => handleDownload('pdf')}
+              className="flex-1 flex flex-col items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-2 rounded-xl transition-colors border border-gray-600"
             >
-              <Download size={20} />
-              Gerar PDF
+              <FileText size={20} className="text-red-400" />
+              <span className="text-xs">Versão PDF</span>
+            </button>
+            <button
+              onClick={() => handleDownload('csv')}
+              className="flex-1 flex flex-col items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-2 rounded-xl transition-colors border border-gray-600"
+            >
+              <FileSpreadsheet size={20} className="text-green-400" />
+              <span className="text-xs">Excel (CSV)</span>
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

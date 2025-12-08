@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
-import { formatCurrency, formatTime, generateId, formatDate } from './utils';
+import { formatCurrency, formatTime, generateId, formatDate, generateAndDownloadCSV } from './utils';
 import { generateReportPDF } from './services/pdfService';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
@@ -329,7 +329,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDownloadRange = (startDate: string, endDate: string) => {
+  const handleDownloadRange = (startDate: string, endDate: string, format: 'pdf' | 'csv') => {
     try {
         const start = new Date(startDate);
         start.setHours(0,0,0,0);
@@ -339,6 +339,19 @@ const App: React.FC = () => {
         const rangeClients = clients.filter(c => c.timestamp >= start.getTime() && c.timestamp <= end.getTime());
         const rangeVales = vales.filter(v => v.timestamp >= start.getTime() && v.timestamp <= end.getTime());
         
+        // Safe filename
+        const dateLabel = startDate === endDate 
+            ? startDate 
+            : `De ${startDate} a ${endDate}`;
+        const safeName = `Relatorio_${dateLabel.replace(/\//g, '-').replace(/ /g, '_')}`;
+
+        if (format === 'csv') {
+            generateAndDownloadCSV(safeName, rangeClients, rangeVales);
+            addToast('Planilha Excel (CSV) gerada!', 'success');
+            return;
+        }
+
+        // PDF Logic (Default)
         const totalSales = rangeClients.reduce((acc, curr) => acc + curr.totalValue, 0);
         const grossCommission = totalSales * (settings.commissionRate / 100);
         const totalVales = rangeVales.reduce((acc, curr) => acc + curr.value, 0);
@@ -352,13 +365,13 @@ const App: React.FC = () => {
             netCommission
         };
 
-        const dateLabel = startDate === endDate 
+        const displayLabel = startDate === endDate 
             ? startDate 
             : `De ${new Date(startDate).toLocaleDateString('pt-BR')} a ${new Date(endDate).toLocaleDateString('pt-BR')}`;
 
         generateReportPDF(
             settings.shopName,
-            dateLabel,
+            displayLabel,
             rangeStats,
             rangeClients,
             rangeVales
@@ -425,7 +438,7 @@ const App: React.FC = () => {
     {
         targetId: 'tour-filters',
         title: 'Relatórios',
-        content: 'Baixe PDFs personalizados por dia ou período.',
+        content: 'Baixe PDFs ou Planilhas personalizadas por dia ou período.',
         position: 'bottom'
     }
   ];
@@ -490,7 +503,7 @@ const App: React.FC = () => {
                     <button 
                         onClick={handleDownloadDaily}
                         className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors"
-                        title="Baixar Relatório do Dia"
+                        title="Baixar Relatório do Dia (PDF)"
                     >
                         <FileText size={18} />
                     </button>
@@ -498,7 +511,7 @@ const App: React.FC = () => {
                     <button 
                         onClick={() => setReportModalOpen(true)} 
                         className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors"
-                        title="Baixar Relatório por Período"
+                        title="Exportar Dados (PDF/Excel)"
                     >
                         <Download size={18} />
                     </button>
