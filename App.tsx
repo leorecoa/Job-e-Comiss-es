@@ -35,7 +35,8 @@ import {
   UsersRound,
   ChevronLeft,
   ChevronRight,
-  Filter
+  Filter,
+  FileText
 } from 'lucide-react';
 
 const getTodayString = () => {
@@ -369,6 +370,22 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDownloadDaily = () => {
+    try {
+      generateReportPDF(
+        settings.shopName,
+        selectedDate,
+        stats,
+        filteredClients,
+        filteredVales
+      );
+      addToast('Relatório do dia baixado!', 'success');
+    } catch (e) {
+      console.error(e);
+      addToast('Erro ao gerar relatório.', 'error');
+    }
+  };
+
   const handleOpenAddClient = () => {
     setEditingClient(null);
     setClientModalOpen(true);
@@ -408,7 +425,7 @@ const App: React.FC = () => {
     {
         targetId: 'tour-filters',
         title: 'Relatórios',
-        content: 'Baixe PDFs personalizados por período.',
+        content: 'Baixe PDFs personalizados por dia ou período.',
         position: 'bottom'
     }
   ];
@@ -469,7 +486,20 @@ const App: React.FC = () => {
                         <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-transparent border-none text-white text-sm text-center w-32 focus:ring-0" />
                         <button onClick={() => changeDate(1)} className="p-2 text-gray-400 hover:text-white"><ChevronRight size={20}/></button>
                     </div>
-                    <button onClick={() => setReportModalOpen(true)} className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700">
+                    {/* Botão Baixar Relatório Diário */}
+                    <button 
+                        onClick={handleDownloadDaily}
+                        className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors"
+                        title="Baixar Relatório do Dia"
+                    >
+                        <FileText size={18} />
+                    </button>
+                    {/* Botão Baixar Relatório por Período */}
+                    <button 
+                        onClick={() => setReportModalOpen(true)} 
+                        className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors"
+                        title="Baixar Relatório por Período"
+                    >
                         <Download size={18} />
                     </button>
                 </div>
