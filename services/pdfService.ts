@@ -1,5 +1,4 @@
 
-
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatCurrency, formatTime } from "../utils";
@@ -118,8 +117,12 @@ export const generateReportPDF = (
   const clientRows = sortedClients.map(c => {
     const datePart = new Date(c.timestamp).toLocaleDateString('pt-BR');
     let serviceDisplay: string = c.serviceType;
-    // Append product name if exists
-    if (c.description) {
+    
+    // Append product names if exists
+    if (c.products && c.products.length > 0) {
+        const prodNames = c.products.map(p => p.name).join(', ');
+        serviceDisplay += ` + ${prodNames}`;
+    } else if (c.description) {
         serviceDisplay += ` (${c.description})`;
     } else if (c.extraValue > 0) {
         serviceDisplay += ' (+Adic)';

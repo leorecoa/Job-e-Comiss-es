@@ -1,10 +1,9 @@
 
-
 export enum ServiceType {
   CUT = 'Corte',
   BEARD = 'Barba',
   COMBO = 'Combo', // Cut + Beard
-  PRODUCT = 'Produto',
+  PRODUCT = 'Produto', // Standalone product sale
   OTHER = 'Outros'
 }
 
@@ -17,6 +16,7 @@ export interface ProductItem {
   id: string;
   name: string;
   price: number;
+  commissionRate?: number; // Optional specific commission rate for this product
 }
 
 export interface Client {
@@ -28,8 +28,10 @@ export interface Client {
   serviceValue: number;
   extraValue: number; // For additional services
   totalValue: number;
+  commissionValue: number; // The exact commission value calculated at time of sale
   timestamp: number; // Date.now()
-  description?: string; // Name of the product or details
+  description?: string; // Notes
+  products: ProductItem[]; // List of products sold with this service
 }
 
 export interface Vale {
@@ -60,8 +62,9 @@ export interface AppSettings {
   priceCombo: number;
   priceProduct: number; // Default/Fallback price
   products: ProductItem[]; // List of specific products
-  commissionRate: number; // Percentage (e.g., 40)
-  barbers: string[]; // Lista de barbeiros cadastrados (VIP)
+  commissionRate: number; // Service Commission Percentage (e.g., 50)
+  productCommissionRate: number; // Default Product Commission Percentage (e.g., 5)
+  barbers: string[]; // List of registered barbers
 }
 
 export type PlanType = 'trial' | 'pro_monthly' | 'vip_monthly' | 'admin_life';
@@ -70,9 +73,9 @@ export interface UserProfile {
   ownerName: string;
   shopName: string;
   email: string;
-  startDate: number; // Timestamp of when they started using the app
-  isPro: boolean; // If they have paid (General check)
-  planType: PlanType; // Specific plan detail
+  startDate: number;
+  isPro: boolean;
+  planType: PlanType;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -83,6 +86,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   priceCombo: 70,
   priceProduct: 0,
   products: [],
-  commissionRate: 40,
+  commissionRate: 50,
+  productCommissionRate: 10, // Default 10% for products
   barbers: []
 };

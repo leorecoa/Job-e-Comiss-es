@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AppSettings, UserProfile, ProductItem } from '../types';
-import { X, Save, Crown, Users, Trash2, Plus, Package, DollarSign } from 'lucide-react';
+import { X, Save, Crown, Users, Trash2, Plus, Package, DollarSign, Percent } from 'lucide-react';
 import { generateId } from '../utils';
 
 interface SettingsModalProps {
@@ -27,6 +27,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Product Form State
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
+  const [newProductCommission, setNewProductCommission] = useState('');
 
   if (!isOpen) return null;
 
@@ -61,7 +62,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         const newItem: ProductItem = {
             id: generateId(),
             name: newProductName.trim(),
-            price: Number(newProductPrice)
+            price: Number(newProductPrice),
+            commissionRate: newProductCommission ? Number(newProductCommission) : undefined
         };
         setFormData(prev => ({
             ...prev,
@@ -69,6 +71,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }));
         setNewProductName('');
         setNewProductPrice('');
+        setNewProductCommission('');
     }
   };
 
@@ -161,7 +164,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
             </div>
              <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Produto (Padrão)</label>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Produto (Valor Base)</label>
               <input
                 type="number"
                 value={formData.priceProduct || 0}
@@ -181,7 +184,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1 custom-scrollbar">
                     {(formData.products || []).map((product) => (
                         <div key={product.id} className="flex justify-between items-center bg-gray-900 p-2 rounded-lg border border-gray-700">
-                            <span className="text-white text-sm truncate flex-1">{product.name}</span>
+                            <div className="flex-1 overflow-hidden">
+                                <span className="text-white text-sm block truncate">{product.name}</span>
+                                <span className="text-[10px] text-gray-400 block">
+                                    Comissão: {product.commissionRate !== undefined ? product.commissionRate : formData.productCommissionRate}%
+                                </span>
+                            </div>
                             <span className="text-green-400 text-xs font-bold mr-3">R$ {product.price.toFixed(2)}</span>
                             <button 
                                 type="button"
@@ -202,26 +210,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         type="text"
                         value={newProductName}
                         onChange={(e) => setNewProductName(e.target.value)}
-                        placeholder="Nome (ex: Pomada)"
-                        className="flex-[2] bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none"
+                        placeholder="Nome"
+                        className="flex-[2] bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none w-full"
                     />
-                    <div className="relative flex-1">
+                    <div className="flex-1 flex gap-1">
                         <input 
                             type="number"
                             value={newProductPrice}
                             onChange={(e) => setNewProductPrice(e.target.value)}
                             placeholder="$$"
-                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none"
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none"
+                        />
+                        <input 
+                            type="number"
+                            value={newProductCommission}
+                            onChange={(e) => setNewProductCommission(e.target.value)}
+                            placeholder="%"
+                            title="Comissão Específica"
+                            className="w-12 bg-gray-900 border border-gray-700 rounded-lg px-1 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none text-center"
                         />
                     </div>
                     <button 
                         type="button"
                         onClick={handleAddProduct}
-                        className="bg-green-600 hover:bg-green-500 text-white p-2 rounded-lg"
+                        className="bg-green-600 hover:bg-green-500 text-white p-2 rounded-lg shrink-0"
                     >
                         <Plus size={18} />
                     </button>
                 </div>
+                <p className="text-[10px] text-gray-500 text-right">Dica: Use o campo % para comissão específica do produto.</p>
           </div>
 
           {/* VIP Barber Management Section */}
@@ -270,15 +287,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          <div className="mt-2">
-            <label className="block text-sm font-medium text-gray-400 mb-1">Taxa de Comissão (%)</label>
-            <input
-              type="number"
-              value={formData.commissionRate}
-              onChange={(e) => handleChange('commissionRate', e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
-            />
-            <p className="text-xs text-gray-500 mt-1">Porcentagem paga ao barbeiro.</p>
+          <div className="mt-2 grid grid-cols-2 gap-4">
+            <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Comissão Serviços (%)</label>
+                <input
+                type="number"
+                value={formData.commissionRate}
+                onChange={(e) => handleChange('commissionRate', e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
+                />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Comissão Produtos (%)</label>
+                <input
+                type="number"
+                value={formData.productCommissionRate || 10}
+                onChange={(e) => handleChange('productCommissionRate', e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-green-500 outline-none"
+                />
+            </div>
+            <p className="text-xs text-gray-500 col-span-2">Defina porcentagens diferentes para serviços (ex: 50%) e vendas (ex: 10%).</p>
           </div>
 
           <div className="pt-4">

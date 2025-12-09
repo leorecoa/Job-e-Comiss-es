@@ -1,5 +1,4 @@
 
-
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -46,8 +45,13 @@ export const generateAndDownloadCSV = (
     
     // Improved description logic for CSV
     let detail = '';
-    if (c.serviceType === 'Produto' && c.description) {
-        detail = c.description;
+    
+    // Check for products array first
+    if (c.products && c.products.length > 0) {
+        detail = c.products.map((p: any) => p.name).join(' + ');
+        if (c.description && c.description !== detail) {
+             detail += ` (${c.description})`;
+        }
     } else if (c.description) {
         detail = c.description;
     } else if (c.extraValue > 0) {

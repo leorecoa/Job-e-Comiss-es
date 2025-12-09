@@ -93,7 +93,9 @@ const App: React.FC = () => {
       if (!Array.isArray(parsed)) return [];
       return parsed.map((c: any) => ({
           ...c,
-          clientType: c.clientType || ClientType.RETURNING
+          clientType: c.clientType || ClientType.RETURNING,
+          products: c.products || [], // Ensure backward compatibility
+          commissionValue: c.commissionValue || 0
       }));
     } catch (e) {
       console.error("Error loading clients", e);
@@ -238,7 +240,16 @@ const App: React.FC = () => {
   // -- Calculations --
   const stats = useMemo(() => {
     const totalSales = filteredClients.reduce((acc, curr) => acc + curr.totalValue, 0);
-    const grossCommission = totalSales * (settings.commissionRate / 100);
+    
+    // Calculate Commission using the stored value if available, else fallback
+    const grossCommission = filteredClients.reduce((acc, curr) => {
+        if (curr.commissionValue !== undefined) {
+            return acc + curr.commissionValue;
+        }
+        // Fallback for old records
+        return acc + (curr.totalValue * (settings.commissionRate / 100));
+    }, 0);
+
     const totalVales = filteredVales.reduce((acc, curr) => acc + curr.value, 0);
     const netCommission = grossCommission - totalVales;
 
@@ -353,7 +364,12 @@ const App: React.FC = () => {
 
         // PDF Logic (Default)
         const totalSales = rangeClients.reduce((acc, curr) => acc + curr.totalValue, 0);
-        const grossCommission = totalSales * (settings.commissionRate / 100);
+        
+        // Use stored commission value
+        const grossCommission = rangeClients.reduce((acc, curr) => {
+             return acc + (curr.commissionValue || (curr.totalValue * (settings.commissionRate / 100)));
+        }, 0);
+
         const totalVales = rangeVales.reduce((acc, curr) => acc + curr.value, 0);
         const netCommission = grossCommission - totalVales;
 
@@ -560,6 +576,12 @@ const App: React.FC = () => {
                                                 </td>
                                                 <td className="p-3 md:p-4 text-gray-300 text-sm whitespace-nowrap">
                                                     {c.serviceType}
+                                                    {/* Show product names if available */}
+                                                    {c.products && c.products.length > 0 && (
+                                                        <span className="text-green-400 text-xs block">
+                                                            + {c.products.length} Prod.
+                                                        </span>
+                                                    )}
                                                     {c.extraValue > 0 && <span className="text-xs ml-1 text-gray-500">+{c.extraValue}</span>}
                                                 </td>
                                                 <td className="p-3 md:p-4 text-right font-bold text-white whitespace-nowrap">{formatCurrency(c.totalValue)}</td>

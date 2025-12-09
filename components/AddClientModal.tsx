@@ -1,8 +1,7 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { ServiceType, AppSettings, ClientType, Client, ProductItem } from '../types';
-import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText } from 'lucide-react';
+import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag } from 'lucide-react';
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -19,8 +18,9 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   const [clientType, setClientType] = useState<ClientType>(ClientType.RETURNING);
   const [extraValue, setExtraValue] = useState<string>('0');
   const [customPrice, setCustomPrice] = useState<string>('');
-  const [description, setDescription] = useState<string>(''); // Product name or notes
+  const [description, setDescription] = useState<string>(''); 
   const [time, setTime] = useState('');
+  const [selectedProducts, setSelectedProducts] = useState<ProductItem[]>([]);
 
   // Reset or populate form when modal opens
   useEffect(() => {
@@ -32,6 +32,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setClientType(initialData.clientType || ClientType.RETURNING);
         setExtraValue(initialData.extraValue.toString());
         setDescription(initialData.description || '');
+        setSelectedProducts(initialData.products || []);
         
         if (initialData.serviceType === ServiceType.OTHER || initialData.serviceType === ServiceType.PRODUCT) {
            setCustomPrice(initialData.serviceValue.toString());
@@ -39,7 +40,6 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
            setCustomPrice('');
         }
 
-        // Set time from timestamp
         const d = new Date(initialData.timestamp);
         const hours = String(d.getHours()).padStart(2, '0');
         const minutes = String(d.getMinutes()).padStart(2, '0');
@@ -47,15 +47,14 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
       } else {
         setName('');
-        // Pre-select first barber if available in list
         setBarber(settings.barbers && settings.barbers.length > 0 ? settings.barbers[0] : '');
         setService(ServiceType.CUT);
         setClientType(ClientType.RETURNING);
         setExtraValue('0');
         setCustomPrice('');
         setDescription('');
+        setSelectedProducts([]);
         
-        // Set current time
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
@@ -64,54 +63,71 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
     }
   }, [isOpen, initialData, settings.barbers]);
 
-  // Effect to update custom price input when switching to Product or Other
-  useEffect(() => {
-    if (!initialData && isOpen) {
-        if (service === ServiceType.PRODUCT) {
-            setCustomPrice(settings.priceProduct ? settings.priceProduct.toString() : '');
-        } else if (service === ServiceType.OTHER) {
-            setCustomPrice('');
-        } else {
-            // Only reset description if switching away from product/other to standard services if needed
-            // But we want to keep notes if user typed them. 
-            // However, if switching TO product, we might want to clear a generic note.
-            // Let's keep it simple and not auto-clear description aggressively.
-        }
-    }
-  }, [service, settings.priceProduct, isOpen, initialData]);
-
   if (!isOpen) return null;
 
-  const getBasePrice = () => {
+  const getServicePrice = () => {
     if (service === ServiceType.CUT) return settings.priceCut;
     if (service === ServiceType.BEARD) return settings.priceBeard || 0;
     if (service === ServiceType.COMBO) return settings.priceCombo;
-    // For Product and Other, we rely on the input, but fallback to settings for product if input is empty
+    // If it's pure Product type (legacy) or Other
     if (service === ServiceType.PRODUCT) return Number(customPrice) || settings.priceProduct || 0;
     return Number(customPrice) || 0;
   };
 
-  const getTotal = () => {
-    return getBasePrice() + (Number(extraValue) || 0);
+  const getProductsTotal = () => {
+    return selectedProducts.reduce((acc, p) => acc + p.price, 0);
   };
 
-  const handleSelectProduct = (product: ProductItem) => {
-     setCustomPrice(product.price.toString());
-     setDescription(product.name);
+  const getTotal = () => {
+    return getServicePrice() + getProductsTotal() + (Number(extraValue) || 0);
+  };
+
+  const toggleProduct = (product: ProductItem) => {
+    setSelectedProducts(prev => {
+        const exists = prev.find(p => p.id === product.id);
+        if (exists) {
+            return prev.filter(p => p.id !== product.id);
+        } else {
+            return [...prev, product];
+        }
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const serviceVal = getServicePrice();
+    const productsVal = getProductsTotal();
+    
+    // Calculate Commission
+    // Service Commission
+    const serviceCommission = serviceVal * (settings.commissionRate / 100);
+    
+    // Product Commission (Individual or Default)
+    const productsCommission = selectedProducts.reduce((acc, p) => {
+        const rate = p.commissionRate !== undefined ? p.commissionRate : (settings.productCommissionRate || 10);
+        return acc + (p.price * (rate / 100));
+    }, 0);
+
+    const totalCommission = serviceCommission + productsCommission;
+
+    // Create description string if products are selected but description is empty
+    let finalDescription = description;
+    if (!finalDescription && selectedProducts.length > 0) {
+        finalDescription = selectedProducts.map(p => p.name).join(', ');
+    }
+
     onSave({
       name,
       barberName: barber,
       serviceType: service,
       clientType: clientType,
-      serviceValue: getBasePrice(),
+      serviceValue: serviceVal,
       extraValue: Number(extraValue),
       totalValue: getTotal(),
+      commissionValue: totalCommission,
       timeStr: time,
-      description: description
+      description: finalDescription,
+      products: selectedProducts
     });
     onClose();
   };
@@ -132,7 +148,6 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
           
           {/* Top Row: Client Type & Time */}
           <div className="grid grid-cols-2 gap-3 mb-2">
-             {/* Client Type Toggle */}
              <div className="flex bg-gray-900 rounded-lg p-1 border border-gray-700">
                 <button
                   type="button"
@@ -158,7 +173,6 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                 </button>
              </div>
 
-             {/* Time Input */}
              <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                   <Clock size={16} />
@@ -214,9 +228,11 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Tipo de Serviço</label>
+            <label className="block text-sm font-medium text-gray-400 mb-2">Serviço Principal</label>
             <div className="grid grid-cols-3 gap-2">
-              {Object.values(ServiceType).map((type) => (
+              {Object.values(ServiceType)
+               .filter(t => t !== ServiceType.PRODUCT) // Hide generic product type if we have specific products list
+               .map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -230,72 +246,82 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                   {type}
                 </button>
               ))}
+              {/* Optional: Generic Product Button if list is empty or strictly needed */}
+              {(!settings.products || settings.products.length === 0) && (
+                   <button
+                   type="button"
+                   onClick={() => setService(ServiceType.PRODUCT)}
+                   className={`py-2 px-1 rounded-lg text-xs font-medium transition-all ${
+                     service === ServiceType.PRODUCT
+                       ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
+                       : 'bg-gray-900 text-gray-400 hover:bg-gray-700'
+                   }`}
+                 >
+                   Produto
+                 </button>
+              )}
             </div>
           </div>
           
-          {/* Quick Select Products */}
-          {service === ServiceType.PRODUCT && settings.products && settings.products.length > 0 && (
+          {/* Products Multi-Selection */}
+          {settings.products && settings.products.length > 0 && (
              <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
-                 <p className="text-xs text-gray-400 mb-2 font-bold uppercase">Selecione o Produto:</p>
+                 <div className="flex items-center gap-2 mb-2">
+                    <ShoppingBag size={14} className="text-green-400"/>
+                    <p className="text-xs text-gray-400 font-bold uppercase">Adicionar Produtos:</p>
+                 </div>
                  <div className="flex flex-wrap gap-2">
-                     {settings.products.map(p => (
-                         <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => handleSelectProduct(p)}
-                            className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
-                                description === p.name 
-                                    ? 'bg-green-600 text-white border-green-500' 
-                                    : 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700'
-                            }`}
-                         >
-                            {p.name} <span className="opacity-70 ml-1">R${p.price}</span>
-                         </button>
-                     ))}
+                     {settings.products.map(p => {
+                         const isSelected = selectedProducts.some(sp => sp.id === p.id);
+                         return (
+                            <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => toggleProduct(p)}
+                                className={`px-3 py-1.5 rounded-full text-xs border transition-colors flex items-center gap-1 ${
+                                    isSelected 
+                                        ? 'bg-green-600 text-white border-green-500' 
+                                        : 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700'
+                                }`}
+                            >
+                                {isSelected && <Check size={12} />}
+                                {p.name} <span className="opacity-70 font-mono">R${p.price}</span>
+                            </button>
+                         );
+                     })}
                  </div>
              </div>
           )}
           
-          {/* Custom Price - Only for Other/Product */}
-          {(service === ServiceType.OTHER || service === ServiceType.PRODUCT) && (
+          {/* Custom Price - Only for Other */}
+          {(service === ServiceType.OTHER || (service === ServiceType.PRODUCT && selectedProducts.length === 0)) && (
              <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">
-                   {service === ServiceType.PRODUCT ? 'Valor do Produto (R$)' : 'Valor do Serviço (R$)'}
+                   Valor do Serviço/Produto (R$)
                 </label>
                 <input
                   type="number"
                   value={customPrice}
                   onChange={(e) => setCustomPrice(e.target.value)}
-                  placeholder={service === ServiceType.PRODUCT && settings.priceProduct ? settings.priceProduct.toString() : "0.00"}
+                  placeholder="0.00"
                   className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
                 />
               </div>
           )}
 
-          {/* Description / Notes - Always Visible Now */}
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">
-               {service === ServiceType.PRODUCT ? 'Qual produto?' : 
-                service === ServiceType.OTHER ? 'Descrição do Serviço' : 
-                'Observações (Opcional)'}
+               Observações
             </label>
             <div className="relative">
                 <input
                     type="text"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder={
-                        service === ServiceType.PRODUCT ? "Ex: Pomada" : 
-                        service === ServiceType.OTHER ? "Ex: Sobrancelha" :
-                        "Ex: Disfarçado baixo, detalhes..."
-                    }
+                    placeholder="Ex: Disfarçado baixo, detalhes..."
                     className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 pl-10 text-white focus:ring-2 focus:ring-gold-500 outline-none"
                 />
-                {service === ServiceType.PRODUCT || service === ServiceType.OTHER ? (
-                   <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                ) : (
-                   <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                )}
+                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
             </div>
           </div>
 
