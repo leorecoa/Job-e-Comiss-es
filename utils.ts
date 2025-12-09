@@ -43,7 +43,16 @@ export const generateAndDownloadCSV = (
     const dateStr = date.toLocaleDateString('pt-BR');
     const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const valueStr = c.totalValue.toFixed(2).replace('.', ','); // Formato Excel PT-BR
-    const detail = c.description ? c.description : (c.extraValue > 0 ? `+ Adicional R$${c.extraValue}` : '');
+    
+    // Improved description logic for CSV
+    let detail = '';
+    if (c.serviceType === 'Produto' && c.description) {
+        detail = c.description;
+    } else if (c.description) {
+        detail = c.description;
+    } else if (c.extraValue > 0) {
+        detail = `+ Adicional R$${c.extraValue}`;
+    }
 
     rows.push([
       dateStr,

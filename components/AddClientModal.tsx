@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ServiceType, AppSettings, ClientType, Client, ProductItem } from '../types';
-import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag } from 'lucide-react';
+import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText } from 'lucide-react';
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -72,8 +72,10 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         } else if (service === ServiceType.OTHER) {
             setCustomPrice('');
         } else {
-            // Reset description if not product/other
-            setDescription('');
+            // Only reset description if switching away from product/other to standard services if needed
+            // But we want to keep notes if user typed them. 
+            // However, if switching TO product, we might want to clear a generic note.
+            // Let's keep it simple and not auto-clear description aggressively.
         }
     }
   }, [service, settings.priceProduct, isOpen, initialData]);
@@ -253,26 +255,10 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                  </div>
              </div>
           )}
-
+          
+          {/* Custom Price - Only for Other/Product */}
           {(service === ServiceType.OTHER || service === ServiceType.PRODUCT) && (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">
-                   {service === ServiceType.PRODUCT ? 'Qual produto?' : 'Descrição do Serviço'}
-                </label>
-                <div className="relative">
-                    <input
-                        type="text"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder={service === ServiceType.PRODUCT ? "Ex: Pomada" : "Ex: Sobrancelha"}
-                        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 pl-10 text-white focus:ring-2 focus:ring-gold-500 outline-none"
-                    />
-                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                </div>
-              </div>
-              
-              <div>
+             <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">
                    {service === ServiceType.PRODUCT ? 'Valor do Produto (R$)' : 'Valor do Serviço (R$)'}
                 </label>
@@ -284,8 +270,34 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                   className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
                 />
               </div>
-            </div>
           )}
+
+          {/* Description / Notes - Always Visible Now */}
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+               {service === ServiceType.PRODUCT ? 'Qual produto?' : 
+                service === ServiceType.OTHER ? 'Descrição do Serviço' : 
+                'Observações (Opcional)'}
+            </label>
+            <div className="relative">
+                <input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder={
+                        service === ServiceType.PRODUCT ? "Ex: Pomada" : 
+                        service === ServiceType.OTHER ? "Ex: Sobrancelha" :
+                        "Ex: Disfarçado baixo, detalhes..."
+                    }
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 pl-10 text-white focus:ring-2 focus:ring-gold-500 outline-none"
+                />
+                {service === ServiceType.PRODUCT || service === ServiceType.OTHER ? (
+                   <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                ) : (
+                   <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                )}
+            </div>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Adicionais (R$)</label>
