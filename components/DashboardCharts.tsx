@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { formatCurrency } from '../utils';
 import { ServiceType } from '../types';
@@ -89,7 +90,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ clients }) => 
                                 <span className={`w-2 h-2 rounded-full ${
                                     d.name === ServiceType.CUT ? 'bg-blue-500' : 
                                     d.name === ServiceType.BEARD ? 'bg-orange-500' : 
-                                    d.name === ServiceType.COMBO ? 'bg-purple-500' : 'bg-gray-500'
+                                    d.name === ServiceType.COMBO ? 'bg-purple-500' : 
+                                    d.name === ServiceType.PRODUCT ? 'bg-green-500' : 'bg-gray-500'
                                 }`}></span>
                                 {d.name}
                             </span>
@@ -100,7 +102,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ clients }) => 
                                 className={`h-full rounded-full transition-all duration-1000 ease-out ${
                                     d.name === ServiceType.CUT ? 'bg-blue-500' : 
                                     d.name === ServiceType.BEARD ? 'bg-orange-500' : 
-                                    d.name === ServiceType.COMBO ? 'bg-purple-500' : 'bg-gray-500'
+                                    d.name === ServiceType.COMBO ? 'bg-purple-500' : 
+                                    d.name === ServiceType.PRODUCT ? 'bg-green-500' : 'bg-gray-500'
                                 }`}
                                 style={{ width: `${d.percent}%` }}
                             ></div>

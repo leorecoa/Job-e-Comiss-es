@@ -1,8 +1,10 @@
 
+
 export enum ServiceType {
   CUT = 'Corte',
   BEARD = 'Barba',
   COMBO = 'Combo', // Cut + Beard
+  PRODUCT = 'Produto',
   OTHER = 'Outros'
 }
 

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { ServiceType, AppSettings, ClientType, Client } from '../types';
 import { X, Check, UserPlus, UserCheck, Clock, ChevronDown } from 'lucide-react';
@@ -30,7 +31,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setClientType(initialData.clientType || ClientType.RETURNING);
         setExtraValue(initialData.extraValue.toString());
         
-        if (initialData.serviceType === ServiceType.OTHER) {
+        if (initialData.serviceType === ServiceType.OTHER || initialData.serviceType === ServiceType.PRODUCT) {
            setCustomPrice(initialData.serviceValue.toString());
         } else {
            setCustomPrice('');
@@ -205,7 +206,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
             </div>
           </div>
 
-          {service === ServiceType.OTHER && (
+          {(service === ServiceType.OTHER || service === ServiceType.PRODUCT) && (
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">Valor do Serviço (R$)</label>
               <input
