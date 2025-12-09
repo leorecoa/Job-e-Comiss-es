@@ -61,12 +61,25 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
     }
   }, [isOpen, initialData, settings.barbers]);
 
+  // Effect to update custom price input when switching to Product or Other
+  useEffect(() => {
+    if (!initialData && isOpen) {
+        if (service === ServiceType.PRODUCT) {
+            setCustomPrice(settings.priceProduct ? settings.priceProduct.toString() : '');
+        } else if (service === ServiceType.OTHER) {
+            setCustomPrice('');
+        }
+    }
+  }, [service, settings.priceProduct, isOpen, initialData]);
+
   if (!isOpen) return null;
 
   const getBasePrice = () => {
     if (service === ServiceType.CUT) return settings.priceCut;
     if (service === ServiceType.BEARD) return settings.priceBeard || 0;
     if (service === ServiceType.COMBO) return settings.priceCombo;
+    // For Product and Other, we rely on the input, but fallback to settings for product if input is empty
+    if (service === ServiceType.PRODUCT) return Number(customPrice) || settings.priceProduct || 0;
     return Number(customPrice) || 0;
   };
 
@@ -188,13 +201,13 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">Tipo de Serviço</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {Object.values(ServiceType).map((type) => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => setService(type)}
-                  className={`py-2 px-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`py-2 px-1 rounded-lg text-xs font-medium transition-all ${
                     service === type
                       ? 'bg-gold-500 text-black shadow-lg shadow-gold-500/20'
                       : 'bg-gray-900 text-gray-400 hover:bg-gray-700'
@@ -208,11 +221,14 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
           {(service === ServiceType.OTHER || service === ServiceType.PRODUCT) && (
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Valor do Serviço (R$)</label>
+              <label className="block text-sm font-medium text-gray-400 mb-1">
+                 {service === ServiceType.PRODUCT ? 'Valor do Produto (R$)' : 'Valor do Serviço (R$)'}
+              </label>
               <input
                 type="number"
                 value={customPrice}
                 onChange={(e) => setCustomPrice(e.target.value)}
+                placeholder={service === ServiceType.PRODUCT && settings.priceProduct ? settings.priceProduct.toString() : "0.00"}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
               />
             </div>
@@ -227,7 +243,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
               placeholder="0.00"
             />
-            <p className="text-xs text-gray-500 mt-1">Sobrancelha, Pezinho, produtos, etc.</p>
+            <p className="text-xs text-gray-500 mt-1">Sobrancelha, Pezinho, etc.</p>
           </div>
 
           <div className="pt-4 border-t border-gray-700 flex justify-between items-center">

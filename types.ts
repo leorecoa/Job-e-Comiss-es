@@ -51,6 +51,7 @@ export interface AppSettings {
   priceCut: number;
   priceBeard: number;
   priceCombo: number;
+  priceProduct: number; // New field
   commissionRate: number; // Percentage (e.g., 40)
   barbers: string[]; // Lista de barbeiros cadastrados (VIP)
 }
@@ -72,6 +73,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   priceCut: 50,
   priceBeard: 30,
   priceCombo: 70,
+  priceProduct: 0,
   commissionRate: 40,
   barbers: []
 };

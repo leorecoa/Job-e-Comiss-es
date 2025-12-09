@@ -161,7 +161,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-3">
+             <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Corte (R$)</label>
+              <input
+                type="number"
+                value={formData.priceCut}
+                onChange={(e) => handleChange('priceCut', e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+              />
+            </div>
              <div>
               <label className="block text-xs font-medium text-gray-400 mb-1">Barba (R$)</label>
               <input
@@ -172,20 +181,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Corte (R$)</label>
-              <input
-                type="number"
-                value={formData.priceCut}
-                onChange={(e) => handleChange('priceCut', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
-              />
-            </div>
-            <div>
               <label className="block text-xs font-medium text-gray-400 mb-1">Combo (R$)</label>
               <input
                 type="number"
                 value={formData.priceCombo}
                 onChange={(e) => handleChange('priceCombo', e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Produto (R$)</label>
+              <input
+                type="number"
+                value={formData.priceProduct || 0}
+                onChange={(e) => handleChange('priceProduct', e.target.value)}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
               />
             </div>

@@ -477,32 +477,32 @@ const App: React.FC = () => {
         
         {viewMode === 'daily' && (
           <div className="animate-slide-in">
-             <div className="flex flex-col lg:flex-row justify-between items-center gap-4 mb-6">
-                <div id="tour-actions" className="flex gap-2 w-full lg:w-auto">
-                    <button id="tour-new-client-btn" onClick={handleOpenAddClient} className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95">
+             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                <div id="tour-actions" className="flex gap-2 w-full md:w-auto">
+                    <button id="tour-new-client-btn" onClick={handleOpenAddClient} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95">
                         <Plus size={18} /> Novo
                     </button>
-                    <button onClick={() => setValeModalOpen(true)} className="flex items-center justify-center gap-2 bg-gray-800 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95">
+                    <button onClick={() => setValeModalOpen(true)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-800 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95">
                         <MinusCircle size={18} /> Vale
                     </button>
-                    <button id="tour-settings-btn" onClick={() => setSettingsModalOpen(true)} className="bg-gray-800 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors">
+                    <button id="tour-settings-btn" onClick={() => setSettingsModalOpen(true)} className="bg-gray-800 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors shrink-0">
                         <Settings size={18} />
                     </button>
                 </div>
 
-                <div id="tour-filters" className="flex gap-2 w-full lg:w-auto items-center">
-                    <button onClick={() => setViewMode('monthly')} className="bg-gray-800 text-blue-400 px-4 py-2.5 rounded-xl border border-gray-700">
+                <div id="tour-filters" className="flex gap-2 w-full md:w-auto items-center overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+                    <button onClick={() => setViewMode('monthly')} className="bg-gray-800 text-blue-400 px-4 py-2.5 rounded-xl border border-gray-700 shrink-0">
                         <BarChart3 size={18} />
                     </button>
-                    <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5 flex-1 justify-between lg:flex-none">
+                    <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5 flex-1 justify-between md:flex-none min-w-[140px]">
                         <button onClick={() => changeDate(-1)} className="p-2 text-gray-400 hover:text-white"><ChevronLeft size={20}/></button>
-                        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-transparent border-none text-white text-sm text-center w-32 focus:ring-0" />
+                        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-transparent border-none text-white text-sm text-center w-full md:w-32 focus:ring-0" />
                         <button onClick={() => changeDate(1)} className="p-2 text-gray-400 hover:text-white"><ChevronRight size={20}/></button>
                     </div>
                     {/* Botão Baixar Relatório Diário */}
                     <button 
                         onClick={handleDownloadDaily}
-                        className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors"
+                        className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors shrink-0"
                         title="Baixar Relatório do Dia (PDF)"
                     >
                         <FileText size={18} />
@@ -510,7 +510,7 @@ const App: React.FC = () => {
                     {/* Botão Baixar Relatório por Período */}
                     <button 
                         onClick={() => setReportModalOpen(true)} 
-                        className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors"
+                        className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors shrink-0"
                         title="Exportar Dados (PDF/Excel)"
                     >
                         <Download size={18} />
@@ -543,27 +543,27 @@ const App: React.FC = () => {
                                 <table className="w-full text-left">
                                     <thead className="text-xs text-gray-400 bg-gray-900/50 uppercase">
                                         <tr>
-                                            <th className="p-4">Hora</th>
-                                            <th className="p-4">Cliente</th>
-                                            <th className="p-4">Serviço</th>
-                                            <th className="p-4 text-right">Valor</th>
-                                            <th className="p-4 w-20"></th>
+                                            <th className="p-3 md:p-4">Hora</th>
+                                            <th className="p-3 md:p-4">Cliente</th>
+                                            <th className="p-3 md:p-4">Serviço</th>
+                                            <th className="p-3 md:p-4 text-right">Valor</th>
+                                            <th className="p-3 md:p-4 w-20"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-700/50">
                                         {filteredClients.map(c => (
                                             <tr key={c.id} className="hover:bg-gray-700/30 group">
-                                                <td className="p-4 text-gray-400 font-mono text-xs">{formatTime(c.timestamp)}</td>
-                                                <td className="p-4 font-medium text-white">
+                                                <td className="p-3 md:p-4 text-gray-400 font-mono text-xs whitespace-nowrap">{formatTime(c.timestamp)}</td>
+                                                <td className="p-3 md:p-4 font-medium text-white min-w-[100px]">
                                                     {c.name}
                                                     <span className={`block text-[10px] ${c.clientType === ClientType.NEW ? 'text-green-400' : 'text-gold-500'}`}>{c.clientType}</span>
                                                 </td>
-                                                <td className="p-4 text-gray-300 text-sm">
+                                                <td className="p-3 md:p-4 text-gray-300 text-sm whitespace-nowrap">
                                                     {c.serviceType}
                                                     {c.extraValue > 0 && <span className="text-xs ml-1 text-gray-500">+{c.extraValue}</span>}
                                                 </td>
-                                                <td className="p-4 text-right font-bold text-white">{formatCurrency(c.totalValue)}</td>
-                                                <td className="p-4 flex justify-end gap-2">
+                                                <td className="p-3 md:p-4 text-right font-bold text-white whitespace-nowrap">{formatCurrency(c.totalValue)}</td>
+                                                <td className="p-3 md:p-4 flex justify-end gap-2">
                                                     <button onClick={() => handleEditClient(c)} className="text-blue-400 hover:bg-blue-500/10 p-2 rounded"><Pencil size={16}/></button>
                                                     <button onClick={() => handleDeleteClient(c.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>
                                                 </td>
@@ -579,19 +579,19 @@ const App: React.FC = () => {
                                 <table className="w-full text-left">
                                     <thead className="text-xs text-gray-400 bg-gray-900/50 uppercase">
                                         <tr>
-                                            <th className="p-4">Hora</th>
-                                            <th className="p-4">Descrição</th>
-                                            <th className="p-4 text-right">Valor</th>
-                                            <th className="p-4 w-16"></th>
+                                            <th className="p-3 md:p-4">Hora</th>
+                                            <th className="p-3 md:p-4">Descrição</th>
+                                            <th className="p-3 md:p-4 text-right">Valor</th>
+                                            <th className="p-3 md:p-4 w-16"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-700/50">
                                         {filteredVales.map(v => (
                                             <tr key={v.id} className="hover:bg-gray-700/30">
-                                                <td className="p-4 text-gray-400 font-mono text-xs">{formatTime(v.timestamp)}</td>
-                                                <td className="p-4 text-gray-300">{v.description} <span className="text-gray-500 text-xs">({v.barberName})</span></td>
-                                                <td className="p-4 text-right font-bold text-red-400">-{formatCurrency(v.value)}</td>
-                                                <td className="p-4 text-right">
+                                                <td className="p-3 md:p-4 text-gray-400 font-mono text-xs whitespace-nowrap">{formatTime(v.timestamp)}</td>
+                                                <td className="p-3 md:p-4 text-gray-300 min-w-[120px]">{v.description} <span className="text-gray-500 text-xs">({v.barberName})</span></td>
+                                                <td className="p-3 md:p-4 text-right font-bold text-red-400 whitespace-nowrap">-{formatCurrency(v.value)}</td>
+                                                <td className="p-3 md:p-4 text-right">
                                                     <button onClick={() => handleDeleteVale(v.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>
                                                 </td>
                                             </tr>
