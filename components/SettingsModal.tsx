@@ -27,7 +27,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Product Form State
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
-  const [newProductCommission, setNewProductCommission] = useState('');
 
   if (!isOpen) return null;
 
@@ -62,8 +61,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         const newItem: ProductItem = {
             id: generateId(),
             name: newProductName.trim(),
-            price: Number(newProductPrice),
-            commissionRate: newProductCommission ? Number(newProductCommission) : undefined
+            price: Number(newProductPrice)
         };
         setFormData(prev => ({
             ...prev,
@@ -71,7 +69,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }));
         setNewProductName('');
         setNewProductPrice('');
-        setNewProductCommission('');
     }
   };
 
@@ -186,9 +183,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <div key={product.id} className="flex justify-between items-center bg-gray-900 p-2 rounded-lg border border-gray-700">
                             <div className="flex-1 overflow-hidden">
                                 <span className="text-white text-sm block truncate">{product.name}</span>
-                                <span className="text-[10px] text-gray-400 block">
-                                    Comissão: {product.commissionRate !== undefined ? product.commissionRate : formData.productCommissionRate}%
-                                </span>
                             </div>
                             <span className="text-green-400 text-xs font-bold mr-3">R$ {product.price.toFixed(2)}</span>
                             <button 
@@ -221,14 +215,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             placeholder="$$"
                             className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none"
                         />
-                        <input 
-                            type="number"
-                            value={newProductCommission}
-                            onChange={(e) => setNewProductCommission(e.target.value)}
-                            placeholder="%"
-                            title="Comissão Específica"
-                            className="w-12 bg-gray-900 border border-gray-700 rounded-lg px-1 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none text-center"
-                        />
                     </div>
                     <button 
                         type="button"
@@ -238,7 +224,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <Plus size={18} />
                     </button>
                 </div>
-                <p className="text-[10px] text-gray-500 text-right">Dica: Use o campo % para comissão específica do produto.</p>
           </div>
 
           {/* VIP Barber Management Section */}
@@ -287,7 +272,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          <div className="mt-2 grid grid-cols-2 gap-4">
+          <div className="mt-2">
             <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">Comissão Serviços (%)</label>
                 <input
@@ -297,16 +282,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
                 />
             </div>
-            <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Comissão Produtos (%)</label>
-                <input
-                type="number"
-                value={formData.productCommissionRate || 10}
-                onChange={(e) => handleChange('productCommissionRate', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-green-500 outline-none"
-                />
-            </div>
-            <p className="text-xs text-gray-500 col-span-2">Defina porcentagens diferentes para serviços (ex: 50%) e vendas (ex: 10%).</p>
+            <p className="text-xs text-gray-500 mt-1">A comissão se aplica apenas a serviços (Corte, Barba, etc). Produtos não geram comissão.</p>
           </div>
 
           <div className="pt-4">

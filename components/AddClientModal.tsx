@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ServiceType, AppSettings, ClientType, Client, ProductItem } from '../types';
 import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag } from 'lucide-react';
@@ -95,27 +96,20 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const serviceVal = getServicePrice();
-    const productsVal = getProductsTotal();
     
-    // Calculate Commission
-    
-    // 1. Service Commission
-    // Se o tipo selecionado for "Produto" (o botão genérico), usa a taxa de produto. 
-    // Se for Corte/Barba/Combo, usa a taxa de serviço.
+    // Commission Calculation
     let serviceRate = settings.commissionRate;
+    
+    // If the main service type is PRODUCT, commission is 0 (Simple Conference)
     if (service === ServiceType.PRODUCT) {
-        serviceRate = settings.productCommissionRate || 10;
+        serviceRate = 0;
     }
 
+    // Only apply commission to the Service Value (not products)
     const serviceCommission = serviceVal * (serviceRate / 100);
     
-    // 2. Product List Commission (Individual or Default)
-    const productsCommission = selectedProducts.reduce((acc, p) => {
-        const rate = p.commissionRate !== undefined ? p.commissionRate : (settings.productCommissionRate || 10);
-        return acc + (p.price * (rate / 100));
-    }, 0);
-
-    const totalCommission = serviceCommission + productsCommission;
+    // Products contribute 0 to commission
+    const totalCommission = serviceCommission;
 
     // Create description string if products are selected but description is empty
     let finalDescription = description;
@@ -273,7 +267,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
              <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
                  <div className="flex items-center gap-2 mb-2">
                     <ShoppingBag size={14} className="text-green-400"/>
-                    <p className="text-xs text-gray-400 font-bold uppercase">Adicionar Produtos:</p>
+                    <p className="text-xs text-gray-400 font-bold uppercase">Adicionar Produtos (Sem Comissão):</p>
                  </div>
                  <div className="flex flex-wrap gap-2">
                      {settings.products.map(p => {

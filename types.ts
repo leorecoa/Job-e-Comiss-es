@@ -16,7 +16,7 @@ export interface ProductItem {
   id: string;
   name: string;
   price: number;
-  commissionRate?: number; // Optional specific commission rate for this product
+  // Commission rate removed as requested
 }
 
 export interface Client {
@@ -63,7 +63,6 @@ export interface AppSettings {
   priceProduct: number; // Default/Fallback price
   products: ProductItem[]; // List of specific products
   commissionRate: number; // Service Commission Percentage (e.g., 50)
-  productCommissionRate: number; // Default Product Commission Percentage (e.g., 5)
   barbers: string[]; // List of registered barbers
 }
 
@@ -87,6 +86,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   priceProduct: 0,
   products: [],
   commissionRate: 50,
-  productCommissionRate: 10, // Default 10% for products
   barbers: []
 };
