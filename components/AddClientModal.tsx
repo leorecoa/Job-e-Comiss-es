@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ServiceType, AppSettings, ClientType, Client, ProductItem } from '../types';
-import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag } from 'lucide-react';
+import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag, DollarSign } from 'lucide-react';
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -21,6 +21,10 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   const [description, setDescription] = useState<string>(''); 
   const [time, setTime] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<ProductItem[]>([]);
+  
+  // New: Manual Commission State
+  const [commissionValue, setCommissionValue] = useState<string>('');
+  const [isCommissionManuallyEdited, setIsCommissionManuallyEdited] = useState(false);
 
   // Reset or populate form when modal opens
   useEffect(() => {
@@ -33,6 +37,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setExtraValue(initialData.extraValue.toString());
         setDescription(initialData.description || '');
         setSelectedProducts(initialData.products || []);
+        setCommissionValue(initialData.commissionValue?.toString() || '0');
+        setIsCommissionManuallyEdited(true); // Don't auto-recalculate on load unless changed
         
         if (initialData.serviceType === ServiceType.OTHER || initialData.serviceType === ServiceType.PRODUCT) {
            setCustomPrice(initialData.serviceValue.toString());
@@ -54,6 +60,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setCustomPrice('');
         setDescription('');
         setSelectedProducts([]);
+        setIsCommissionManuallyEdited(false);
+        setCommissionValue(''); // Will be auto-calculated by the other useEffect
         
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
@@ -62,8 +70,6 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
       }
     }
   }, [isOpen, initialData, settings.barbers]);
-
-  if (!isOpen) return null;
 
   const getServicePrice = () => {
     if (service === ServiceType.CUT) return settings.priceCut;
@@ -82,6 +88,26 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
     return getServicePrice() + getProductsTotal() + (Number(extraValue) || 0);
   };
 
+  // Auto-Calculate Commission when dependencies change
+  useEffect(() => {
+    if (isOpen && !isCommissionManuallyEdited) {
+        let baseValueForCommission = 0;
+        let rate = settings.commissionRate / 100;
+
+        if (service === ServiceType.PRODUCT) {
+            // Standalone products have 0 commission by default
+            baseValueForCommission = 0;
+        } else {
+            // For Services (Cut, Beard, Combo, Other)
+            // Base = Service Price + Extras (usually Eyebrows, etc)
+            baseValueForCommission = getServicePrice() + (Number(extraValue) || 0);
+        }
+
+        const calculated = baseValueForCommission * rate;
+        setCommissionValue(calculated.toFixed(2));
+    }
+  }, [isOpen, service, customPrice, extraValue, settings.commissionRate, settings.priceCut, settings.priceBeard, settings.priceCombo, settings.priceProduct, isCommissionManuallyEdited]);
+
   const toggleProduct = (product: ProductItem) => {
     setSelectedProducts(prev => {
         const exists = prev.find(p => p.id === product.id);
@@ -96,21 +122,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const serviceVal = getServicePrice();
+    const totalVal = getTotal();
     
-    // Commission Calculation
-    let serviceRate = settings.commissionRate;
-    
-    // If the main service type is PRODUCT, commission is 0 (Simple Conference)
-    if (service === ServiceType.PRODUCT) {
-        serviceRate = 0;
-    }
-
-    // Only apply commission to the Service Value (not products)
-    const serviceCommission = serviceVal * (serviceRate / 100);
-    
-    // Products contribute 0 to commission
-    const totalCommission = serviceCommission;
-
     // Create description string if products are selected but description is empty
     let finalDescription = description;
     if (!finalDescription && selectedProducts.length > 0) {
@@ -124,14 +137,16 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
       clientType: clientType,
       serviceValue: serviceVal,
       extraValue: Number(extraValue),
-      totalValue: getTotal(),
-      commissionValue: totalCommission,
+      totalValue: totalVal,
+      commissionValue: Number(commissionValue) || 0, // Use the explicit field value
       timeStr: time,
       description: finalDescription,
       products: selectedProducts
     });
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-slide-in">
@@ -232,12 +247,15 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
             <label className="block text-sm font-medium text-gray-400 mb-2">Serviço Principal</label>
             <div className="grid grid-cols-3 gap-2">
               {Object.values(ServiceType)
-               .filter(t => t !== ServiceType.PRODUCT) // Hide generic product type if we have specific products list
+               .filter(t => t !== ServiceType.PRODUCT) 
                .map((type) => (
                 <button
                   key={type}
                   type="button"
-                  onClick={() => setService(type)}
+                  onClick={() => {
+                      setService(type);
+                      setIsCommissionManuallyEdited(false); // Reset manual override on type change
+                  }}
                   className={`py-2 px-1 rounded-lg text-xs font-medium transition-all ${
                     service === type
                       ? 'bg-gold-500 text-black shadow-lg shadow-gold-500/20'
@@ -247,10 +265,13 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                   {type}
                 </button>
               ))}
-              {/* Generic Product Button is always visible as a fallback */}
+              
                <button
                type="button"
-               onClick={() => setService(ServiceType.PRODUCT)}
+               onClick={() => {
+                   setService(ServiceType.PRODUCT);
+                   setIsCommissionManuallyEdited(false);
+               }}
                className={`py-2 px-1 rounded-lg text-xs font-medium transition-all ${
                  service === ServiceType.PRODUCT
                    ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
@@ -267,7 +288,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
              <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
                  <div className="flex items-center gap-2 mb-2">
                     <ShoppingBag size={14} className="text-green-400"/>
-                    <p className="text-xs text-gray-400 font-bold uppercase">Adicionar Produtos (Sem Comissão):</p>
+                    <p className="text-xs text-gray-400 font-bold uppercase">Adicionar Produtos (+ R$):</p>
                  </div>
                  <div className="flex flex-wrap gap-2">
                      {settings.products.map(p => {
@@ -289,6 +310,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                          );
                      })}
                  </div>
+                 <p className="text-[10px] text-gray-500 mt-2 italic">* Produtos somam ao total, mas não geram comissão automática.</p>
              </div>
           )}
           
@@ -324,22 +346,46 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Adicionais (R$)</label>
-            <input
-              type="number"
-              value={extraValue}
-              onChange={(e) => setExtraValue(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
-              placeholder="0.00"
-            />
-            <p className="text-xs text-gray-500 mt-1">Sobrancelha, Pezinho, etc.</p>
+          <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Adicionais (R$)</label>
+                <input
+                  type="number"
+                  value={extraValue}
+                  onChange={(e) => setExtraValue(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
+                  placeholder="0.00"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">Sobrancelha, etc.</p>
+              </div>
+
+              {/* Editable Commission Field */}
+              <div>
+                <label className="block text-sm font-bold text-gold-500 mb-1 flex items-center gap-1">
+                    Comissão (R$)
+                    <span className="text-[10px] font-normal text-gray-500 bg-gray-900 px-1 rounded border border-gray-700">Editável</span>
+                </label>
+                <div className="relative">
+                    <input
+                      type="number"
+                      value={commissionValue}
+                      onChange={(e) => {
+                          setCommissionValue(e.target.value);
+                          setIsCommissionManuallyEdited(true);
+                      }}
+                      className="w-full bg-gray-900 border border-gold-500/30 rounded-lg pl-8 pr-2 py-2 text-gold-500 font-bold focus:ring-2 focus:ring-gold-500 outline-none"
+                      placeholder="0.00"
+                    />
+                    <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gold-600" size={14} />
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">Valor para o barbeiro.</p>
+              </div>
           </div>
 
           <div className="pt-4 border-t border-gray-700 flex justify-between items-center">
             <div className="text-white">
-              <p className="text-sm text-gray-400">Total Final</p>
-              <p className="text-2xl font-bold text-gold-500">R$ {getTotal().toFixed(2)}</p>
+              <p className="text-sm text-gray-400">Total Cliente</p>
+              <p className="text-2xl font-bold text-white">R$ {getTotal().toFixed(2)}</p>
             </div>
             <button
               type="submit"
