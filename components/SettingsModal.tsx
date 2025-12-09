@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { AppSettings, UserProfile } from '../types';
-import { X, Save, Crown, Users, Trash2, Plus } from 'lucide-react';
+import { AppSettings, UserProfile, ProductItem } from '../types';
+import { X, Save, Crown, Users, Trash2, Plus, Package, DollarSign } from 'lucide-react';
+import { generateId } from '../utils';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -22,6 +23,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [newBarberName, setNewBarberName] = useState('');
+  
+  // Product Form State
+  const [newProductName, setNewProductName] = useState('');
+  const [newProductPrice, setNewProductPrice] = useState('');
 
   if (!isOpen) return null;
 
@@ -48,6 +53,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setFormData(prev => ({
         ...prev,
         barbers: prev.barbers?.filter((_, i) => i !== index) || []
+    }));
+  };
+
+  const handleAddProduct = () => {
+    if (newProductName.trim() && newProductPrice) {
+        const newItem: ProductItem = {
+            id: generateId(),
+            name: newProductName.trim(),
+            price: Number(newProductPrice)
+        };
+        setFormData(prev => ({
+            ...prev,
+            products: [...(prev.products || []), newItem]
+        }));
+        setNewProductName('');
+        setNewProductPrice('');
+    }
+  };
+
+  const handleRemoveProduct = (id: string) => {
+    setFormData(prev => ({
+        ...prev,
+        products: prev.products?.filter(p => p.id !== id) || []
     }));
   };
 
@@ -92,6 +120,108 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                 )}
              </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Nome da Barbearia</label>
+            <input
+              type="text"
+              value={formData.shopName}
+              onChange={(e) => handleChange('shopName', e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+             <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Corte (R$)</label>
+              <input
+                type="number"
+                value={formData.priceCut}
+                onChange={(e) => handleChange('priceCut', e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+              />
+            </div>
+             <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Barba (R$)</label>
+              <input
+                type="number"
+                value={formData.priceBeard || 0}
+                onChange={(e) => handleChange('priceBeard', e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Combo (R$)</label>
+              <input
+                type="number"
+                value={formData.priceCombo}
+                onChange={(e) => handleChange('priceCombo', e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+              />
+            </div>
+             <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Produto (Padrão)</label>
+              <input
+                type="number"
+                value={formData.priceProduct || 0}
+                onChange={(e) => handleChange('priceProduct', e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+              />
+            </div>
+          </div>
+
+           {/* Products List Section */}
+           <div className="p-4 rounded-xl border border-gray-700 bg-gray-900/30 space-y-3">
+                <div className="flex items-center gap-2 text-green-400 mb-2">
+                    <Package size={18} />
+                    <h3 className="font-bold text-sm">Catálogo de Produtos</h3>
+                </div>
+                
+                <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1 custom-scrollbar">
+                    {(formData.products || []).map((product) => (
+                        <div key={product.id} className="flex justify-between items-center bg-gray-900 p-2 rounded-lg border border-gray-700">
+                            <span className="text-white text-sm truncate flex-1">{product.name}</span>
+                            <span className="text-green-400 text-xs font-bold mr-3">R$ {product.price.toFixed(2)}</span>
+                            <button 
+                                type="button"
+                                onClick={() => handleRemoveProduct(product.id)}
+                                className="text-red-400 hover:text-red-300"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
+                    ))}
+                    {(formData.products || []).length === 0 && (
+                        <p className="text-xs text-gray-500 text-center italic">Nenhum produto cadastrado.</p>
+                    )}
+                </div>
+
+                <div className="flex gap-2 mt-2">
+                    <input 
+                        type="text"
+                        value={newProductName}
+                        onChange={(e) => setNewProductName(e.target.value)}
+                        placeholder="Nome (ex: Pomada)"
+                        className="flex-[2] bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none"
+                    />
+                    <div className="relative flex-1">
+                        <input 
+                            type="number"
+                            value={newProductPrice}
+                            onChange={(e) => setNewProductPrice(e.target.value)}
+                            placeholder="$$"
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none"
+                        />
+                    </div>
+                    <button 
+                        type="button"
+                        onClick={handleAddProduct}
+                        className="bg-green-600 hover:bg-green-500 text-white p-2 rounded-lg"
+                    >
+                        <Plus size={18} />
+                    </button>
+                </div>
           </div>
 
           {/* VIP Barber Management Section */}
@@ -139,66 +269,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
             </div>
           )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Nome da Barbearia</label>
-            <input
-              type="text"
-              value={formData.shopName}
-              onChange={(e) => handleChange('shopName', e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">URL do Logo (Opcional)</label>
-            <input
-              type="text"
-              value={formData.logoUrl}
-              onChange={(e) => handleChange('logoUrl', e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none"
-              placeholder="https://..."
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Corte (R$)</label>
-              <input
-                type="number"
-                value={formData.priceCut}
-                onChange={(e) => handleChange('priceCut', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
-              />
-            </div>
-             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Barba (R$)</label>
-              <input
-                type="number"
-                value={formData.priceBeard || 0}
-                onChange={(e) => handleChange('priceBeard', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Combo (R$)</label>
-              <input
-                type="number"
-                value={formData.priceCombo}
-                onChange={(e) => handleChange('priceCombo', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Produto (R$)</label>
-              <input
-                type="number"
-                value={formData.priceProduct || 0}
-                onChange={(e) => handleChange('priceProduct', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
-              />
-            </div>
-          </div>
 
           <div className="mt-2">
             <label className="block text-sm font-medium text-gray-400 mb-1">Taxa de Comissão (%)</label>

@@ -1,8 +1,8 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { ServiceType, AppSettings, ClientType, Client } from '../types';
-import { X, Check, UserPlus, UserCheck, Clock, ChevronDown } from 'lucide-react';
+import { ServiceType, AppSettings, ClientType, Client, ProductItem } from '../types';
+import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag } from 'lucide-react';
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -19,6 +19,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   const [clientType, setClientType] = useState<ClientType>(ClientType.RETURNING);
   const [extraValue, setExtraValue] = useState<string>('0');
   const [customPrice, setCustomPrice] = useState<string>('');
+  const [description, setDescription] = useState<string>(''); // Product name or notes
   const [time, setTime] = useState('');
 
   // Reset or populate form when modal opens
@@ -30,6 +31,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setService(initialData.serviceType);
         setClientType(initialData.clientType || ClientType.RETURNING);
         setExtraValue(initialData.extraValue.toString());
+        setDescription(initialData.description || '');
         
         if (initialData.serviceType === ServiceType.OTHER || initialData.serviceType === ServiceType.PRODUCT) {
            setCustomPrice(initialData.serviceValue.toString());
@@ -51,6 +53,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setClientType(ClientType.RETURNING);
         setExtraValue('0');
         setCustomPrice('');
+        setDescription('');
         
         // Set current time
         const now = new Date();
@@ -68,6 +71,9 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
             setCustomPrice(settings.priceProduct ? settings.priceProduct.toString() : '');
         } else if (service === ServiceType.OTHER) {
             setCustomPrice('');
+        } else {
+            // Reset description if not product/other
+            setDescription('');
         }
     }
   }, [service, settings.priceProduct, isOpen, initialData]);
@@ -87,6 +93,11 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
     return getBasePrice() + (Number(extraValue) || 0);
   };
 
+  const handleSelectProduct = (product: ProductItem) => {
+     setCustomPrice(product.price.toString());
+     setDescription(product.name);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
@@ -97,14 +108,15 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
       serviceValue: getBasePrice(),
       extraValue: Number(extraValue),
       totalValue: getTotal(),
-      timeStr: time // Send the time string back to App
+      timeStr: time,
+      description: description
     });
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-slide-in">
-      <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700">
+      <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white font-display">
             {initialData ? 'Editar Atendimento' : 'Novo Atendimento'}
@@ -218,19 +230,60 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
               ))}
             </div>
           </div>
+          
+          {/* Quick Select Products */}
+          {service === ServiceType.PRODUCT && settings.products && settings.products.length > 0 && (
+             <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
+                 <p className="text-xs text-gray-400 mb-2 font-bold uppercase">Selecione o Produto:</p>
+                 <div className="flex flex-wrap gap-2">
+                     {settings.products.map(p => (
+                         <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => handleSelectProduct(p)}
+                            className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                                description === p.name 
+                                    ? 'bg-green-600 text-white border-green-500' 
+                                    : 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700'
+                            }`}
+                         >
+                            {p.name} <span className="opacity-70 ml-1">R${p.price}</span>
+                         </button>
+                     ))}
+                 </div>
+             </div>
+          )}
 
           {(service === ServiceType.OTHER || service === ServiceType.PRODUCT) && (
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">
-                 {service === ServiceType.PRODUCT ? 'Valor do Produto (R$)' : 'Valor do Serviço (R$)'}
-              </label>
-              <input
-                type="number"
-                value={customPrice}
-                onChange={(e) => setCustomPrice(e.target.value)}
-                placeholder={service === ServiceType.PRODUCT && settings.priceProduct ? settings.priceProduct.toString() : "0.00"}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
-              />
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                   {service === ServiceType.PRODUCT ? 'Qual produto?' : 'Descrição do Serviço'}
+                </label>
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder={service === ServiceType.PRODUCT ? "Ex: Pomada" : "Ex: Sobrancelha"}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 pl-10 text-white focus:ring-2 focus:ring-gold-500 outline-none"
+                    />
+                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                   {service === ServiceType.PRODUCT ? 'Valor do Produto (R$)' : 'Valor do Serviço (R$)'}
+                </label>
+                <input
+                  type="number"
+                  value={customPrice}
+                  onChange={(e) => setCustomPrice(e.target.value)}
+                  placeholder={service === ServiceType.PRODUCT && settings.priceProduct ? settings.priceProduct.toString() : "0.00"}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
+                />
+              </div>
             </div>
           )}
 

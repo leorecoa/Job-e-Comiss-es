@@ -13,6 +13,12 @@ export enum ClientType {
   RETURNING = 'Da Casa'
 }
 
+export interface ProductItem {
+  id: string;
+  name: string;
+  price: number;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -23,6 +29,7 @@ export interface Client {
   extraValue: number; // For additional services
   totalValue: number;
   timestamp: number; // Date.now()
+  description?: string; // Name of the product or details
 }
 
 export interface Vale {
@@ -51,7 +58,8 @@ export interface AppSettings {
   priceCut: number;
   priceBeard: number;
   priceCombo: number;
-  priceProduct: number; // New field
+  priceProduct: number; // Default/Fallback price
+  products: ProductItem[]; // List of specific products
   commissionRate: number; // Percentage (e.g., 40)
   barbers: string[]; // Lista de barbeiros cadastrados (VIP)
 }
@@ -74,6 +82,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   priceBeard: 30,
   priceCombo: 70,
   priceProduct: 0,
+  products: [],
   commissionRate: 40,
   barbers: []
 };

@@ -1,4 +1,5 @@
 
+
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -31,7 +32,7 @@ export const generateAndDownloadCSV = (
   vales: any[]
 ) => {
   // Cabeçalho do CSV
-  const headers = ["Data", "Hora", "Tipo Movimento", "Descrição/Cliente", "Profissional", "Serviço", "Valor (R$)"];
+  const headers = ["Data", "Hora", "Tipo Movimento", "Cliente", "Detalhe/Produto", "Profissional", "Serviço", "Valor (R$)"];
   
   const rows: string[] = [];
   rows.push(headers.join(";")); // Usando ponto e vírgula para Excel em PT-BR
@@ -42,12 +43,14 @@ export const generateAndDownloadCSV = (
     const dateStr = date.toLocaleDateString('pt-BR');
     const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const valueStr = c.totalValue.toFixed(2).replace('.', ','); // Formato Excel PT-BR
+    const detail = c.description ? c.description : (c.extraValue > 0 ? `+ Adicional R$${c.extraValue}` : '');
 
     rows.push([
       dateStr,
       timeStr,
       "RECEITA",
       c.name,
+      detail,
       c.barberName,
       c.serviceType,
       valueStr
@@ -65,9 +68,10 @@ export const generateAndDownloadCSV = (
       dateStr,
       timeStr,
       "DESPESA",
+      "Vale/Retirada",
       v.description,
       v.barberName,
-      "Vale/Retirada",
+      "Vale",
       valueStr
     ].join(";"));
   });

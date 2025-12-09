@@ -1,4 +1,5 @@
 
+
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatCurrency, formatTime } from "../utils";
@@ -116,10 +117,18 @@ export const generateReportPDF = (
 
   const clientRows = sortedClients.map(c => {
     const datePart = new Date(c.timestamp).toLocaleDateString('pt-BR');
+    let serviceDisplay: string = c.serviceType;
+    // Append product name if exists
+    if (c.description) {
+        serviceDisplay += ` (${c.description})`;
+    } else if (c.extraValue > 0) {
+        serviceDisplay += ' (+Adic)';
+    }
+
     return [
         `${datePart} ${formatTime(c.timestamp)}`,
         c.name,
-        c.serviceType + (c.extraValue > 0 ? ' (+Adic)' : ''),
+        serviceDisplay,
         c.barberName,
         c.clientType === 'Novidade' ? 'Novo' : 'Casa',
         formatCurrency(c.totalValue)
@@ -128,7 +137,7 @@ export const generateReportPDF = (
 
   autoTable(doc, {
     startY: currentY + 5,
-    head: [['Data/Hora', 'Cliente', 'Serviço', 'Profissional', 'Tipo', 'Valor']],
+    head: [['Data/Hora', 'Cliente', 'Serviço/Produto', 'Profissional', 'Tipo', 'Valor']],
     body: clientRows,
     theme: 'grid',
     headStyles: { 
@@ -148,7 +157,7 @@ export const generateReportPDF = (
     columnStyles: {
         0: { cellWidth: 35 }, // Date
         1: { cellWidth: 'auto' }, // Name
-        2: { cellWidth: 35 }, // Service
+        2: { cellWidth: 45 }, // Service (Wider now)
         3: { cellWidth: 30 }, // Barber
         4: { cellWidth: 20, halign: 'center' }, // Type
         5: { cellWidth: 30, fontStyle: 'bold', halign: 'right' } // Value
