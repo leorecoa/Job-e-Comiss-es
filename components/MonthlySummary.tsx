@@ -43,9 +43,18 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
       return d.getFullYear() === year && d.getMonth() === month;
     });
 
+    // Função auxiliar para pegar a comissão correta
+    const getCommission = (c: Client) => {
+        if (c.commissionValue !== undefined) {
+            return c.commissionValue;
+        }
+        // Fallback para dados antigos sem commissionValue salvo
+        return c.totalValue * (settings.commissionRate / 100);
+    };
+
     // Totais Gerais
     const totalSales = filteredClients.reduce((acc, c) => acc + c.totalValue, 0);
-    const totalCommission = totalSales * (settings.commissionRate / 100);
+    const totalCommission = filteredClients.reduce((acc, c) => acc + getCommission(c), 0);
     const totalVales = filteredVales.reduce((acc, v) => acc + v.value, 0);
     const netCommission = totalCommission - totalVales;
 
@@ -56,18 +65,20 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
 
     // Processar Clientes
     filteredClients.forEach(c => {
+      const comm = getCommission(c);
+      
       // Por dia
       const dayKey = new Date(c.timestamp).toLocaleDateString('pt-BR');
       if (!daysMap[dayKey]) daysMap[dayKey] = { sales: 0, commission: 0, vales: 0, count: 0 };
       daysMap[dayKey].sales += c.totalValue;
-      daysMap[dayKey].commission += (c.totalValue * (settings.commissionRate / 100));
+      daysMap[dayKey].commission += comm;
       daysMap[dayKey].count += 1;
 
       // Por Barbeiro
       const barberName = c.barberName || 'Desconhecido';
       if (!barbersMap[barberName]) barbersMap[barberName] = { sales: 0, commission: 0, vales: 0, count: 0 };
       barbersMap[barberName].sales += c.totalValue;
-      barbersMap[barberName].commission += (c.totalValue * (settings.commissionRate / 100));
+      barbersMap[barberName].commission += comm;
       barbersMap[barberName].count += 1;
     });
 
@@ -182,9 +193,6 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                     <Users size={18} className="text-blue-400"/>
                     Desempenho da Equipe
                 </h3>
-                <span className="text-[10px] text-gray-500 bg-gray-800 px-2 py-1 rounded border border-gray-700">
-                    Taxa Base: {settings.commissionRate}%
-                </span>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -237,6 +245,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                   <th className="p-4 font-medium">Data</th>
                   <th className="p-4 font-medium text-center">Atend.</th>
                   <th className="p-4 font-medium text-right text-gray-300">Faturamento</th>
+                  <th className="p-4 font-medium text-right text-gold-500">Comissão (Líq)</th>
                   <th className="p-4 font-medium text-right text-gray-400">Vales</th>
                 </tr>
               </thead>
@@ -247,6 +256,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                             <td className="p-4 text-white font-medium">{day.date}</td>
                             <td className="p-4 text-center text-gray-300">{day.count}</td>
                             <td className="p-4 text-right text-gray-300">{formatCurrency(day.sales)}</td>
+                            <td className="p-4 text-right text-gold-500 font-bold">{formatCurrency(day.commission - day.vales)}</td>
                             <td className="p-4 text-right text-gray-400">{day.vales > 0 ? `- ${formatCurrency(day.vales)}` : '-'}</td>
                         </tr>
                     );

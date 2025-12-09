@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
 import { formatCurrency, formatTime, generateId, formatDate, generateAndDownloadCSV } from './utils';
@@ -365,9 +364,9 @@ const App: React.FC = () => {
         // PDF Logic (Default)
         const totalSales = rangeClients.reduce((acc, curr) => acc + curr.totalValue, 0);
         
-        // Use stored commission value
+        // Use stored commission value, critical for consistent reports
         const grossCommission = rangeClients.reduce((acc, curr) => {
-             return acc + (curr.commissionValue || (curr.totalValue * (settings.commissionRate / 100)));
+             return acc + (curr.commissionValue !== undefined ? curr.commissionValue : (curr.totalValue * (settings.commissionRate / 100)));
         }, 0);
 
         const totalVales = rangeVales.reduce((acc, curr) => acc + curr.value, 0);

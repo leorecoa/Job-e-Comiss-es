@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ServiceType, AppSettings, ClientType, Client, ProductItem } from '../types';
 import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag } from 'lucide-react';
@@ -99,10 +98,18 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
     const productsVal = getProductsTotal();
     
     // Calculate Commission
-    // Service Commission
-    const serviceCommission = serviceVal * (settings.commissionRate / 100);
     
-    // Product Commission (Individual or Default)
+    // 1. Service Commission
+    // Se o tipo selecionado for "Produto" (o botão genérico), usa a taxa de produto. 
+    // Se for Corte/Barba/Combo, usa a taxa de serviço.
+    let serviceRate = settings.commissionRate;
+    if (service === ServiceType.PRODUCT) {
+        serviceRate = settings.productCommissionRate || 10;
+    }
+
+    const serviceCommission = serviceVal * (serviceRate / 100);
+    
+    // 2. Product List Commission (Individual or Default)
     const productsCommission = selectedProducts.reduce((acc, p) => {
         const rate = p.commissionRate !== undefined ? p.commissionRate : (settings.productCommissionRate || 10);
         return acc + (p.price * (rate / 100));
@@ -246,20 +253,18 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                   {type}
                 </button>
               ))}
-              {/* Optional: Generic Product Button if list is empty or strictly needed */}
-              {(!settings.products || settings.products.length === 0) && (
-                   <button
-                   type="button"
-                   onClick={() => setService(ServiceType.PRODUCT)}
-                   className={`py-2 px-1 rounded-lg text-xs font-medium transition-all ${
-                     service === ServiceType.PRODUCT
-                       ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
-                       : 'bg-gray-900 text-gray-400 hover:bg-gray-700'
-                   }`}
-                 >
-                   Produto
-                 </button>
-              )}
+              {/* Generic Product Button is always visible as a fallback */}
+               <button
+               type="button"
+               onClick={() => setService(ServiceType.PRODUCT)}
+               className={`py-2 px-1 rounded-lg text-xs font-medium transition-all ${
+                 service === ServiceType.PRODUCT
+                   ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
+                   : 'bg-gray-900 text-gray-400 hover:bg-gray-700'
+               }`}
+             >
+               Produto
+             </button>
             </div>
           </div>
           
