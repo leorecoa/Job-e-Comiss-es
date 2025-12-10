@@ -282,7 +282,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
                 />
             </div>
-            <p className="text-xs text-gray-500 mt-1">A comissão se aplica apenas a serviços (Corte, Barba, etc). Produtos não geram comissão.</p>
+            <p className="text-xs text-gray-500 mt-1">A comissão se aplica estritamente a serviços. Produtos não geram comissão.</p>
           </div>
 
           <div className="pt-4">

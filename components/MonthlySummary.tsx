@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Client, Vale, AppSettings } from '../types';
 import { formatCurrency } from '../utils';
@@ -49,7 +50,9 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
             return c.commissionValue;
         }
         // Fallback para dados antigos sem commissionValue salvo
-        return c.totalValue * (settings.commissionRate / 100);
+        // IMPORTANTE: Não usar c.totalValue se possível, pois pode incluir produtos
+        const base = (c.serviceValue || 0) + (c.extraValue || 0);
+        return base * (settings.commissionRate / 100);
     };
 
     // Totais Gerais

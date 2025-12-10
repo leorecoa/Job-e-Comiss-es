@@ -89,22 +89,23 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   };
 
   // Auto-Calculate Commission
+  // STRICT LOGIC: ONLY SERVICES + EXTRAS GENERATE COMMISSION. PRODUCTS = 0.
   useEffect(() => {
     if (isOpen && !isCommissionManuallyEdited) {
         let calculated = 0;
-        const rate = settings.commissionRate / 100;
-
-        // REGRA DEFINITIVA DE COMISSÃO:
-        // 1. Se o serviço principal for PRODUTO -> Comissão ZERO.
-        // 2. Se for Corte/Barba/Combo -> Comissão = (Valor Serviço + Adicionais) * Taxa.
-        // 3. Produtos adicionados via lista NUNCA geram comissão.
-
+        
+        // Se o tipo principal for PRODUTO, a comissão base é 0.
         if (service === ServiceType.PRODUCT) {
             calculated = 0;
         } else {
-            // Base = Apenas o Serviço + Adicionais (Sobrancelha etc)
-            // Produtos são ignorados aqui propositalmente
-            const baseValue = getServicePrice() + (Number(extraValue) || 0);
+            // Se for SERVIÇO (Corte, Barba, Combo, Outros):
+            // Base = Valor do Serviço + Adicionais (Sobrancelha, etc)
+            // Produtos da lista (selectedProducts) NÃO entram na conta.
+            const servicePrice = getServicePrice();
+            const additional = Number(extraValue) || 0;
+            const baseValue = servicePrice + additional;
+            
+            const rate = settings.commissionRate / 100;
             calculated = baseValue * rate;
         }
 
@@ -313,7 +314,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                          );
                      })}
                  </div>
-                 <p className="text-[10px] text-gray-500 mt-2 italic">* Produtos apenas conferência (Comissão R$ 0,00).</p>
+                 <p className="text-[10px] text-gray-500 mt-2 italic">* Valor vai integral para o caixa (Sem comissão).</p>
              </div>
           )}
           
@@ -381,7 +382,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                     />
                     <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gold-600" size={14} />
                 </div>
-                <p className="text-[10px] text-gray-500 mt-1">Valor para o barbeiro.</p>
+                <p className="text-[10px] text-gray-500 mt-1">Valor para o barbeiro (apenas serviços).</p>
               </div>
           </div>
 

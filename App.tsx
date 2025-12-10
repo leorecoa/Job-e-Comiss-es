@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
 import { formatCurrency, formatTime, generateId, formatDate, generateAndDownloadCSV } from './utils';
@@ -245,8 +246,10 @@ const App: React.FC = () => {
         if (curr.commissionValue !== undefined) {
             return acc + curr.commissionValue;
         }
-        // Fallback for old records
-        return acc + (curr.totalValue * (settings.commissionRate / 100));
+        // Fallback for old records: Use serviceValue + extraValue only.
+        // DO NOT use totalValue as it might contain products.
+        const base = (curr.serviceValue || 0) + (curr.extraValue || 0);
+        return acc + (base * (settings.commissionRate / 100));
     }, 0);
 
     const totalVales = filteredVales.reduce((acc, curr) => acc + curr.value, 0);
@@ -366,7 +369,10 @@ const App: React.FC = () => {
         
         // Use stored commission value, critical for consistent reports
         const grossCommission = rangeClients.reduce((acc, curr) => {
-             return acc + (curr.commissionValue !== undefined ? curr.commissionValue : (curr.totalValue * (settings.commissionRate / 100)));
+             if (curr.commissionValue !== undefined) return acc + curr.commissionValue;
+             // Fallback
+             const base = (curr.serviceValue || 0) + (curr.extraValue || 0);
+             return acc + (base * (settings.commissionRate / 100));
         }, 0);
 
         const totalVales = rangeVales.reduce((acc, curr) => acc + curr.value, 0);
