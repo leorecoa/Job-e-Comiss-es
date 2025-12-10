@@ -22,7 +22,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   const [time, setTime] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<ProductItem[]>([]);
   
-  // New: Manual Commission State
+  // Commission State
   const [commissionValue, setCommissionValue] = useState<string>('');
   const [isCommissionManuallyEdited, setIsCommissionManuallyEdited] = useState(false);
 
@@ -38,7 +38,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setDescription(initialData.description || '');
         setSelectedProducts(initialData.products || []);
         setCommissionValue(initialData.commissionValue?.toString() || '0');
-        setIsCommissionManuallyEdited(true); // Don't auto-recalculate on load unless changed
+        setIsCommissionManuallyEdited(true); // Preserve saved commission value
         
         if (initialData.serviceType === ServiceType.OTHER || initialData.serviceType === ServiceType.PRODUCT) {
            setCustomPrice(initialData.serviceValue.toString());
@@ -61,7 +61,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setDescription('');
         setSelectedProducts([]);
         setIsCommissionManuallyEdited(false);
-        setCommissionValue(''); // Will be auto-calculated by the other useEffect
+        setCommissionValue(''); 
         
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
@@ -75,7 +75,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
     if (service === ServiceType.CUT) return settings.priceCut;
     if (service === ServiceType.BEARD) return settings.priceBeard || 0;
     if (service === ServiceType.COMBO) return settings.priceCombo;
-    // If it's pure Product type (legacy) or Other
+    // If it's pure Product type or Other, use custom/base price
     if (service === ServiceType.PRODUCT) return Number(customPrice) || settings.priceProduct || 0;
     return Number(customPrice) || 0;
   };
@@ -88,22 +88,26 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
     return getServicePrice() + getProductsTotal() + (Number(extraValue) || 0);
   };
 
-  // Auto-Calculate Commission when dependencies change
+  // Auto-Calculate Commission
   useEffect(() => {
     if (isOpen && !isCommissionManuallyEdited) {
-        let baseValueForCommission = 0;
-        let rate = settings.commissionRate / 100;
+        let calculated = 0;
+        const rate = settings.commissionRate / 100;
+
+        // REGRA DEFINITIVA DE COMISSÃO:
+        // 1. Se o serviço principal for PRODUTO -> Comissão ZERO.
+        // 2. Se for Corte/Barba/Combo -> Comissão = (Valor Serviço + Adicionais) * Taxa.
+        // 3. Produtos adicionados via lista NUNCA geram comissão.
 
         if (service === ServiceType.PRODUCT) {
-            // Standalone products have 0 commission by default
-            baseValueForCommission = 0;
+            calculated = 0;
         } else {
-            // For Services (Cut, Beard, Combo, Other)
-            // Base = Service Price + Extras (usually Eyebrows, etc)
-            baseValueForCommission = getServicePrice() + (Number(extraValue) || 0);
+            // Base = Apenas o Serviço + Adicionais (Sobrancelha etc)
+            // Produtos são ignorados aqui propositalmente
+            const baseValue = getServicePrice() + (Number(extraValue) || 0);
+            calculated = baseValue * rate;
         }
 
-        const calculated = baseValueForCommission * rate;
         setCommissionValue(calculated.toFixed(2));
     }
   }, [isOpen, service, customPrice, extraValue, settings.commissionRate, settings.priceCut, settings.priceBeard, settings.priceCombo, settings.priceProduct, isCommissionManuallyEdited]);
@@ -124,7 +128,6 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
     const serviceVal = getServicePrice();
     const totalVal = getTotal();
     
-    // Create description string if products are selected but description is empty
     let finalDescription = description;
     if (!finalDescription && selectedProducts.length > 0) {
         finalDescription = selectedProducts.map(p => p.name).join(', ');
@@ -138,7 +141,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
       serviceValue: serviceVal,
       extraValue: Number(extraValue),
       totalValue: totalVal,
-      commissionValue: Number(commissionValue) || 0, // Use the explicit field value
+      commissionValue: Number(commissionValue) || 0,
       timeStr: time,
       description: finalDescription,
       products: selectedProducts
@@ -254,7 +257,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                   type="button"
                   onClick={() => {
                       setService(type);
-                      setIsCommissionManuallyEdited(false); // Reset manual override on type change
+                      setIsCommissionManuallyEdited(false); // Reset to auto-calc
                   }}
                   className={`py-2 px-1 rounded-lg text-xs font-medium transition-all ${
                     service === type
@@ -310,7 +313,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                          );
                      })}
                  </div>
-                 <p className="text-[10px] text-gray-500 mt-2 italic">* Produtos somam ao total, mas não geram comissão automática.</p>
+                 <p className="text-[10px] text-gray-500 mt-2 italic">* Produtos apenas conferência (Comissão R$ 0,00).</p>
              </div>
           )}
           
@@ -356,7 +359,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                   className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
                   placeholder="0.00"
                 />
-                <p className="text-[10px] text-gray-500 mt-1">Sobrancelha, etc.</p>
+                <p className="text-[10px] text-gray-500 mt-1">Sobrancelha, etc. (Gera Comissão)</p>
               </div>
 
               {/* Editable Commission Field */}
