@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { AppSettings, UserProfile, ProductItem } from '../types';
-import { X, Save, Crown, Users, Trash2, Plus, Package, DollarSign, Percent } from 'lucide-react';
+import { AppSettings, UserProfile, ProductItem, Client, Vale } from '../types';
+import { X, Save, Crown, Users, Trash2, Plus, Package, DollarSign, Percent, Download, Upload, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { generateId } from '../utils';
 
 interface SettingsModalProps {
@@ -11,6 +11,8 @@ interface SettingsModalProps {
   onSave: (newSettings: AppSettings) => void;
   userProfile: UserProfile;
   onSubscribe: () => void;
+  clients: Client[];
+  vales: Vale[];
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -19,7 +21,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings, 
   onSave,
   userProfile,
-  onSubscribe
+  onSubscribe,
+  clients,
+  vales
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [newBarberName, setNewBarberName] = useState('');
@@ -77,6 +81,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         ...prev,
         products: prev.products?.filter(p => p.id !== id) || []
     }));
+  };
+
+  const handleBackup = () => {
+      const data = {
+          clients,
+          vales,
+          settings: formData,
+          profile: userProfile,
+          backupDate: new Date().toISOString(),
+          version: "1.0"
+      };
+
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `backup_gestao_maxima_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
+  const handleRestore = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      if (!window.confirm("ATENÇÃO: Isso irá substituir TODOS os dados atuais pelos do arquivo de backup. Tem certeza?")) {
+          return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+          try {
+              const content = e.target?.result as string;
+              const data = JSON.parse(content);
+
+              if (data.clients && Array.isArray(data.clients)) {
+                  localStorage.setItem('barbearia_clients', JSON.stringify(data.clients));
+              }
+              if (data.vales && Array.isArray(data.vales)) {
+                  localStorage.setItem('barbearia_vales', JSON.stringify(data.vales));
+              }
+              if (data.settings) {
+                  localStorage.setItem('barbearia_settings', JSON.stringify(data.settings));
+              }
+              // Optional: Restore profile if needed, but risky if moving between users
+              // localStorage.setItem('barbearia_profile', JSON.stringify(data.profile));
+
+              alert("Backup restaurado com sucesso! O sistema será reiniciado.");
+              window.location.reload();
+          } catch (error) {
+              alert("Erro ao ler arquivo de backup. Verifique se é um arquivo válido.");
+              console.error(error);
+          }
+      };
+      reader.readAsText(file);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -285,7 +346,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="text-xs text-gray-500 mt-1">A comissão se aplica estritamente a serviços. Produtos não geram comissão.</p>
           </div>
 
-          <div className="pt-4">
+          {/* Backup & Security Section */}
+          <div className="mt-6 border-t border-gray-700 pt-6">
+              <div className="flex items-center gap-2 mb-3 text-white">
+                  <ShieldCheck size={18} className="text-gold-500" />
+                  <h3 className="font-bold text-sm">Segurança de Dados</h3>
+              </div>
+              <p className="text-xs text-gray-400 mb-4">
+                  Faça backups regulares para garantir que nunca perca seus dados, mesmo trocando de dispositivo.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={handleBackup}
+                    className="flex flex-col items-center justify-center gap-2 p-3 bg-gray-900 border border-gray-600 rounded-xl hover:bg-gray-700 transition-colors"
+                  >
+                      <Download size={20} className="text-blue-400" />
+                      <span className="text-xs font-bold text-white">Baixar Backup</span>
+                  </button>
+                  
+                  <label className="flex flex-col items-center justify-center gap-2 p-3 bg-gray-900 border border-gray-600 rounded-xl hover:bg-gray-700 transition-colors cursor-pointer">
+                      <Upload size={20} className="text-green-400" />
+                      <span className="text-xs font-bold text-white">Restaurar Dados</span>
+                      <input 
+                        type="file" 
+                        accept=".json" 
+                        className="hidden" 
+                        onChange={handleRestore}
+                      />
+                  </label>
+              </div>
+          </div>
+
+          <div className="pt-4 mt-2">
             <button
               type="submit"
               className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded-xl transition-colors"

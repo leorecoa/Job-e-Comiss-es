@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ServiceType, AppSettings, ClientType, Client, ProductItem } from '../types';
-import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag, DollarSign } from 'lucide-react';
+import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag, DollarSign, Calculator } from 'lucide-react';
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -12,145 +12,141 @@ interface AddClientModalProps {
 }
 
 export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, settings, onSave, initialData }) => {
+  // -- Form State --
   const [name, setName] = useState('');
   const [barber, setBarber] = useState('');
-  const [service, setService] = useState<ServiceType>(ServiceType.CUT);
+  const [serviceType, setServiceType] = useState<ServiceType>(ServiceType.CUT);
   const [clientType, setClientType] = useState<ClientType>(ClientType.RETURNING);
-  const [extraValue, setExtraValue] = useState<string>('0');
-  const [customPrice, setCustomPrice] = useState<string>('');
-  const [description, setDescription] = useState<string>(''); 
   const [time, setTime] = useState('');
-  const [selectedProducts, setSelectedProducts] = useState<ProductItem[]>([]);
+  const [description, setDescription] = useState('');
   
-  // Commission State
+  // -- Financial State --
+  const [serviceValue, setServiceValue] = useState<string>(''); // Valor do Serviço Base
+  const [extraValue, setExtraValue] = useState<string>(''); // Adicionais (Sobrancelha etc)
+  const [selectedProducts, setSelectedProducts] = useState<ProductItem[]>([]); // Produtos selecionados
+  
+  // -- Commission State --
   const [commissionValue, setCommissionValue] = useState<string>('');
-  const [isCommissionManuallyEdited, setIsCommissionManuallyEdited] = useState(false);
+  const [isCommissionEdited, setIsCommissionEdited] = useState(false);
 
-  // Reset or populate form when modal opens
+  // -- Initialization Effect --
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
+        // Edit Mode
         setName(initialData.name);
         setBarber(initialData.barberName);
-        setService(initialData.serviceType);
+        setServiceType(initialData.serviceType);
         setClientType(initialData.clientType || ClientType.RETURNING);
-        setExtraValue(initialData.extraValue.toString());
         setDescription(initialData.description || '');
-        setSelectedProducts(initialData.products || []);
-        setCommissionValue(initialData.commissionValue?.toString() || '0');
-        setIsCommissionManuallyEdited(true); // Preserve saved commission value
         
-        if (initialData.serviceType === ServiceType.OTHER || initialData.serviceType === ServiceType.PRODUCT) {
-           setCustomPrice(initialData.serviceValue.toString());
-        } else {
-           setCustomPrice('');
-        }
-
+        // Time Formatting
         const d = new Date(initialData.timestamp);
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        setTime(`${hours}:${minutes}`);
+        const h = String(d.getHours()).padStart(2, '0');
+        const m = String(d.getMinutes()).padStart(2, '0');
+        setTime(`${h}:${m}`);
 
+        // Financials
+        // Note: We use serviceValue if available, or fall back for legacy records
+        setServiceValue(initialData.serviceValue?.toString() || initialData.totalValue.toString());
+        setExtraValue(initialData.extraValue?.toString() || '');
+        setSelectedProducts(initialData.products || []);
+        
+        // Commission
+        setCommissionValue(initialData.commissionValue?.toString() || '0');
+        setIsCommissionEdited(true); // Keep saved commission value
       } else {
+        // New Mode
         setName('');
         setBarber(settings.barbers && settings.barbers.length > 0 ? settings.barbers[0] : '');
-        setService(ServiceType.CUT);
+        setServiceType(ServiceType.CUT);
         setClientType(ClientType.RETURNING);
-        setExtraValue('0');
-        setCustomPrice('');
         setDescription('');
-        setSelectedProducts([]);
-        setIsCommissionManuallyEdited(false);
-        setCommissionValue(''); 
         
+        // Default Time (Now)
         const now = new Date();
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        setTime(`${hours}:${minutes}`);
+        setTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+
+        // Default Financials
+        setServiceValue(settings.priceCut.toString());
+        setExtraValue('');
+        setSelectedProducts([]);
+        
+        // Reset Commission Logic
+        setCommissionValue('');
+        setIsCommissionEdited(false);
       }
     }
-  }, [isOpen, initialData, settings.barbers]);
+  }, [isOpen, initialData, settings]);
 
-  const getServicePrice = () => {
-    if (service === ServiceType.CUT) return settings.priceCut;
-    if (service === ServiceType.BEARD) return settings.priceBeard || 0;
-    if (service === ServiceType.COMBO) return settings.priceCombo;
-    // If it's pure Product type or Other, use custom/base price
-    if (service === ServiceType.PRODUCT) return Number(customPrice) || settings.priceProduct || 0;
-    return Number(customPrice) || 0;
+  // -- Auto-Update Service Price on Type Change --
+  const updateBasePrice = (type: ServiceType) => {
+    setServiceType(type);
+    setIsCommissionEdited(false); // Reset commission to auto-calc when type changes
+    
+    if (type === ServiceType.CUT) setServiceValue(settings.priceCut.toString());
+    else if (type === ServiceType.BEARD) setServiceValue((settings.priceBeard || 0).toString());
+    else if (type === ServiceType.COMBO) setServiceValue(settings.priceCombo.toString());
+    else if (type === ServiceType.PRODUCT) setServiceValue((settings.priceProduct || 0).toString());
+    else setServiceValue(''); // Other/Custom
   };
 
-  const getProductsTotal = () => {
-    return selectedProducts.reduce((acc, p) => acc + p.price, 0);
-  };
-
+  // -- Calculations --
+  const getNumericService = () => Number(serviceValue) || 0;
+  const getNumericExtra = () => Number(extraValue) || 0;
+  const getProductsTotal = () => selectedProducts.reduce((acc, p) => acc + p.price, 0);
+  
   const getTotal = () => {
-    return getServicePrice() + getProductsTotal() + (Number(extraValue) || 0);
+    return getNumericService() + getNumericExtra() + getProductsTotal();
   };
 
-  // Auto-Calculate Commission
-  // STRICT LOGIC: ONLY SERVICES + EXTRAS GENERATE COMMISSION. PRODUCTS = 0.
+  // -- Commission Auto-Calc Effect --
   useEffect(() => {
-    if (isOpen && !isCommissionManuallyEdited) {
-        let calculated = 0;
-        
-        // Se o tipo principal for PRODUTO, a comissão base é 0.
-        if (service === ServiceType.PRODUCT) {
-            calculated = 0;
-        } else {
-            // Se for SERVIÇO (Corte, Barba, Combo, Outros):
-            // Base = Valor do Serviço + Adicionais (Sobrancelha, etc)
-            // Produtos da lista (selectedProducts) NÃO entram na conta.
-            const servicePrice = getServicePrice();
-            const additional = Number(extraValue) || 0;
-            const baseValue = servicePrice + additional;
-            
-            const rate = settings.commissionRate / 100;
-            calculated = baseValue * rate;
-        }
+    if (isOpen && !isCommissionEdited) {
+      // REGRA: Produtos (seja via ServiceType ou lista) NÃO geram comissão.
+      if (serviceType === ServiceType.PRODUCT) {
+        setCommissionValue('0.00');
+        return;
+      }
 
-        setCommissionValue(calculated.toFixed(2));
+      const baseForCommission = getNumericService() + getNumericExtra();
+      const rate = settings.commissionRate / 100;
+      const calculated = baseForCommission * rate;
+      
+      setCommissionValue(calculated.toFixed(2));
     }
-  }, [isOpen, service, customPrice, extraValue, settings.commissionRate, settings.priceCut, settings.priceBeard, settings.priceCombo, settings.priceProduct, isCommissionManuallyEdited]);
+  }, [serviceValue, extraValue, serviceType, settings.commissionRate, isOpen, isCommissionEdited]);
 
+
+  // -- Handlers --
   const toggleProduct = (product: ProductItem) => {
     setSelectedProducts(prev => {
-        const exists = prev.find(p => p.id === product.id);
-        if (exists) {
-            return prev.filter(p => p.id !== product.id);
-        } else {
-            return [...prev, product];
-        }
+      const exists = prev.find(p => p.id === product.id);
+      if (exists) return prev.filter(p => p.id !== product.id);
+      return [...prev, product];
     });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const serviceVal = getServicePrice();
-    const totalVal = getTotal();
-    
-    let finalDescription = description;
-    if (!finalDescription && selectedProducts.length > 0) {
-        finalDescription = selectedProducts.map(p => p.name).join(', ');
-    }
-    
-    // Safety check: if service type is Product, commission MUST be 0
-    let finalCommission = Number(commissionValue) || 0;
-    if (service === ServiceType.PRODUCT) {
-        finalCommission = 0;
+
+    // Montar descrição inteligente se estiver vazia
+    let finalDesc = description;
+    if (!finalDesc && selectedProducts.length > 0) {
+        finalDesc = selectedProducts.map(p => p.name).join(', ');
     }
 
     onSave({
       name,
       barberName: barber,
-      serviceType: service,
-      clientType: clientType,
-      serviceValue: serviceVal,
-      extraValue: Number(extraValue),
-      totalValue: totalVal,
-      commissionValue: finalCommission,
+      serviceType,
+      clientType,
+      serviceValue: getNumericService(),
+      extraValue: getNumericExtra(),
+      totalValue: getTotal(),
+      commissionValue: Number(commissionValue),
       timeStr: time,
-      description: finalDescription,
+      description: finalDesc,
       products: selectedProducts
     });
     onClose();
@@ -160,47 +156,54 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-slide-in">
-      <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center p-6 border-b border-gray-700">
-          <h2 className="text-xl font-bold text-white font-display">
-            {initialData ? 'Editar Atendimento' : 'Novo Atendimento'}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            <X size={24} />
+      <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 max-h-[90vh] overflow-y-auto flex flex-col">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center p-5 border-b border-gray-700 bg-gray-900/50 sticky top-0 z-10 backdrop-blur-md">
+          <div>
+            <h2 className="text-xl font-bold text-white font-display">
+                {initialData ? 'Editar Atendimento' : 'Novo Atendimento'}
+            </h2>
+            <p className="text-xs text-gray-400">Preencha os dados do serviço</p>
+          </div>
+          <button onClick={onClose} className="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition-colors">
+            <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 flex-1 overflow-y-auto">
           
-          {/* Top Row: Client Type & Time */}
-          <div className="grid grid-cols-2 gap-3 mb-2">
-             <div className="flex bg-gray-900 rounded-lg p-1 border border-gray-700">
+          {/* Section 1: Who & When */}
+          <div className="grid grid-cols-2 gap-4">
+             {/* Client Type Toggle */}
+             <div className="bg-gray-900 p-1 rounded-xl flex border border-gray-700">
                 <button
                   type="button"
                   onClick={() => setClientType(ClientType.NEW)}
-                  className={`flex-1 flex items-center justify-center rounded-md text-xs font-medium transition-all py-2 ${
+                  className={`flex-1 flex flex-col items-center justify-center rounded-lg text-[10px] font-bold uppercase py-2 transition-all gap-1 ${
                     clientType === ClientType.NEW
-                      ? 'bg-green-900/50 text-green-400 shadow-sm'
+                      ? 'bg-green-900/40 text-green-400 shadow-sm border border-green-500/30'
                       : 'text-gray-500 hover:text-gray-300'
                   }`}
                 >
-                  <UserPlus size={14} className="mr-1" /> Novo
+                  <UserPlus size={14} /> Novo
                 </button>
                 <button
                   type="button"
                   onClick={() => setClientType(ClientType.RETURNING)}
-                  className={`flex-1 flex items-center justify-center rounded-md text-xs font-medium transition-all py-2 ${
+                  className={`flex-1 flex flex-col items-center justify-center rounded-lg text-[10px] font-bold uppercase py-2 transition-all gap-1 ${
                     clientType === ClientType.RETURNING
-                      ? 'bg-gold-500/20 text-gold-500 shadow-sm'
+                      ? 'bg-gold-500/20 text-gold-500 shadow-sm border border-gold-500/30'
                       : 'text-gray-500 hover:text-gray-300'
                   }`}
                 >
-                  <UserCheck size={14} className="mr-1" /> Casa
+                  <UserCheck size={14} /> Casa
                 </button>
              </div>
 
+             {/* Time Input */}
              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gold-500 pointer-events-none">
                   <Clock size={16} />
                 </div>
                 <input
@@ -208,38 +211,34 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                   required
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-3 py-2.5 text-white focus:ring-2 focus:ring-gold-500 outline-none [color-scheme:dark]"
+                  className="w-full h-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-3 text-white focus:ring-2 focus:ring-gold-500 outline-none font-mono text-sm"
                 />
              </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Nome do Cliente</label>
-            <input
+          <div className="space-y-3">
+             <input
               required
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
-              placeholder="Ex: João Silva"
-            />
-          </div>
+              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-gold-500 outline-none placeholder-gray-500"
+              placeholder="Nome do Cliente"
+             />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Barbeiro</label>
-            {settings.barbers && settings.barbers.length > 0 ? (
+             {settings.barbers && settings.barbers.length > 0 ? (
                  <div className="relative">
                     <select
                         required
                         value={barber}
                         onChange={(e) => setBarber(e.target.value)}
-                        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none appearance-none"
+                        className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-gold-500 outline-none appearance-none"
                     >
                         {settings.barbers.map(b => (
                             <option key={b} value={b}>{b}</option>
                         ))}
                     </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={16} />
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={16} />
                  </div>
             ) : (
                 <input
@@ -247,60 +246,98 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                 type="text"
                 value={barber}
                 onChange={(e) => setBarber(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
-                placeholder="Quem atendeu?"
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-gold-500 outline-none placeholder-gray-500"
+                placeholder="Nome do Barbeiro"
                 />
             )}
           </div>
 
+          <hr className="border-gray-700/50" />
+
+          {/* Section 2: Service Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Servico Principal</label>
-            <div className="grid grid-cols-3 gap-2">
-              {Object.values(ServiceType)
-               .filter(t => t !== ServiceType.PRODUCT) 
-               .map((type) => (
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Tipo de Serviço</label>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {[ServiceType.CUT, ServiceType.BEARD, ServiceType.COMBO].map((type) => (
                 <button
                   key={type}
                   type="button"
-                  onClick={() => {
-                      setService(type);
-                      setIsCommissionManuallyEdited(false); // Reset to auto-calc
-                  }}
-                  className={`py-2 px-1 rounded-lg text-xs font-medium transition-all ${
-                    service === type
-                      ? 'bg-gold-500 text-black shadow-lg shadow-gold-500/20'
-                      : 'bg-gray-900 text-gray-400 hover:bg-gray-700'
+                  onClick={() => updateBasePrice(type)}
+                  className={`py-2.5 px-1 rounded-xl text-xs font-bold transition-all ${
+                    serviceType === type
+                      ? 'bg-gold-500 text-black shadow-lg shadow-gold-500/20 scale-[1.02]'
+                      : 'bg-gray-900 text-gray-400 border border-gray-700 hover:border-gray-600'
                   }`}
                 >
                   {type}
                 </button>
               ))}
-              
+              <button
+                 type="button"
+                 onClick={() => updateBasePrice(ServiceType.OTHER)}
+                 className={`py-2.5 px-1 rounded-xl text-xs font-bold transition-all ${
+                    serviceType === ServiceType.OTHER
+                      ? 'bg-gray-200 text-black'
+                      : 'bg-gray-900 text-gray-400 border border-gray-700 hover:border-gray-600'
+                  }`}
+               >
+                 Outros
+               </button>
+               
+               {/* Product Type Button */}
                <button
-               type="button"
-               onClick={() => {
-                   setService(ServiceType.PRODUCT);
-                   setIsCommissionManuallyEdited(false);
-               }}
-               className={`py-2 px-1 rounded-lg text-xs font-medium transition-all ${
-                 service === ServiceType.PRODUCT
-                   ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
-                   : 'bg-gray-900 text-gray-400 hover:bg-gray-700'
-               }`}
-             >
-               Produto
-             </button>
+                 type="button"
+                 onClick={() => updateBasePrice(ServiceType.PRODUCT)}
+                 className={`col-span-2 py-2.5 px-1 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                    serviceType === ServiceType.PRODUCT
+                      ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
+                      : 'bg-gray-900 text-green-500 border border-green-500/30 hover:bg-green-500/10'
+                  }`}
+               >
+                 <ShoppingBag size={14}/> Apenas Produto
+               </button>
+            </div>
+            
+            <div className="flex gap-3">
+                <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Valor Serviço (R$)</label>
+                    <input
+                      type="number"
+                      value={serviceValue}
+                      onChange={(e) => setServiceValue(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none font-mono"
+                    />
+                </div>
+                <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 mb-1">Adicionais (R$)</label>
+                    <input
+                      type="number"
+                      value={extraValue}
+                      onChange={(e) => setExtraValue(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none font-mono"
+                    />
+                </div>
             </div>
           </div>
-          
-          {/* Products Multi-Selection */}
+
+          {/* Section 3: Products Add-on */}
           {settings.products && settings.products.length > 0 && (
-             <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
-                 <div className="flex items-center gap-2 mb-2">
-                    <ShoppingBag size={14} className="text-green-400"/>
-                    <p className="text-xs text-gray-400 font-bold uppercase">Adicionar Produtos (+ R$):</p>
-                 </div>
-                 <div className="flex flex-wrap gap-2">
+             <div className="bg-gray-900/50 rounded-xl p-3 border border-gray-700/50">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <Tag size={14} className="text-green-400"/>
+                        <span className="text-xs font-bold text-gray-300">Incluir Produtos</span>
+                    </div>
+                    {selectedProducts.length > 0 && (
+                        <span className="text-xs font-mono text-green-400 font-bold">
+                            + R${getProductsTotal().toFixed(2)}
+                        </span>
+                    )}
+                </div>
+                
+                <div className="flex flex-wrap gap-2 max-h-[100px] overflow-y-auto custom-scrollbar">
                      {settings.products.map(p => {
                          const isSelected = selectedProducts.some(sp => sp.id === p.id);
                          return (
@@ -308,106 +345,91 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                                 key={p.id}
                                 type="button"
                                 onClick={() => toggleProduct(p)}
-                                className={`px-3 py-1.5 rounded-full text-xs border transition-colors flex items-center gap-1 ${
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-medium border transition-all flex items-center gap-1.5 ${
                                     isSelected 
-                                        ? 'bg-green-600 text-white border-green-500' 
-                                        : 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700'
+                                        ? 'bg-green-600 text-white border-green-500 shadow-md' 
+                                        : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
                                 }`}
                             >
-                                {isSelected && <Check size={12} />}
-                                {p.name} <span className="opacity-70 font-mono">R${p.price}</span>
+                                {p.name} <span className="opacity-70">R${p.price}</span>
+                                {isSelected && <Check size={10} />}
                             </button>
                          );
                      })}
-                 </div>
-                 <p className="text-[10px] text-gray-500 mt-2 italic">* Valor vai integral para o caixa (Sem comissao).</p>
+                </div>
              </div>
           )}
-          
-          {/* Custom Price - Only for Other */}
-          {(service === ServiceType.OTHER || (service === ServiceType.PRODUCT && selectedProducts.length === 0)) && (
-             <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">
-                   Valor do Servico/Produto (R$)
-                </label>
-                <input
-                  type="number"
-                  value={customPrice}
-                  onChange={(e) => setCustomPrice(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
-                />
-              </div>
-          )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">
-               Observacoes
-            </label>
-            <div className="relative">
-                <input
-                    type="text"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Ex: Disfarçado baixo, detalhes..."
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 pl-10 text-white focus:ring-2 focus:ring-gold-500 outline-none"
-                />
-                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-            </div>
-          </div>
-
+          {/* Section 4: Commission & Notes */}
           <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Adicionais (R$)</label>
-                <input
-                  type="number"
-                  value={extraValue}
-                  onChange={(e) => setExtraValue(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
-                  placeholder="0.00"
-                />
-                <p className="text-[10px] text-gray-500 mt-1">Sobrancelha, etc. (Gera Comissao)</p>
-              </div>
+               <div>
+                  <label className="block text-[10px] text-gray-500 mb-1">Observações</label>
+                  <div className="relative">
+                     <input
+                        type="text"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-8 pr-2 py-2 text-white text-xs focus:ring-2 focus:ring-gold-500 outline-none"
+                        placeholder="Detalhes..."
+                     />
+                     <FileText size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500"/>
+                  </div>
+               </div>
 
-              {/* Editable Commission Field */}
-              <div className={service === ServiceType.PRODUCT ? 'opacity-50 pointer-events-none' : ''}>
-                <label className="block text-sm font-bold text-gold-500 mb-1 flex items-center gap-1">
-                    Comissao (R$)
-                    <span className="text-[10px] font-normal text-gray-500 bg-gray-900 px-1 rounded border border-gray-700">Editavel</span>
-                </label>
-                <div className="relative">
-                    <input
-                      type="number"
-                      value={commissionValue}
-                      onChange={(e) => {
-                          setCommissionValue(e.target.value);
-                          setIsCommissionManuallyEdited(true);
-                      }}
-                      className="w-full bg-gray-900 border border-gold-500/30 rounded-lg pl-8 pr-2 py-2 text-gold-500 font-bold focus:ring-2 focus:ring-gold-500 outline-none"
-                      placeholder="0.00"
-                    />
-                    <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gold-600" size={14} />
-                </div>
-                <p className="text-[10px] text-gray-500 mt-1">
-                    {service === ServiceType.PRODUCT ? 'Produto não gera comissão.' : 'Valor para o barbeiro (apenas serviços).'}
-                </p>
-              </div>
-          </div>
-
-          <div className="pt-4 border-t border-gray-700 flex justify-between items-center">
-            <div className="text-white">
-              <p className="text-sm text-gray-400">Total Cliente</p>
-              <p className="text-2xl font-bold text-white">R$ {getTotal().toFixed(2)}</p>
-            </div>
-            <button
-              type="submit"
-              className="bg-white hover:bg-gray-100 text-black font-bold py-3 px-6 rounded-xl transition-colors flex items-center gap-2"
-            >
-              <Check size={20} />
-              {initialData ? 'Salvar' : 'Confirmar'}
-            </button>
+               <div className={serviceType === ServiceType.PRODUCT ? 'opacity-50 pointer-events-none grayscale' : ''}>
+                  <label className="block text-[10px] text-gold-500 mb-1 font-bold flex justify-between">
+                     Comissão ({settings.commissionRate}%)
+                     {!isCommissionEdited && serviceType !== ServiceType.PRODUCT && (
+                        <span className="text-[8px] bg-gray-700 px-1 rounded text-gray-300 flex items-center">AUTO</span>
+                     )}
+                  </label>
+                  <div className="relative">
+                      <input
+                        type="number"
+                        value={commissionValue}
+                        onChange={(e) => {
+                            setCommissionValue(e.target.value);
+                            setIsCommissionEdited(true);
+                        }}
+                        className="w-full bg-gray-900 border border-gold-500/30 rounded-xl pl-8 pr-2 py-2 text-gold-500 font-bold focus:ring-2 focus:ring-gold-500 outline-none font-mono"
+                      />
+                      <Calculator size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gold-600" />
+                  </div>
+               </div>
           </div>
         </form>
+
+        {/* Footer: Total & Actions */}
+        <div className="p-5 bg-gray-900 border-t border-gray-800 rounded-b-2xl">
+            <div className="flex justify-between items-end mb-4">
+                <div>
+                    <p className="text-gray-400 text-xs mb-0.5">Total a Receber</p>
+                    <div className="flex items-baseline gap-1">
+                        <span className="text-sm text-gray-500">R$</span>
+                        <span className="text-3xl font-display font-bold text-white tracking-tight">
+                            {getTotal().toFixed(2)}
+                        </span>
+                    </div>
+                </div>
+                {serviceType !== ServiceType.PRODUCT && (
+                    <div className="text-right">
+                        <p className="text-gray-500 text-[10px]">Lucro Casa</p>
+                        <p className="text-sm font-bold text-green-500">
+                             R$ {(getTotal() - (Number(commissionValue) || 0)).toFixed(2)}
+                        </p>
+                    </div>
+                )}
+            </div>
+            
+            <button
+              onClick={handleSubmit}
+              className="w-full bg-white hover:bg-gray-100 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+            >
+              <Check size={20} />
+              {initialData ? 'Salvar Alterações' : 'Confirmar Atendimento'}
+            </button>
+        </div>
+
       </div>
     </div>
   );

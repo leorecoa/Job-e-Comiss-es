@@ -777,7 +777,16 @@ const App: React.FC = () => {
 
       <AddClientModal isOpen={isClientModalOpen} onClose={() => setClientModalOpen(false)} settings={settings} onSave={handleSaveClient} initialData={editingClient} />
       <AddValeModal isOpen={isValeModalOpen} onClose={() => setValeModalOpen(false)} onAdd={handleAddVale} settings={settings} />
-      <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} settings={settings} onSave={setSettings} userProfile={userProfile} onSubscribe={() => setSubscriptionModalOpen(true)} />
+      <SettingsModal 
+        isOpen={isSettingsModalOpen} 
+        onClose={() => setSettingsModalOpen(false)} 
+        settings={settings} 
+        onSave={setSettings} 
+        userProfile={userProfile} 
+        onSubscribe={() => setSubscriptionModalOpen(true)} 
+        clients={clients}
+        vales={vales}
+      />
       <SubscriptionModal isOpen={isSubscriptionModalOpen} onClose={() => setSubscriptionModalOpen(false)} onSubscribe={handleSubscribe} />
     </div>
   );
