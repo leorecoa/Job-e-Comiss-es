@@ -24,14 +24,14 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onDow
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-slide-in">
       <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm border border-gray-700">
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
-          <h2 className="text-xl font-bold text-white font-display">Baixar Relatório</h2>
+          <h2 className="text-xl font-bold text-white font-display">Baixar Relatorio</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
             <X size={24} />
           </button>
         </div>
 
         <div className="p-6 space-y-4">
-          <p className="text-sm text-gray-400">Selecione o período e o formato para exportação.</p>
+          <p className="text-sm text-gray-400">Selecione o periodo e o formato para exportação.</p>
 
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Data Inicial</label>

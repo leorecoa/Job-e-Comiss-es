@@ -87,7 +87,7 @@ export const AddValeModal: React.FC<AddValeModalProps> = ({ isOpen, onClose, onA
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Descrição (Opcional)</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Descricao (Opcional)</label>
             <input
               type="text"
               value={description}

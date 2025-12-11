@@ -1,4 +1,5 @@
 
+
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatCurrency, formatTime } from "../utils";
@@ -84,7 +85,11 @@ export const generateReportPDF = (
   const drawCard = (x: number, title: string, value: string, isGold = false) => {
     // Card Background
     doc.setDrawColor(220, 220, 220);
-    doc.setFillColor(isGold ? colorGold : 255, 255, 255);
+    if (isGold) {
+        doc.setFillColor(colorGold);
+    } else {
+        doc.setFillColor(255, 255, 255);
+    }
     doc.roundedRect(x, currentY, cardWidth, cardHeight, 3, 3, 'FD');
     
     // Title

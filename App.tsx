@@ -36,7 +36,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  FileText
+  FileText,
+  Clock,
+  Tag
 } from 'lucide-react';
 
 const getTodayString = () => {
@@ -241,25 +243,27 @@ const App: React.FC = () => {
   const stats = useMemo(() => {
     const totalSales = filteredClients.reduce((acc, curr) => acc + curr.totalValue, 0);
     
-    // Calculate Commission
+    // Calculate Commission strictly for services
     const grossCommission = filteredClients.reduce((acc, curr) => {
-        // 1. Force 0 for Products
+        // REGRA 1: Produtos NUNCA geram comissão
         if (curr.serviceType === ServiceType.PRODUCT) {
             return acc;
         }
 
-        // 2. If Commission is saved AND > 0, trust it.
+        // REGRA 2: Se existe comissão salva E é > 0, respeita o histórico (para serviços)
         if (curr.commissionValue !== undefined && curr.commissionValue > 0) {
             return acc + curr.commissionValue;
         }
 
-        // 3. Fallback: Recalculate if it's 0 or undefined (Fix for "Zeroed History")
+        // REGRA 3: Fallback (Recálculo) se comissão for 0 ou indefinida
+        // Apenas para serviços. Usa serviceValue + extraValue.
         let baseValue = 0;
-        if (curr.serviceValue) {
-            // Clean data: Service + Extra
+        if (curr.serviceValue !== undefined) {
+            // Registro Moderno: Valor do Serviço + Extra
             baseValue = curr.serviceValue + (curr.extraValue || 0);
         } else {
-            // Legacy data: Total Value (assumed to be service mostly)
+            // Registro Legado (sem serviceValue separado): 
+            // Usa totalValue como fallback, assumindo que antigos eram majoritariamente serviços.
             baseValue = curr.totalValue;
         }
 
@@ -312,12 +316,20 @@ const App: React.FC = () => {
     const [hours, minutes] = timeStr ? timeStr.split(':').map(Number) : [new Date().getHours(), new Date().getMinutes()];
     const timestamp = new Date(year, month - 1, day, hours, minutes).getTime();
 
+    // Force commission to 0 if it is a PRODUCT type, regardless of what the form sent
+    const sanitizedCommission = clientInfo.serviceType === ServiceType.PRODUCT ? 0 : clientInfo.commissionValue;
+
+    const sanitizedClient = { 
+        ...clientInfo, 
+        commissionValue: sanitizedCommission 
+    };
+
     if (editingClient) {
-      setClients(prev => prev.map(c => c.id === editingClient.id ? { ...clientInfo, id: c.id, timestamp } : c));
+      setClients(prev => prev.map(c => c.id === editingClient.id ? { ...sanitizedClient, id: c.id, timestamp } : c));
       setEditingClient(null);
       addToast('Atendimento atualizado!', 'success');
     } else {
-      const newClient: Client = { ...clientInfo, id: generateId(), timestamp };
+      const newClient: Client = { ...sanitizedClient, id: generateId(), timestamp };
       setClients(prev => [newClient, ...prev]);
       addToast('Novo atendimento salvo!', 'success');
     }
@@ -378,19 +390,19 @@ const App: React.FC = () => {
             return;
         }
 
-        // PDF Logic (Fix for Zeroed History)
+        // PDF Logic (Strict Service Commission Only)
         const totalSales = rangeClients.reduce((acc, curr) => acc + curr.totalValue, 0);
         
         const grossCommission = rangeClients.reduce((acc, curr) => {
-             // 1. Force 0 for Products
+             // 1. Produtos = 0
              if (curr.serviceType === ServiceType.PRODUCT) return acc;
              
-             // 2. Trust stored POSITIVE values
+             // 2. Histórico salvo positivo (Serviços)
              if (curr.commissionValue !== undefined && curr.commissionValue > 0) return acc + curr.commissionValue;
              
-             // 3. Fallback Recalculate
+             // 3. Fallback Recálculo (Serviços)
              let baseValue = 0;
-             if (curr.serviceValue) {
+             if (curr.serviceValue !== undefined) {
                  baseValue = curr.serviceValue + (curr.extraValue || 0);
              } else {
                  baseValue = curr.totalValue;
@@ -582,74 +594,176 @@ const App: React.FC = () => {
                 
                 <div className="min-h-[200px] bg-gray-900/30">
                     {activeTab === 'clients' ? (
-                        <div className="overflow-x-auto">
-                            {filteredClients.length === 0 ? <p className="text-center py-8 text-gray-500">Sem registros.</p> : (
-                                <table className="w-full text-left">
-                                    <thead className="text-xs text-gray-400 bg-gray-900/50 uppercase">
-                                        <tr>
-                                            <th className="p-3 md:p-4">Hora</th>
-                                            <th className="p-3 md:p-4">Cliente</th>
-                                            <th className="p-3 md:p-4">Serviço</th>
-                                            <th className="p-3 md:p-4 text-right">Valor</th>
-                                            <th className="p-3 md:p-4 w-20"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-700/50">
+                        <>
+                           {filteredClients.length === 0 ? <p className="text-center py-8 text-gray-500">Sem registros.</p> : (
+                                <>
+                                    {/* Mobile View: Cards */}
+                                    <div className="md:hidden p-4 space-y-3">
                                         {filteredClients.map(c => (
-                                            <tr key={c.id} className="hover:bg-gray-700/30 group">
-                                                <td className="p-3 md:p-4 text-gray-400 font-mono text-xs whitespace-nowrap">{formatTime(c.timestamp)}</td>
-                                                <td className="p-3 md:p-4 font-medium text-white min-w-[100px]">
-                                                    {c.name}
-                                                    <span className={`block text-[10px] ${c.clientType === ClientType.NEW ? 'text-green-400' : 'text-gold-500'}`}>{c.clientType}</span>
-                                                </td>
-                                                <td className="p-3 md:p-4 text-gray-300 text-sm whitespace-nowrap">
-                                                    {c.serviceType}
-                                                    {/* Show product names if available */}
-                                                    {c.products && c.products.length > 0 && (
-                                                        <span className="text-green-400 text-xs block">
-                                                            + {c.products.length} Prod.
+                                            <div key={c.id} className={`bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-sm relative ${c.clientType === ClientType.NEW ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gold-500'}`}>
+                                                
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="bg-gray-900 text-gray-400 text-xs font-mono px-2 py-1 rounded flex items-center gap-1">
+                                                            <Clock size={12}/> {formatTime(c.timestamp)}
                                                         </span>
+                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded ${c.clientType === ClientType.NEW ? 'bg-green-900/30 text-green-400' : 'bg-gold-500/10 text-gold-500'}`}>
+                                                            {c.clientType === ClientType.NEW ? 'NOVO' : 'CASA'}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-white font-bold text-lg">
+                                                        {formatCurrency(c.totalValue)}
+                                                    </span>
+                                                </div>
+
+                                                <div className="mb-4">
+                                                    <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                                                        {c.name}
+                                                    </h3>
+                                                    <p className="text-gray-300 text-sm mt-1 flex items-center gap-1">
+                                                        <Scissors size={14} className="text-gray-500"/>
+                                                        {c.serviceType}
+                                                        {c.extraValue > 0 && <span className="text-gray-500 text-xs ml-1">(+Adic)</span>}
+                                                    </p>
+                                                    {c.products && c.products.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-2">
+                                                            {c.products.map(p => (
+                                                                <span key={p.id} className="text-[10px] bg-gray-900 text-gray-400 px-2 py-0.5 rounded border border-gray-700">
+                                                                    + {p.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
                                                     )}
-                                                    {c.extraValue > 0 && <span className="text-xs ml-1 text-gray-500">+{c.extraValue}</span>}
-                                                </td>
-                                                <td className="p-3 md:p-4 text-right font-bold text-white whitespace-nowrap">{formatCurrency(c.totalValue)}</td>
-                                                <td className="p-3 md:p-4 flex justify-end gap-2">
-                                                    <button onClick={() => handleEditClient(c)} className="text-blue-400 hover:bg-blue-500/10 p-2 rounded"><Pencil size={16}/></button>
-                                                    <button onClick={() => handleDeleteClient(c.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>
-                                                </td>
-                                            </tr>
+                                                    <p className="text-gray-500 text-xs mt-2 flex items-center gap-1">
+                                                        <User size={12}/> Barbeiro: {c.barberName}
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex gap-3 pt-3 border-t border-gray-700/50">
+                                                    <button 
+                                                        onClick={() => handleEditClient(c)} 
+                                                        className="flex-1 flex items-center justify-center gap-2 bg-blue-500/10 text-blue-400 py-2.5 rounded-lg text-sm font-bold active:bg-blue-500/20 transition-colors"
+                                                    >
+                                                        <Pencil size={16}/> Editar
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDeleteClient(c.id)} 
+                                                        className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 text-red-400 py-2.5 rounded-lg text-sm font-bold active:bg-red-500/20 transition-colors"
+                                                    >
+                                                        <Trash2 size={16}/> Excluir
+                                                    </button>
+                                                </div>
+                                            </div>
                                         ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                           {filteredVales.length === 0 ? <p className="text-center py-8 text-gray-500">Sem vales.</p> : (
-                                <table className="w-full text-left">
-                                    <thead className="text-xs text-gray-400 bg-gray-900/50 uppercase">
-                                        <tr>
-                                            <th className="p-3 md:p-4">Hora</th>
-                                            <th className="p-3 md:p-4">Descrição</th>
-                                            <th className="p-3 md:p-4 text-right">Valor</th>
-                                            <th className="p-3 md:p-4 w-16"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-700/50">
-                                        {filteredVales.map(v => (
-                                            <tr key={v.id} className="hover:bg-gray-700/30">
-                                                <td className="p-3 md:p-4 text-gray-400 font-mono text-xs whitespace-nowrap">{formatTime(v.timestamp)}</td>
-                                                <td className="p-3 md:p-4 text-gray-300 min-w-[120px]">{v.description} <span className="text-gray-500 text-xs">({v.barberName})</span></td>
-                                                <td className="p-3 md:p-4 text-right font-bold text-red-400 whitespace-nowrap">-{formatCurrency(v.value)}</td>
-                                                <td className="p-3 md:p-4 text-right">
-                                                    <button onClick={() => handleDeleteVale(v.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                    </div>
+
+                                    {/* Desktop View: Table */}
+                                    <div className="hidden md:block overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead className="text-xs text-gray-400 bg-gray-900/50 uppercase">
+                                                <tr>
+                                                    <th className="p-4">Hora</th>
+                                                    <th className="p-4">Cliente</th>
+                                                    <th className="p-4">Servico</th>
+                                                    <th className="p-4 text-right">Valor</th>
+                                                    <th className="p-4 w-20"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-700/50">
+                                                {filteredClients.map(c => (
+                                                    <tr key={c.id} className="hover:bg-gray-700/30 group">
+                                                        <td className="p-4 text-gray-400 font-mono text-xs whitespace-nowrap">{formatTime(c.timestamp)}</td>
+                                                        <td className="p-4 font-medium text-white min-w-[100px]">
+                                                            {c.name}
+                                                            <span className={`block text-[10px] ${c.clientType === ClientType.NEW ? 'text-green-400' : 'text-gold-500'}`}>{c.clientType}</span>
+                                                        </td>
+                                                        <td className="p-4 text-gray-300 text-sm whitespace-nowrap">
+                                                            {c.serviceType}
+                                                            {c.products && c.products.length > 0 && (
+                                                                <span className="text-green-400 text-xs block">
+                                                                    + {c.products.length} Prod.
+                                                                </span>
+                                                            )}
+                                                            {c.extraValue > 0 && <span className="text-xs ml-1 text-gray-500">+{c.extraValue}</span>}
+                                                        </td>
+                                                        <td className="p-4 text-right font-bold text-white whitespace-nowrap">{formatCurrency(c.totalValue)}</td>
+                                                        <td className="p-4 flex justify-end gap-2">
+                                                            <button onClick={() => handleEditClient(c)} className="text-blue-400 hover:bg-blue-500/10 p-2 rounded"><Pencil size={16}/></button>
+                                                            <button onClick={() => handleDeleteClient(c.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
                            )}
-                        </div>
+                        </>
+                    ) : (
+                        <>
+                           {filteredVales.length === 0 ? <p className="text-center py-8 text-gray-500">Sem vales.</p> : (
+                                <>
+                                    {/* Mobile View: Cards for Vales */}
+                                    <div className="md:hidden p-4 space-y-3">
+                                        {filteredVales.map(v => (
+                                            <div key={v.id} className="bg-gray-800 p-4 rounded-xl border border-gray-700 border-l-4 border-l-red-500 shadow-sm relative">
+                                                <div className="flex justify-between items-start mb-2">
+                                                     <div className="flex items-center gap-2">
+                                                        <span className="bg-gray-900 text-gray-400 text-xs font-mono px-2 py-1 rounded flex items-center gap-1">
+                                                            <Clock size={12}/> {formatTime(v.timestamp)}
+                                                        </span>
+                                                        <span className="text-[10px] font-bold px-2 py-1 rounded bg-red-900/30 text-red-400">
+                                                            VALE
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-red-400 font-bold text-lg">
+                                                        -{formatCurrency(v.value)}
+                                                    </span>
+                                                </div>
+
+                                                <div className="mb-4">
+                                                    <h3 className="text-white font-bold text-lg">{v.barberName}</h3>
+                                                    <p className="text-gray-400 text-sm mt-1 italic">"{v.description}"</p>
+                                                </div>
+
+                                                <button 
+                                                    onClick={() => handleDeleteVale(v.id)} 
+                                                    className="w-full flex items-center justify-center gap-2 bg-red-500/10 text-red-400 py-2.5 rounded-lg text-sm font-bold active:bg-red-500/20 transition-colors border border-red-500/20"
+                                                >
+                                                    <Trash2 size={16}/> Remover Vale
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Desktop View: Table for Vales */}
+                                    <div className="hidden md:block overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead className="text-xs text-gray-400 bg-gray-900/50 uppercase">
+                                                <tr>
+                                                    <th className="p-4">Hora</th>
+                                                    <th className="p-4">Descricao</th>
+                                                    <th className="p-4 text-right">Valor</th>
+                                                    <th className="p-4 w-16"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-700/50">
+                                                {filteredVales.map(v => (
+                                                    <tr key={v.id} className="hover:bg-gray-700/30">
+                                                        <td className="p-4 text-gray-400 font-mono text-xs whitespace-nowrap">{formatTime(v.timestamp)}</td>
+                                                        <td className="p-4 text-gray-300 min-w-[120px]">{v.description} <span className="text-gray-500 text-xs">({v.barberName})</span></td>
+                                                        <td className="p-4 text-right font-bold text-red-400 whitespace-nowrap">-{formatCurrency(v.value)}</td>
+                                                        <td className="p-4 text-right">
+                                                            <button onClick={() => handleDeleteVale(v.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
+                           )}
+                        </>
                     )}
                 </div>
              </div>

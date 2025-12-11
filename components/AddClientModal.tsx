@@ -133,6 +133,12 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
     if (!finalDescription && selectedProducts.length > 0) {
         finalDescription = selectedProducts.map(p => p.name).join(', ');
     }
+    
+    // Safety check: if service type is Product, commission MUST be 0
+    let finalCommission = Number(commissionValue) || 0;
+    if (service === ServiceType.PRODUCT) {
+        finalCommission = 0;
+    }
 
     onSave({
       name,
@@ -142,7 +148,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
       serviceValue: serviceVal,
       extraValue: Number(extraValue),
       totalValue: totalVal,
-      commissionValue: Number(commissionValue) || 0,
+      commissionValue: finalCommission,
       timeStr: time,
       description: finalDescription,
       products: selectedProducts
@@ -248,7 +254,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Serviço Principal</label>
+            <label className="block text-sm font-medium text-gray-400 mb-2">Servico Principal</label>
             <div className="grid grid-cols-3 gap-2">
               {Object.values(ServiceType)
                .filter(t => t !== ServiceType.PRODUCT) 
@@ -314,7 +320,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                          );
                      })}
                  </div>
-                 <p className="text-[10px] text-gray-500 mt-2 italic">* Valor vai integral para o caixa (Sem comissão).</p>
+                 <p className="text-[10px] text-gray-500 mt-2 italic">* Valor vai integral para o caixa (Sem comissao).</p>
              </div>
           )}
           
@@ -322,7 +328,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
           {(service === ServiceType.OTHER || (service === ServiceType.PRODUCT && selectedProducts.length === 0)) && (
              <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">
-                   Valor do Serviço/Produto (R$)
+                   Valor do Servico/Produto (R$)
                 </label>
                 <input
                   type="number"
@@ -336,7 +342,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">
-               Observações
+               Observacoes
             </label>
             <div className="relative">
                 <input
@@ -360,14 +366,14 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                   className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
                   placeholder="0.00"
                 />
-                <p className="text-[10px] text-gray-500 mt-1">Sobrancelha, etc. (Gera Comissão)</p>
+                <p className="text-[10px] text-gray-500 mt-1">Sobrancelha, etc. (Gera Comissao)</p>
               </div>
 
               {/* Editable Commission Field */}
-              <div>
+              <div className={service === ServiceType.PRODUCT ? 'opacity-50 pointer-events-none' : ''}>
                 <label className="block text-sm font-bold text-gold-500 mb-1 flex items-center gap-1">
-                    Comissão (R$)
-                    <span className="text-[10px] font-normal text-gray-500 bg-gray-900 px-1 rounded border border-gray-700">Editável</span>
+                    Comissao (R$)
+                    <span className="text-[10px] font-normal text-gray-500 bg-gray-900 px-1 rounded border border-gray-700">Editavel</span>
                 </label>
                 <div className="relative">
                     <input
@@ -382,7 +388,9 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                     />
                     <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gold-600" size={14} />
                 </div>
-                <p className="text-[10px] text-gray-500 mt-1">Valor para o barbeiro (apenas serviços).</p>
+                <p className="text-[10px] text-gray-500 mt-1">
+                    {service === ServiceType.PRODUCT ? 'Produto não gera comissão.' : 'Valor para o barbeiro (apenas serviços).'}
+                </p>
               </div>
           </div>
 

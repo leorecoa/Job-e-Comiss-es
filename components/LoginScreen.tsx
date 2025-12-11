@@ -47,14 +47,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
              </svg>
           </div>
           
-          <h1 className="text-2xl font-display font-bold text-white mb-1">Gestão Máxima</h1>
+          <h1 className="text-2xl font-display font-bold text-white mb-1">Gestao Maxima</h1>
           <p className="text-gold-500 font-bold text-[10px] uppercase tracking-widest mb-2">Sistema Profissional</p>
-          <p className="text-gray-400 text-sm">Configure seu sistema para começar</p>
+          <p className="text-gray-400 text-sm">Configure seu sistema para comecar</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">Nome do Negócio</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1.5">Nome do Negocio</label>
             <input
               type="text"
               required
@@ -66,7 +66,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">Seu Nome (Dono/Gerente)</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1.5">Seu Nome (Dono/BarbeiroLider/Gerente)</label>
             <input
               type="text"
               required
@@ -78,7 +78,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           </div>
 
            <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">Email (para recuperação)</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1.5">Email (para recuperacao)</label>
             <input
               type="email"
               value={email}
@@ -93,10 +93,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               type="submit"
               className="w-full bg-gold-500 hover:bg-gold-600 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 hover:translate-y-[-2px] shadow-lg shadow-gold-500/20"
             >
-              Começar Agora <ArrowRight size={20} />
+              Comecar Agora <ArrowRight size={20} />
             </button>
             <p className="text-center text-xs text-gray-500 mt-4">
-              Ao continuar, você inicia seu teste gratuito de 7 dias.
+              Ao continuar, voce inicia seu teste gratuito de 7 dias.
             </p>
           </div>
         </form>

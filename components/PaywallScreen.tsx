@@ -43,7 +43,7 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
             <Lock size={24} className="text-gold-500" />
           </div>
           
-          <h2 className="text-2xl font-display font-bold text-white mb-2">Período de Teste Encerrado</h2>
+          <h2 className="text-2xl font-display font-bold text-white mb-2">Periodo de Teste Encerrado</h2>
           <p className="text-gray-400 text-sm mb-8">
             Escolha o plano ideal para continuar gerenciando sua barbearia profissionalmente.
           </p>
@@ -52,11 +52,11 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
              {/* Plano PRO */}
              <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 hover:border-gold-500/50 transition-colors">
                 <h3 className="text-lg font-bold text-white mb-1">PRO Individual</h3>
-                <p className="text-gold-500 font-bold text-xl mb-3">R$ 29,90 <span className="text-xs font-normal text-gray-500">/mês</span></p>
-                <p className="text-xs text-gray-400 mb-4">Para barbeiros autônomos.</p>
+                <p className="text-gold-500 font-bold text-xl mb-3">R$ 29,90 <span className="text-xs font-normal text-gray-500">/mes</span></p>
+                <p className="text-xs text-gray-400 mb-4">Para barbeiros autonomos.</p>
                 <ul className="text-left text-xs text-gray-300 space-y-2">
-                    <li className="flex gap-2"><Check size={12} className="text-gold-500"/> 1 Usuário</li>
-                    <li className="flex gap-2"><Check size={12} className="text-gold-500"/> Gestão Completa</li>
+                    <li className="flex gap-2"><Check size={12} className="text-gold-500"/> 1 Usuario</li>
+                    <li className="flex gap-2"><Check size={12} className="text-gold-500"/> Gestao Completa</li>
                 </ul>
              </div>
 
@@ -66,11 +66,11 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
                     <Users size={16} className="text-blue-400"/>
                 </div>
                 <h3 className="text-lg font-bold text-white mb-1">VIP Equipe</h3>
-                <p className="text-blue-400 font-bold text-xl mb-3">R$ 59,90 <span className="text-xs font-normal text-gray-500">/mês</span></p>
+                <p className="text-blue-400 font-bold text-xl mb-3">R$ 59,90 <span className="text-xs font-normal text-gray-500">/mes</span></p>
                 <p className="text-xs text-gray-400 mb-4">Para barbearias com equipe.</p>
                 <ul className="text-left text-xs text-gray-300 space-y-2">
-                    <li className="flex gap-2"><Check size={12} className="text-blue-400"/> Até 4 Barbeiros</li>
-                    <li className="flex gap-2"><Check size={12} className="text-blue-400"/> Seleção Rápida</li>
+                    <li className="flex gap-2"><Check size={12} className="text-blue-400"/> Ate 4 Barbeiros</li>
+                    <li className="flex gap-2"><Check size={12} className="text-blue-400"/> Selecao Rapida</li>
                 </ul>
              </div>
           </div>
@@ -90,13 +90,13 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
                     </div>
                 </div>
             </div>
-            <p className="text-[10px] text-gray-500 italic mt-2 border-t border-gray-700 pt-2">Faça o PIX do valor correspondente ao plano escolhido.</p>
+            <p className="text-[10px] text-gray-500 italic mt-2 border-t border-gray-700 pt-2">Faca o PIX do valor correspondente ao plano escolhido.</p>
           </div>
 
           {/* Área de Desbloqueio */}
           <div className="space-y-3 max-w-md mx-auto">
             <label className="block text-left text-sm font-medium text-gray-300">
-              Digite o código recebido:
+              Digite o codigo recebido:
             </label>
             <div className="flex gap-2">
               <input 

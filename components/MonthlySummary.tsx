@@ -45,6 +45,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
     });
 
     // Função auxiliar para pegar a comissão correta
+    // Sincronizada com a lógica do App.tsx
     const getCommission = (c: Client) => {
         // 1. Produtos sempre 0
         if (c.serviceType === ServiceType.PRODUCT) {
@@ -59,11 +60,11 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
 
         // 3. Fallback (Recálculo) para histórico ou dados zerados incorretamente
         let baseValue = 0;
-        if (c.serviceValue) {
+        if (c.serviceValue !== undefined) {
             // Se tiver serviceValue (dado limpo), usa ele + extra
             baseValue = c.serviceValue + (c.extraValue || 0);
         } else {
-            // Se não tiver serviceValue (muito antigo), usa totalValue para não zerar histórico
+            // Se não tiver serviceValue (muito antigo), usa totalValue como fallback
             baseValue = c.totalValue;
         }
         
@@ -220,7 +221,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                     <th className="p-4 font-medium text-center">Cortes</th>
                     <th className="p-4 font-medium text-right text-blue-400">Vendas</th>
                     <th className="p-4 font-medium text-right text-red-400">Vales</th>
-                    <th className="p-4 font-medium text-right text-gold-500">A Receber (Líq)</th>
+                    <th className="p-4 font-medium text-right text-gold-500">A Receber (Liq)</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700/50">
@@ -247,14 +248,14 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
         <div className="p-4 border-b border-gray-700 bg-gray-900/50">
           <h3 className="font-bold text-white flex items-center gap-2">
             <Calendar size={18} className="text-gray-400"/>
-            Histórico Diário (Loja)
+            Historico Diario (Loja)
           </h3>
         </div>
         
         <div className="overflow-x-auto">
           {monthlyData.dailyBreakdown.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              Nenhum registro encontrado neste mês.
+              Nenhum registro encontrado neste mes.
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
@@ -263,7 +264,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                   <th className="p-4 font-medium">Data</th>
                   <th className="p-4 font-medium text-center">Atend.</th>
                   <th className="p-4 font-medium text-right text-gray-300">Faturamento</th>
-                  <th className="p-4 font-medium text-right text-gold-500">Comissão (Líq)</th>
+                  <th className="p-4 font-medium text-right text-gold-500">Comissao (Liq)</th>
                   <th className="p-4 font-medium text-right text-gray-400">Vales</th>
                 </tr>
               </thead>
