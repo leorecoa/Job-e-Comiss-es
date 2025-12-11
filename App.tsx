@@ -243,26 +243,23 @@ const App: React.FC = () => {
     
     // Calculate Commission
     const grossCommission = filteredClients.reduce((acc, curr) => {
-        // 1. New Logic: Use explicitly stored value if available
-        if (curr.commissionValue !== undefined) {
-            return acc + curr.commissionValue;
-        }
-
-        // 2. Fallback Logic for Legacy Data
-        // If it's explicitly a product sale, 0 commission
+        // 1. Force 0 for Products
         if (curr.serviceType === ServiceType.PRODUCT) {
             return acc;
         }
 
-        // Determine the base value for commission
-        let baseValue = 0;
+        // 2. If Commission is saved AND > 0, trust it.
+        if (curr.commissionValue !== undefined && curr.commissionValue > 0) {
+            return acc + curr.commissionValue;
+        }
 
+        // 3. Fallback: Recalculate if it's 0 or undefined (Fix for "Zeroed History")
+        let baseValue = 0;
         if (curr.serviceValue) {
-            // If serviceValue exists (clean data), use it + extra
+            // Clean data: Service + Extra
             baseValue = curr.serviceValue + (curr.extraValue || 0);
         } else {
-            // Ultra-Legacy fallback: use totalValue if serviceValue is missing
-            // This prevents old records from showing 0 commission
+            // Legacy data: Total Value (assumed to be service mostly)
             baseValue = curr.totalValue;
         }
 
@@ -381,14 +378,17 @@ const App: React.FC = () => {
             return;
         }
 
-        // PDF Logic with corrected legacy commission calculation
+        // PDF Logic (Fix for Zeroed History)
         const totalSales = rangeClients.reduce((acc, curr) => acc + curr.totalValue, 0);
         
         const grossCommission = rangeClients.reduce((acc, curr) => {
-             if (curr.commissionValue !== undefined) return acc + curr.commissionValue;
-             
+             // 1. Force 0 for Products
              if (curr.serviceType === ServiceType.PRODUCT) return acc;
              
+             // 2. Trust stored POSITIVE values
+             if (curr.commissionValue !== undefined && curr.commissionValue > 0) return acc + curr.commissionValue;
+             
+             // 3. Fallback Recalculate
              let baseValue = 0;
              if (curr.serviceValue) {
                  baseValue = curr.serviceValue + (curr.extraValue || 0);

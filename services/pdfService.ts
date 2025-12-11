@@ -2,7 +2,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatCurrency, formatTime } from "../utils";
-import { Client, Vale } from "../types";
+import { Client, Vale, ServiceType } from "../types";
 
 export const generateReportPDF = (
   shopName: string,

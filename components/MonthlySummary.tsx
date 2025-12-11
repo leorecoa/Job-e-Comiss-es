@@ -46,17 +46,18 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
 
     // Função auxiliar para pegar a comissão correta
     const getCommission = (c: Client) => {
-        // 1. Prioridade: Valor salvo explicitamente (Registros Novos)
-        if (c.commissionValue !== undefined) {
-            return c.commissionValue;
-        }
-
-        // 2. Lógica para Registros Antigos (Fallback)
-        // Se for explicitamente Produto, comissão 0
+        // 1. Produtos sempre 0
         if (c.serviceType === ServiceType.PRODUCT) {
             return 0;
         }
+        
+        // 2. Prioridade: Valor salvo explicitamente (SE for > 0)
+        // Isso corrige o bug de histórico zerado, pois ignoramos se for 0.
+        if (c.commissionValue !== undefined && c.commissionValue > 0) {
+            return c.commissionValue;
+        }
 
+        // 3. Fallback (Recálculo) para histórico ou dados zerados incorretamente
         let baseValue = 0;
         if (c.serviceValue) {
             // Se tiver serviceValue (dado limpo), usa ele + extra
