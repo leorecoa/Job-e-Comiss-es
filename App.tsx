@@ -95,7 +95,7 @@ const App: React.FC = () => {
           ...c,
           clientType: c.clientType || ClientType.RETURNING,
           products: c.products || [], // Ensure backward compatibility
-          commissionValue: c.commissionValue || 0
+          commissionValue: c.commissionValue // Keep existing or undefined
       }));
     } catch (e) {
       console.error("Error loading clients", e);
@@ -241,15 +241,32 @@ const App: React.FC = () => {
   const stats = useMemo(() => {
     const totalSales = filteredClients.reduce((acc, curr) => acc + curr.totalValue, 0);
     
-    // Calculate Commission using the stored value if available, else fallback
+    // Calculate Commission
     const grossCommission = filteredClients.reduce((acc, curr) => {
+        // 1. New Logic: Use explicitly stored value if available
         if (curr.commissionValue !== undefined) {
             return acc + curr.commissionValue;
         }
-        // Fallback for old records: Use serviceValue + extraValue only.
-        // DO NOT use totalValue as it might contain products.
-        const base = (curr.serviceValue || 0) + (curr.extraValue || 0);
-        return acc + (base * (settings.commissionRate / 100));
+
+        // 2. Fallback Logic for Legacy Data
+        // If it's explicitly a product sale, 0 commission
+        if (curr.serviceType === ServiceType.PRODUCT) {
+            return acc;
+        }
+
+        // Determine the base value for commission
+        let baseValue = 0;
+
+        if (curr.serviceValue) {
+            // If serviceValue exists (clean data), use it + extra
+            baseValue = curr.serviceValue + (curr.extraValue || 0);
+        } else {
+            // Ultra-Legacy fallback: use totalValue if serviceValue is missing
+            // This prevents old records from showing 0 commission
+            baseValue = curr.totalValue;
+        }
+
+        return acc + (baseValue * (settings.commissionRate / 100));
     }, 0);
 
     const totalVales = filteredVales.reduce((acc, curr) => acc + curr.value, 0);
@@ -364,15 +381,21 @@ const App: React.FC = () => {
             return;
         }
 
-        // PDF Logic (Default)
+        // PDF Logic with corrected legacy commission calculation
         const totalSales = rangeClients.reduce((acc, curr) => acc + curr.totalValue, 0);
         
-        // Use stored commission value, critical for consistent reports
         const grossCommission = rangeClients.reduce((acc, curr) => {
              if (curr.commissionValue !== undefined) return acc + curr.commissionValue;
-             // Fallback
-             const base = (curr.serviceValue || 0) + (curr.extraValue || 0);
-             return acc + (base * (settings.commissionRate / 100));
+             
+             if (curr.serviceType === ServiceType.PRODUCT) return acc;
+             
+             let baseValue = 0;
+             if (curr.serviceValue) {
+                 baseValue = curr.serviceValue + (curr.extraValue || 0);
+             } else {
+                 baseValue = curr.totalValue;
+             }
+             return acc + (baseValue * (settings.commissionRate / 100));
         }, 0);
 
         const totalVales = rangeVales.reduce((acc, curr) => acc + curr.value, 0);

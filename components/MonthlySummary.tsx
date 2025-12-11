@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Client, Vale, AppSettings } from '../types';
+import { Client, Vale, AppSettings, ServiceType } from '../types';
 import { formatCurrency } from '../utils';
 import { StatsCard } from './StatsCard';
 import { ArrowLeft, DollarSign, TrendingUp, Calendar, MinusCircle, Crown, Users } from 'lucide-react';
@@ -46,13 +46,27 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
 
     // Função auxiliar para pegar a comissão correta
     const getCommission = (c: Client) => {
+        // 1. Prioridade: Valor salvo explicitamente (Registros Novos)
         if (c.commissionValue !== undefined) {
             return c.commissionValue;
         }
-        // Fallback para dados antigos sem commissionValue salvo
-        // IMPORTANTE: Não usar c.totalValue se possível, pois pode incluir produtos
-        const base = (c.serviceValue || 0) + (c.extraValue || 0);
-        return base * (settings.commissionRate / 100);
+
+        // 2. Lógica para Registros Antigos (Fallback)
+        // Se for explicitamente Produto, comissão 0
+        if (c.serviceType === ServiceType.PRODUCT) {
+            return 0;
+        }
+
+        let baseValue = 0;
+        if (c.serviceValue) {
+            // Se tiver serviceValue (dado limpo), usa ele + extra
+            baseValue = c.serviceValue + (c.extraValue || 0);
+        } else {
+            // Se não tiver serviceValue (muito antigo), usa totalValue para não zerar histórico
+            baseValue = c.totalValue;
+        }
+        
+        return baseValue * (settings.commissionRate / 100);
     };
 
     // Totais Gerais
