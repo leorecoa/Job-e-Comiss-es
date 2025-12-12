@@ -1,35 +1,63 @@
 
-
 import React from 'react';
 import { formatCurrency } from '../utils';
 import { ServiceType } from '../types';
 
 interface DashboardChartsProps {
-  clients: any[]; 
+  clients: any[];
+  period?: 'weekly' | 'monthly';
+  selectedDate?: string; // YYYY-MM format for monthly view
 }
 
-export const DashboardCharts: React.FC<DashboardChartsProps> = ({ clients }) => {
-  // 1. Bar Chart Data (Last 7 Days)
-  const getLast7DaysData = () => {
+export const DashboardCharts: React.FC<DashboardChartsProps> = ({ 
+    clients, 
+    period = 'weekly',
+    selectedDate
+}) => {
+  
+  // 1. Bar Chart Data Generator
+  const getChartData = () => {
     const data = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dayStr = `${d.getDate()}/${d.getMonth() + 1}`;
-      
-      const startOfDay = new Date(d.setHours(0,0,0,0)).getTime();
-      const endOfDay = new Date(d.setHours(23,59,59,999)).getTime();
-      
-      const dayTotal = clients
-        .filter(c => c.timestamp >= startOfDay && c.timestamp <= endOfDay)
-        .reduce((acc, c) => acc + c.totalValue, 0);
 
-      data.push({ day: dayStr, value: dayTotal });
+    if (period === 'monthly' && selectedDate) {
+        // Monthly Logic: 1 to 31 (or end of month)
+        const [year, month] = selectedDate.split('-').map(Number);
+        const daysInMonth = new Date(year, month, 0).getDate();
+        
+        for (let i = 1; i <= daysInMonth; i++) {
+            const currentDayDate = new Date(year, month - 1, i);
+            const dayStr = String(i).padStart(2, '0');
+            
+            const startOfDay = currentDayDate.setHours(0,0,0,0);
+            const endOfDay = currentDayDate.setHours(23,59,59,999);
+
+            const dayTotal = clients
+                .filter(c => c.timestamp >= startOfDay && c.timestamp <= endOfDay)
+                .reduce((acc, c) => acc + c.totalValue, 0);
+
+            data.push({ day: dayStr, value: dayTotal, fullDate: currentDayDate });
+        }
+    } else {
+        // Weekly Logic: Last 7 Days
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dayStr = `${d.getDate()}/${d.getMonth() + 1}`;
+            
+            const startOfDay = new Date(d.setHours(0,0,0,0)).getTime();
+            const endOfDay = new Date(d.setHours(23,59,59,999)).getTime();
+            
+            const dayTotal = clients
+                .filter(c => c.timestamp >= startOfDay && c.timestamp <= endOfDay)
+                .reduce((acc, c) => acc + c.totalValue, 0);
+
+            data.push({ day: dayStr, value: dayTotal });
+        }
     }
     return data;
   };
 
-  const barData = getLast7DaysData();
+  const barData = getChartData();
   const maxBarValue = Math.max(...barData.map(d => d.value), 100);
 
   // 2. Pie Chart Data (Service Types)
@@ -54,23 +82,31 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ clients }) => 
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
       
       {/* Revenue Chart */}
-      <div className="bg-gray-800 rounded-2xl border border-gray-700 p-5 shadow-lg">
-        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Faturamento (7 Dias)</h3>
-        <div className="flex items-end justify-between h-32 gap-2">
+      <div className="bg-gray-800 rounded-2xl border border-gray-700 p-5 shadow-lg flex flex-col">
+        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">
+            {period === 'monthly' ? 'Fluxo do Mês (Dia a Dia)' : 'Faturamento (7 Dias)'}
+        </h3>
+        
+        {/* Scroll container for monthly view if needed */}
+        <div className={`flex-1 flex items-end justify-between gap-1 ${period === 'monthly' ? 'overflow-x-auto pb-2 custom-scrollbar' : ''}`}>
             {barData.map((d, i) => (
-                <div key={i} className="flex flex-col items-center flex-1 group">
-                    <div className="relative w-full flex justify-center h-full items-end">
+                <div key={i} className={`flex flex-col items-center group ${period === 'monthly' ? 'min-w-[12px] flex-1' : 'flex-1'}`}>
+                    <div className="relative w-full flex justify-center h-32 items-end">
                         {/* Tooltip */}
                         <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 border border-gray-600 text-white text-[10px] py-1 px-2 rounded pointer-events-none whitespace-nowrap z-10 shadow-xl">
+                            <span className="font-bold block">{d.day}</span>
                             {formatCurrency(d.value)}
                         </div>
                         {/* Bar */}
                         <div 
-                            className="w-full max-w-[24px] bg-gradient-to-t from-gold-600 to-gold-400 rounded-t-sm hover:from-gold-500 hover:to-gold-300 transition-all opacity-80 hover:opacity-100"
+                            className={`w-full ${period === 'monthly' ? 'max-w-[8px] rounded-sm' : 'max-w-[24px] rounded-t-sm'} bg-gradient-to-t from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 transition-all opacity-80 hover:opacity-100`}
                             style={{ height: `${(d.value / maxBarValue) * 100}%`, minHeight: d.value > 0 ? '4px' : '0' }}
                         ></div>
                     </div>
-                    <span className="text-[10px] text-gray-500 mt-2 font-mono">{d.day}</span>
+                    {/* Labels: Show all for weekly, but skip some for monthly to avoid clutter if screen is small */}
+                    <span className="text-[9px] text-gray-500 mt-2 font-mono truncate w-full text-center">
+                        {period === 'monthly' ? (i % 2 === 0 ? d.day : '') : d.day}
+                    </span>
                 </div>
             ))}
         </div>
@@ -78,10 +114,10 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ clients }) => 
 
       {/* Services Chart */}
       <div className="bg-gray-800 rounded-2xl border border-gray-700 p-5 shadow-lg">
-         <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Serviços Populares</h3>
-         <div className="space-y-4">
+         <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Mix de Serviços</h3>
+         <div className="space-y-4 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
             {pieData.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-4">Sem dados ainda.</p>
+                <p className="text-gray-500 text-sm text-center py-4">Sem dados no período.</p>
             ) : (
                 pieData.map((d) => (
                     <div key={d.name} className="group">

@@ -1,4 +1,6 @@
 
+import { Client, ServiceType } from './types';
+
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -23,6 +25,32 @@ export const formatTime = (timestamp: number): string => {
 
 export const generateId = (): string => {
   return Math.random().toString(36).substr(2, 9);
+};
+
+// Lógica Centralizada de Comissão
+export const calculateClientCommission = (client: Client, currentRate: number): number => {
+  // 1. Produtos nunca geram comissão
+  if (client.serviceType === ServiceType.PRODUCT) {
+    return 0;
+  }
+
+  // 2. Prioridade: Valor salvo explicitamente (se > 0)
+  // Isso garante que comissões antigas (com taxas antigas) sejam preservadas
+  if (client.commissionValue !== undefined && client.commissionValue > 0) {
+    return client.commissionValue;
+  }
+
+  // 3. Fallback: Recálculo usando a taxa atual
+  let baseValue = 0;
+  if (client.serviceValue !== undefined) {
+    // Registro Moderno: Serviço + Extra (exclui produtos da base de cálculo)
+    baseValue = client.serviceValue + (client.extraValue || 0);
+  } else {
+    // Registro Legado: Total (assume que era apenas serviço)
+    baseValue = client.totalValue;
+  }
+
+  return baseValue * (currentRate / 100);
 };
 
 export const generateAndDownloadCSV = (

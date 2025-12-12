@@ -5,9 +5,10 @@ import { CheckCircle, Lock, Copy, Check, Users } from 'lucide-react';
 interface PaywallScreenProps {
   onSubscribe: (code: string) => boolean; // Agora retorna boleano se deu certo
   daysUsed: number;
+  expirationDate: number; // Novo prop para data de expiração
 }
 
-export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysUsed }) => {
+export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysUsed, expirationDate }) => {
   const [activationCode, setActivationCode] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -29,6 +30,10 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
     }
   };
 
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString('pt-BR');
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background decoration */}
@@ -44,7 +49,10 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({ onSubscribe, daysU
           </div>
           
           <h2 className="text-2xl font-display font-bold text-white mb-2">Periodo de Teste Encerrado</h2>
-          <p className="text-gray-400 text-sm mb-8">
+          <p className="text-gray-400 text-sm mb-1">
+             Seu teste de 7 dias encerrou em <span className="text-gold-500 font-bold">{formatDate(expirationDate)}</span>.
+          </p>
+          <p className="text-gray-500 text-xs mb-8">
             Escolha o plano ideal para continuar gerenciando sua barbearia profissionalmente.
           </p>
 

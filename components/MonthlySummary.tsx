@@ -1,8 +1,9 @@
 
 import React, { useMemo } from 'react';
 import { Client, Vale, AppSettings, ServiceType } from '../types';
-import { formatCurrency } from '../utils';
+import { formatCurrency, calculateClientCommission } from '../utils';
 import { StatsCard } from './StatsCard';
+import { DashboardCharts } from './DashboardCharts';
 import { ArrowLeft, DollarSign, TrendingUp, Calendar, MinusCircle, Crown, Users } from 'lucide-react';
 
 interface MonthlySummaryProps {
@@ -44,31 +45,9 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
       return d.getFullYear() === year && d.getMonth() === month;
     });
 
-    // Função auxiliar para pegar a comissão correta
-    // Sincronizada com a lógica do App.tsx
+    // Função auxiliar usando a lógica centralizada
     const getCommission = (c: Client) => {
-        // 1. Produtos sempre 0
-        if (c.serviceType === ServiceType.PRODUCT) {
-            return 0;
-        }
-        
-        // 2. Prioridade: Valor salvo explicitamente (SE for > 0)
-        // Isso corrige o bug de histórico zerado, pois ignoramos se for 0.
-        if (c.commissionValue !== undefined && c.commissionValue > 0) {
-            return c.commissionValue;
-        }
-
-        // 3. Fallback (Recálculo) para histórico ou dados zerados incorretamente
-        let baseValue = 0;
-        if (c.serviceValue !== undefined) {
-            // Se tiver serviceValue (dado limpo), usa ele + extra
-            baseValue = c.serviceValue + (c.extraValue || 0);
-        } else {
-            // Se não tiver serviceValue (muito antigo), usa totalValue como fallback
-            baseValue = c.totalValue;
-        }
-        
-        return baseValue * (settings.commissionRate / 100);
+        return calculateClientCommission(c, settings.commissionRate);
     };
 
     // Totais Gerais
@@ -129,6 +108,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
       .sort((a, b) => b.sales - a.sales); // Quem vendeu mais primeiro
 
     return {
+      filteredClients, // Exposing filtered list for Charts
       totalSales,
       totalCommission,
       totalVales,
@@ -140,9 +120,9 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
   }, [clients, vales, selectedMonth, settings.commissionRate]);
 
   return (
-    <div className="animate-slide-in space-y-6">
+    <div className="animate-slide-in space-y-6 pb-12">
       {/* Header do Relatório */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-800 p-4 rounded-2xl border border-gray-700">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-800 p-4 rounded-2xl border border-gray-700 sticky top-[72px] z-30 shadow-2xl shadow-gray-950/50">
         <div className="flex items-center gap-4 w-full md:w-auto">
           <button 
             onClick={onBack}
@@ -152,7 +132,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
           </button>
           <div>
             <h2 className="text-xl font-display font-bold text-white">Resumo Mensal</h2>
-            <p className="text-sm text-gray-400">Acompanhe seu desempenho financeiro</p>
+            <p className="text-sm text-gray-400">Analise financeira completa</p>
           </div>
         </div>
 
@@ -174,7 +154,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                     type="month" 
                     value={selectedMonth}
                     onChange={(e) => onMonthChange(e.target.value)}
-                    className="w-full md:w-40 bg-gray-900 border border-gray-700 text-white text-sm rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent block pl-10 p-2.5 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                    className="w-full md:w-40 bg-gray-900 border border-gray-700 text-white text-sm rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent block pl-10 p-2.5 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert cursor-pointer"
                 />
             </div>
         </div>
@@ -202,6 +182,15 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
           icon={<TrendingUp size={20} />} 
           colorClass="bg-gradient-to-br from-gold-500/20 to-gray-800 border-gold-500/50 text-gold-500"
         />
+      </div>
+
+      {/* Gráficos Mensais */}
+      <div className="mt-6">
+         <DashboardCharts 
+            clients={monthlyData.filteredClients} 
+            period="monthly" 
+            selectedDate={selectedMonth} 
+         />
       </div>
 
       {/* TABELA DE EQUIPE (Somente se houver dados de equipe ou múltiplos nomes) */}

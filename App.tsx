@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
-import { formatCurrency, formatTime, generateId, formatDate, generateAndDownloadCSV } from './utils';
+import { formatCurrency, formatTime, generateId, formatDate, generateAndDownloadCSV, calculateClientCommission } from './utils';
 import { generateReportPDF } from './services/pdfService';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
@@ -190,16 +190,22 @@ const App: React.FC = () => {
 
   // -- Derived State --
   const trialStatus = useMemo(() => {
-    if (!userProfile) return { isExpired: false, daysLeft: 7, daysUsed: 0 };
-    if (userProfile.isPro) return { isExpired: false, daysLeft: 999, daysUsed: 0 };
+    if (!userProfile) return { isExpired: false, daysLeft: 7, daysUsed: 0, expirationDate: Date.now() + (7 * 24 * 60 * 60 * 1000) };
+    if (userProfile.isPro) return { isExpired: false, daysLeft: 999, daysUsed: 0, expirationDate: Date.now() + (3650 * 24 * 60 * 60 * 1000) };
+    
     const now = Date.now();
     const start = userProfile.startDate;
     const diffTime = Math.abs(now - start);
     const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    
+    // Calculate exact expiration date
+    const expirationDate = start + (TRIAL_DAYS * 24 * 60 * 60 * 1000);
+
     return {
       isExpired: diffDays > TRIAL_DAYS,
       daysLeft: Math.max(0, Math.ceil(TRIAL_DAYS - diffDays)),
-      daysUsed: diffDays
+      daysUsed: diffDays,
+      expirationDate
     };
   }, [userProfile]);
 
@@ -243,31 +249,9 @@ const App: React.FC = () => {
   const stats = useMemo(() => {
     const totalSales = filteredClients.reduce((acc, curr) => acc + curr.totalValue, 0);
     
-    // Calculate Commission strictly for services
+    // Calculate Commission strictly using centralized logic
     const grossCommission = filteredClients.reduce((acc, curr) => {
-        // REGRA 1: Produtos NUNCA geram comissão
-        if (curr.serviceType === ServiceType.PRODUCT) {
-            return acc;
-        }
-
-        // REGRA 2: Se existe comissão salva E é > 0, respeita o histórico (para serviços)
-        if (curr.commissionValue !== undefined && curr.commissionValue > 0) {
-            return acc + curr.commissionValue;
-        }
-
-        // REGRA 3: Fallback (Recálculo) se comissão for 0 ou indefinida
-        // Apenas para serviços. Usa serviceValue + extraValue.
-        let baseValue = 0;
-        if (curr.serviceValue !== undefined) {
-            // Registro Moderno: Valor do Serviço + Extra
-            baseValue = curr.serviceValue + (curr.extraValue || 0);
-        } else {
-            // Registro Legado (sem serviceValue separado): 
-            // Usa totalValue como fallback, assumindo que antigos eram majoritariamente serviços.
-            baseValue = curr.totalValue;
-        }
-
-        return acc + (baseValue * (settings.commissionRate / 100));
+        return acc + calculateClientCommission(curr, settings.commissionRate);
     }, 0);
 
     const totalVales = filteredVales.reduce((acc, curr) => acc + curr.value, 0);
@@ -393,21 +377,9 @@ const App: React.FC = () => {
         // PDF Logic (Strict Service Commission Only)
         const totalSales = rangeClients.reduce((acc, curr) => acc + curr.totalValue, 0);
         
+        // Use centralized commission logic
         const grossCommission = rangeClients.reduce((acc, curr) => {
-             // 1. Produtos = 0
-             if (curr.serviceType === ServiceType.PRODUCT) return acc;
-             
-             // 2. Histórico salvo positivo (Serviços)
-             if (curr.commissionValue !== undefined && curr.commissionValue > 0) return acc + curr.commissionValue;
-             
-             // 3. Fallback Recálculo (Serviços)
-             let baseValue = 0;
-             if (curr.serviceValue !== undefined) {
-                 baseValue = curr.serviceValue + (curr.extraValue || 0);
-             } else {
-                 baseValue = curr.totalValue;
-             }
-             return acc + (baseValue * (settings.commissionRate / 100));
+             return acc + calculateClientCommission(curr, settings.commissionRate);
         }, 0);
 
         const totalVales = rangeVales.reduce((acc, curr) => acc + curr.value, 0);
@@ -500,7 +472,7 @@ const App: React.FC = () => {
   ];
 
   if (!userProfile) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><LoginScreen onLogin={handleLogin} /></>;
-  if (trialStatus.isExpired) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><PaywallScreen onSubscribe={handleSubscribe} daysUsed={trialStatus.daysUsed} /></>;
+  if (trialStatus.isExpired) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><PaywallScreen onSubscribe={handleSubscribe} daysUsed={trialStatus.daysUsed} expirationDate={trialStatus.expirationDate} /></>;
 
   return (
     <div className="min-h-screen bg-transparent pb-24 font-sans selection:bg-gold-500/30">
@@ -600,7 +572,7 @@ const App: React.FC = () => {
                                     {/* Mobile View: Cards */}
                                     <div className="md:hidden p-4 space-y-3">
                                         {filteredClients.map(c => (
-                                            <div key={c.id} className={`bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-sm relative ${c.clientType === ClientType.NEW ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gold-500'}`}>
+                                            <div key={c.id} className={`bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-sm relative transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20 hover:border-gray-600 ${c.clientType === ClientType.NEW ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gold-500'}`}>
                                                 
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div className="flex items-center gap-2">
@@ -706,7 +678,7 @@ const App: React.FC = () => {
                                     {/* Mobile View: Cards for Vales */}
                                     <div className="md:hidden p-4 space-y-3">
                                         {filteredVales.map(v => (
-                                            <div key={v.id} className="bg-gray-800 p-4 rounded-xl border border-gray-700 border-l-4 border-l-red-500 shadow-sm relative">
+                                            <div key={v.id} className="bg-gray-800 p-4 rounded-xl border border-gray-700 border-l-4 border-l-red-500 shadow-sm relative transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20 hover:border-gray-600">
                                                 <div className="flex justify-between items-start mb-2">
                                                      <div className="flex items-center gap-2">
                                                         <span className="bg-gray-900 text-gray-400 text-xs font-mono px-2 py-1 rounded flex items-center gap-1">

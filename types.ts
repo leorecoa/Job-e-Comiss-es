@@ -22,6 +22,9 @@ export interface ProductItem {
 export interface Client {
   id: string;
   name: string;
+  phone?: string;        // Optional Phone
+  birthDate?: string;    // Optional Birth Date (YYYY-MM-DD)
+  address?: string;      // Optional Address
   barberName: string;
   serviceType: ServiceType;
   clientType: ClientType;

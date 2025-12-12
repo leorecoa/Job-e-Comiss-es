@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ServiceType, AppSettings, ClientType, Client, ProductItem } from '../types';
-import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag, DollarSign, Calculator } from 'lucide-react';
+import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag, DollarSign, Calculator, Scissors, Plus, Phone, MapPin, Calendar, ChevronRight } from 'lucide-react';
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -14,12 +14,18 @@ interface AddClientModalProps {
 export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, settings, onSave, initialData }) => {
   // -- Form State --
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [address, setAddress] = useState('');
+  
   const [barber, setBarber] = useState('');
   const [serviceType, setServiceType] = useState<ServiceType>(ServiceType.CUT);
   const [clientType, setClientType] = useState<ClientType>(ClientType.RETURNING);
   const [time, setTime] = useState('');
   const [description, setDescription] = useState('');
   
+  const [showDetails, setShowDetails] = useState(false);
+
   // -- Financial State --
   const [serviceValue, setServiceValue] = useState<string>(''); // Valor do Serviço Base
   const [extraValue, setExtraValue] = useState<string>(''); // Adicionais (Sobrancelha etc)
@@ -35,10 +41,20 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
       if (initialData) {
         // Edit Mode
         setName(initialData.name);
+        setPhone(initialData.phone || '');
+        setBirthDate(initialData.birthDate || '');
+        setAddress(initialData.address || '');
         setBarber(initialData.barberName);
         setServiceType(initialData.serviceType);
         setClientType(initialData.clientType || ClientType.RETURNING);
         setDescription(initialData.description || '');
+        
+        // Check if we should show details by default
+        if (initialData.phone || initialData.birthDate || initialData.address) {
+            setShowDetails(true);
+        } else {
+            setShowDetails(false);
+        }
         
         // Time Formatting
         const d = new Date(initialData.timestamp);
@@ -47,17 +63,21 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setTime(`${h}:${m}`);
 
         // Financials
-        // Note: We use serviceValue if available, or fall back for legacy records
         setServiceValue(initialData.serviceValue?.toString() || initialData.totalValue.toString());
         setExtraValue(initialData.extraValue?.toString() || '');
         setSelectedProducts(initialData.products || []);
         
         // Commission
         setCommissionValue(initialData.commissionValue?.toString() || '0');
-        setIsCommissionEdited(true); // Keep saved commission value
+        setIsCommissionEdited(true); // Keep saved commission value as strict
       } else {
         // New Mode
         setName('');
+        setPhone('');
+        setBirthDate('');
+        setAddress('');
+        setShowDetails(false);
+        
         setBarber(settings.barbers && settings.barbers.length > 0 ? settings.barbers[0] : '');
         setServiceType(ServiceType.CUT);
         setClientType(ClientType.RETURNING);
@@ -67,7 +87,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         const now = new Date();
         setTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
 
-        // Default Financials
+        // Default Financials based on settings
         setServiceValue(settings.priceCut.toString());
         setExtraValue('');
         setSelectedProducts([]);
@@ -109,6 +129,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         return;
       }
 
+      // REGRA: Comissão incide apenas sobre Serviço + Extras
       const baseForCommission = getNumericService() + getNumericExtra();
       const rate = settings.commissionRate / 100;
       const calculated = baseForCommission * rate;
@@ -138,6 +159,9 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
     onSave({
       name,
+      phone,
+      birthDate,
+      address,
       barberName: barber,
       serviceType,
       clientType,
@@ -226,6 +250,52 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
               placeholder="Nome do Cliente"
              />
 
+             {/* Client Details Toggle */}
+             <button 
+                type="button" 
+                onClick={() => setShowDetails(!showDetails)}
+                className="text-xs text-gold-500 font-bold flex items-center gap-1 hover:underline"
+             >
+                {showDetails ? 'Ocultar detalhes' : 'Adicionar telefone, endereço...'}
+                <ChevronRight size={12} className={`transition-transform ${showDetails ? 'rotate-90' : ''}`} />
+             </button>
+
+             {/* Expanded Client Details */}
+             {showDetails && (
+                 <div className="grid grid-cols-2 gap-3 bg-gray-900/50 p-3 rounded-xl border border-gray-700/50 animate-slide-in">
+                    <div className="col-span-2 relative">
+                        <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                        <input
+                            type="tel"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-white text-xs focus:ring-1 focus:ring-gold-500 outline-none"
+                            placeholder="Telefone / WhatsApp"
+                        />
+                    </div>
+                    <div className="relative">
+                        <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                        <input
+                            type="date"
+                            value={birthDate}
+                            onChange={(e) => setBirthDate(e.target.value)}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-white text-xs focus:ring-1 focus:ring-gold-500 outline-none"
+                            placeholder="Nascimento"
+                        />
+                    </div>
+                    <div className="col-span-2 relative">
+                        <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                        <input
+                            type="text"
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-white text-xs focus:ring-1 focus:ring-gold-500 outline-none"
+                            placeholder="Endereço"
+                        />
+                    </div>
+                 </div>
+             )}
+
              {settings.barbers && settings.barbers.length > 0 ? (
                  <div className="relative">
                     <select
@@ -256,7 +326,9 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
           {/* Section 2: Service Selection */}
           <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Tipo de Serviço</label>
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block flex items-center gap-1">
+                <Scissors size={12} /> Tipo de Serviço
+            </label>
             <div className="grid grid-cols-3 gap-2 mb-3">
               {[ServiceType.CUT, ServiceType.BEARD, ServiceType.COMBO].map((type) => (
                 <button
@@ -300,24 +372,30 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
             
             <div className="flex gap-3">
                 <div className="flex-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Valor Serviço (R$)</label>
-                    <input
-                      type="number"
-                      value={serviceValue}
-                      onChange={(e) => setServiceValue(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none font-mono"
-                    />
+                    <label className="block text-[10px] text-gray-500 mb-1 uppercase font-bold">Valor Serviço</label>
+                    <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">R$</span>
+                        <input
+                        type="number"
+                        value={serviceValue}
+                        onChange={(e) => setServiceValue(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-8 pr-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none font-mono"
+                        />
+                    </div>
                 </div>
                 <div className="flex-1">
-                    <label className="block text-[10px] text-gray-500 mb-1">Adicionais (R$)</label>
-                    <input
-                      type="number"
-                      value={extraValue}
-                      onChange={(e) => setExtraValue(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none font-mono"
-                    />
+                    <label className="block text-[10px] text-gray-500 mb-1 uppercase font-bold">Adicionais</label>
+                    <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">+</span>
+                        <input
+                        type="number"
+                        value={extraValue}
+                        onChange={(e) => setExtraValue(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-6 pr-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none font-mono"
+                        />
+                    </div>
                 </div>
             </div>
           </div>
@@ -328,10 +406,10 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                         <Tag size={14} className="text-green-400"/>
-                        <span className="text-xs font-bold text-gray-300">Incluir Produtos</span>
+                        <span className="text-xs font-bold text-gray-300 uppercase">Produtos</span>
                     </div>
                     {selectedProducts.length > 0 && (
-                        <span className="text-xs font-mono text-green-400 font-bold">
+                        <span className="text-xs font-mono text-green-400 font-bold bg-green-900/30 px-2 py-0.5 rounded">
                             + R${getProductsTotal().toFixed(2)}
                         </span>
                     )}
@@ -352,7 +430,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                                 }`}
                             >
                                 {p.name} <span className="opacity-70">R${p.price}</span>
-                                {isSelected && <Check size={10} />}
+                                {isSelected ? <Check size={10} /> : <Plus size={10} />}
                             </button>
                          );
                      })}
@@ -363,7 +441,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
           {/* Section 4: Commission & Notes */}
           <div className="grid grid-cols-2 gap-4">
                <div>
-                  <label className="block text-[10px] text-gray-500 mb-1">Observações</label>
+                  <label className="block text-[10px] text-gray-500 mb-1 uppercase font-bold">Observações</label>
                   <div className="relative">
                      <input
                         type="text"
@@ -377,10 +455,13 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                </div>
 
                <div className={serviceType === ServiceType.PRODUCT ? 'opacity-50 pointer-events-none grayscale' : ''}>
-                  <label className="block text-[10px] text-gold-500 mb-1 font-bold flex justify-between">
+                  <label className="block text-[10px] text-gold-500 mb-1 font-bold flex justify-between uppercase">
                      Comissão ({settings.commissionRate}%)
                      {!isCommissionEdited && serviceType !== ServiceType.PRODUCT && (
-                        <span className="text-[8px] bg-gray-700 px-1 rounded text-gray-300 flex items-center">AUTO</span>
+                        <span className="text-[8px] bg-gray-700 px-1 rounded text-gray-300 flex items-center tracking-wider">AUTO</span>
+                     )}
+                     {isCommissionEdited && (
+                        <span className="text-[8px] bg-gold-900 px-1 rounded text-gold-400 flex items-center tracking-wider border border-gold-500/30">EDITADO</span>
                      )}
                   </label>
                   <div className="relative">
@@ -391,7 +472,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                             setCommissionValue(e.target.value);
                             setIsCommissionEdited(true);
                         }}
-                        className="w-full bg-gray-900 border border-gold-500/30 rounded-xl pl-8 pr-2 py-2 text-gold-500 font-bold focus:ring-2 focus:ring-gold-500 outline-none font-mono"
+                        className={`w-full bg-gray-900 border rounded-xl pl-8 pr-2 py-2 font-bold focus:ring-2 focus:ring-gold-500 outline-none font-mono ${isCommissionEdited ? 'text-white border-gray-500' : 'text-gold-500 border-gold-500/30'}`}
                       />
                       <Calculator size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gold-600" />
                   </div>
@@ -403,7 +484,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         <div className="p-5 bg-gray-900 border-t border-gray-800 rounded-b-2xl">
             <div className="flex justify-between items-end mb-4">
                 <div>
-                    <p className="text-gray-400 text-xs mb-0.5">Total a Receber</p>
+                    <p className="text-gray-400 text-xs mb-0.5 uppercase tracking-wider font-bold">Total a Receber</p>
                     <div className="flex items-baseline gap-1">
                         <span className="text-sm text-gray-500">R$</span>
                         <span className="text-3xl font-display font-bold text-white tracking-tight">
@@ -413,8 +494,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                 </div>
                 {serviceType !== ServiceType.PRODUCT && (
                     <div className="text-right">
-                        <p className="text-gray-500 text-[10px]">Lucro Casa</p>
-                        <p className="text-sm font-bold text-green-500">
+                        <p className="text-gray-500 text-[10px] uppercase font-bold">Lucro Casa (Liq)</p>
+                        <p className="text-sm font-bold text-green-500 font-mono">
                              R$ {(getTotal() - (Number(commissionValue) || 0)).toFixed(2)}
                         </p>
                     </div>
@@ -423,7 +504,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
             
             <button
               onClick={handleSubmit}
-              className="w-full bg-white hover:bg-gray-100 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+              className="w-full bg-white hover:bg-gray-100 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98] shadow-lg shadow-white/10"
             >
               <Check size={20} />
               {initialData ? 'Salvar Alterações' : 'Confirmar Atendimento'}
