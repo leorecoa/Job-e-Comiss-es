@@ -1,20 +1,32 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 💼 Job & Comissões
 
-# Run and deploy your AI Studio app
+> Sistema inteligente para gestão de tarefas freelance e cálculo automatizado de comissões.
 
-This contains everything you need to run your app locally.
+![Habilidades](https://img.shields.io/badge/Tecnologias-React%20%7C%20Node.js%20%7C%20TypeScript-blue)
+![Status](https://img.shields.io/badge/Status-Em%20Desenvolvimento-orange)
+![Licença](https://img.shields.io/badge/License-MIT-green)
 
-View your app in AI Studio: https://ai.studio/apps/drive/1h27if2lTBLVjkMINIcCUqbqKMKzqOi6g
+---
 
-## Run Locally
+### 🚀 Tecnologias
+![JavaScript](https://img.shields.io/badge/javascript-%23323330.svg?style=for-the-badge&logo=javascript&logoColor=%23F7DF1E)
+![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
+![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
-**Prerequisites:**  Node.js
+### 📋 Funcionalidades
+- ✅ Cadastro e acompanhamento de "Jobs".
+- 💰 Cálculo automático de comissões por projeto.
+- 📊 Dashboard de rendimentos mensais.
+- 🕒 Histórico de produtividade.
 
+### 🔧 Instalação
+```bash
+# Clone o repositório
+git clone https://github.com/leorecoa/Job-e-Comiss-es.git
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+# Instale as dependências
+npm install
+
+# Inicie o projeto
+npm run dev
