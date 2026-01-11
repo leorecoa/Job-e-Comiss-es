@@ -16,7 +16,7 @@
 
 ### 📋 Funcionalidades
 - ✅ Cadastro e acompanhamento de "Jobs".
-- 💰 Cálculo automático de comissões por projeto.
+- 💰 Cálculo automático de comissões.
 - 📊 Dashboard de rendimentos mensais.
 - 🕒 Histórico de produtividade.
 
