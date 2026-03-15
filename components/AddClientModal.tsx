@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { ServiceType, AppSettings, ClientType, Client, ProductItem } from '../types';
-import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag, DollarSign, Calculator, Scissors, Plus, Phone, MapPin, Calendar, ChevronRight } from 'lucide-react';
+import { ServiceType, AppSettings, ClientType, Client, ClientFormData, ProductItem } from '../types';
+import { X, Check, UserPlus, UserCheck, Clock, ChevronDown, Tag, FileText, ShoppingBag, Calculator, Scissors, Plus, Phone, MapPin, Calendar, ChevronRight } from 'lucide-react';
 
 interface AddClientModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AppSettings;
-  onSave: (clientData: any) => void;
+  onSave: (clientData: ClientFormData) => void;
   initialData?: Client | null;
 }
 
@@ -68,8 +68,12 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         setSelectedProducts(initialData.products || []);
         
         // Commission
-        setCommissionValue(initialData.commissionValue?.toString() || '0');
-        setIsCommissionEdited(true); // Keep saved commission value as strict
+        const initialCommissionValue = initialData.commissionValue;
+        const fallbackCommission = initialData.serviceType === ServiceType.PRODUCT
+          ? '0.00'
+          : (((initialData.serviceValue || 0) + (initialData.extraValue || 0)) * (settings.commissionRate / 100)).toFixed(2);
+        setCommissionValue(initialCommissionValue !== undefined ? initialCommissionValue.toString() : fallbackCommission);
+        setIsCommissionEdited(initialCommissionValue !== undefined);
       } else {
         // New Mode
         setName('');
@@ -195,7 +199,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6 flex-1 overflow-y-auto">
+        <form id="add-client-form" onSubmit={handleSubmit} className="p-6 space-y-6 flex-1 overflow-y-auto">
           
           {/* Section 1: Who & When */}
           <div className="grid grid-cols-2 gap-4">
@@ -378,7 +382,10 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                         <input
                         type="number"
                         value={serviceValue}
-                        onChange={(e) => setServiceValue(e.target.value)}
+                        onChange={(e) => {
+                          setServiceValue(e.target.value);
+                          setIsCommissionEdited(false);
+                        }}
                         placeholder="0.00"
                         className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-8 pr-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none font-mono"
                         />
@@ -391,7 +398,10 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                         <input
                         type="number"
                         value={extraValue}
-                        onChange={(e) => setExtraValue(e.target.value)}
+                        onChange={(e) => {
+                          setExtraValue(e.target.value);
+                          setIsCommissionEdited(false);
+                        }}
                         placeholder="0.00"
                         className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-6 pr-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none font-mono"
                         />
@@ -503,7 +513,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
             </div>
             
             <button
-              onClick={handleSubmit}
+              type="submit"
+              form="add-client-form"
               className="w-full bg-white hover:bg-gray-100 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98] shadow-lg shadow-white/10"
             >
               <Check size={20} />

@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, ChevronDown } from 'lucide-react';
-import { AppSettings } from '../types';
+import { AppSettings, ValeFormData } from '../types';
 
 interface AddValeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (valeData: any) => void;
+  onAdd: (valeData: ValeFormData) => void;
   settings?: AppSettings;
 }
 

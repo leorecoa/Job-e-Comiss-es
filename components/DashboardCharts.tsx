@@ -1,10 +1,10 @@
 
 import React from 'react';
 import { formatCurrency } from '../utils';
-import { ServiceType } from '../types';
+import { Client, ServiceType } from '../types';
 
 interface DashboardChartsProps {
-  clients: any[];
+  clients: Client[];
   period?: 'weekly' | 'monthly';
   selectedDate?: string; // YYYY-MM format for monthly view
 }

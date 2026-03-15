@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppSettings, UserProfile, ProductItem, Client, Vale } from '../types';
 import { X, Save, Crown, Users, Trash2, Plus, Package, DollarSign, Percent, Download, Upload, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { generateId } from '../utils';
@@ -36,6 +36,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const isVip = userProfile.planType === 'vip_monthly' || userProfile.planType === 'admin_life';
 
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(settings);
+      setNewBarberName('');
+      setNewProductName('');
+      setNewProductPrice('');
+    }
+  }, [isOpen, settings]);
+
+  const planLabel = userProfile.planType === 'admin_life'
+    ? 'Admin Vitalício'
+    : isVip
+      ? 'VIP Multi-Barbeiros (Ativo)'
+      : userProfile.isPro
+        ? 'Assinatura PRO Standard'
+        : 'Versão de Teste';
+
   const handleChange = (field: keyof AppSettings, value: string | number) => {
     setFormData(prev => ({
       ...prev,
@@ -44,10 +61,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleAddBarber = () => {
-    if (newBarberName.trim() && (formData.barbers?.length || 0) < 4) {
+    const trimmedName = newBarberName.trim();
+    const alreadyExists = (formData.barbers || []).some(
+      barber => barber.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (trimmedName && !alreadyExists && (formData.barbers?.length || 0) < 4) {
         setFormData(prev => ({
             ...prev,
-            barbers: [...(prev.barbers || []), newBarberName.trim()]
+            barbers: [...(prev.barbers || []), trimmedName]
         }));
         setNewBarberName('');
     }
@@ -164,9 +186,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                    <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Seu Plano</p>
                    <p className={`font-bold text-sm ${userProfile.isPro ? 'text-gold-500' : 'text-white'}`}>
-                      {userProfile.isPro 
-                        ? (isVip ? 'VIP Multi-Barbeiros (Ativo)' : 'Assinatura PRO Standard') 
-                        : 'Versão de Teste'}
+                      {planLabel}
                    </p>
                 </div>
                 {userProfile.isPro ? (

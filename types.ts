@@ -37,6 +37,10 @@ export interface Client {
   products: ProductItem[]; // List of products sold with this service
 }
 
+export interface ClientFormData extends Omit<Client, 'id' | 'timestamp'> {
+  timeStr: string;
+}
+
 export interface Vale {
   id: string;
   barberName: string;
@@ -44,6 +48,8 @@ export interface Vale {
   description: string;
   timestamp: number;
 }
+
+export type ValeFormData = Omit<Vale, 'id' | 'timestamp'>;
 
 export interface DailyHistory {
   id: string;

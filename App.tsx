@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Client, Vale, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
+import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
 import { formatCurrency, formatTime, generateId, formatDate, generateAndDownloadCSV, calculateClientCommission } from './utils';
 import { generateReportPDF } from './services/pdfService';
 import { StatsCard } from './components/StatsCard';
@@ -211,6 +211,41 @@ const App: React.FC = () => {
 
   const isAdmin = useMemo(() => userProfile?.planType === 'admin_life', [userProfile]);
   const isVip = useMemo(() => userProfile?.planType === 'vip_monthly' || userProfile?.planType === 'admin_life', [userProfile]);
+  const planBadgeLabel = useMemo(() => {
+    if (isAdmin) return 'ADMIN';
+    if (isVip) return 'VIP';
+    if (userProfile?.isPro) return 'PRO';
+    return 'TRIAL ' + trialStatus.daysLeft + 'D';
+  }, [isAdmin, isVip, userProfile, trialStatus.daysLeft]);
+
+  const barberFilterOptions = useMemo(() => {
+    const names = new Set<string>();
+
+    (settings.barbers || []).forEach(barber => {
+      if (barber?.trim()) names.add(barber.trim());
+    });
+
+    clients.forEach(client => {
+      if (client.barberName?.trim()) names.add(client.barberName.trim());
+    });
+
+    vales.forEach(vale => {
+      if (vale.barberName?.trim()) names.add(vale.barberName.trim());
+    });
+
+    return ['TODOS', ...Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR'))];
+  }, [settings.barbers, clients, vales]);
+
+  const chartClients = useMemo(() => {
+    if (selectedBarberFilter === 'TODOS') return clients;
+    return clients.filter(client => client.barberName === selectedBarberFilter);
+  }, [clients, selectedBarberFilter]);
+
+  useEffect(() => {
+    if (selectedBarberFilter !== 'TODOS' && !barberFilterOptions.includes(selectedBarberFilter)) {
+      setSelectedBarberFilter('TODOS');
+    }
+  }, [selectedBarberFilter, barberFilterOptions]);
 
   // -- Filtering (Only for Daily View) --
   const filteredClients = useMemo(() => {
@@ -294,7 +329,7 @@ const App: React.FC = () => {
     return false;
   };
 
-  const handleSaveClient = (data: any) => {
+  const handleSaveClient = (data: ClientFormData) => {
     const { timeStr, ...clientInfo } = data;
     const [year, month, day] = selectedDate.split('-').map(Number);
     const [hours, minutes] = timeStr ? timeStr.split(':').map(Number) : [new Date().getHours(), new Date().getMinutes()];
@@ -324,7 +359,7 @@ const App: React.FC = () => {
     setClientModalOpen(true);
   };
 
-  const handleAddVale = (data: Omit<Vale, 'id' | 'timestamp'>) => {
+  const handleAddVale = (data: ValeFormData) => {
     let timestamp = Date.now();
     const todayStr = getTodayString();
     if (selectedDate !== todayStr) {
@@ -494,7 +529,11 @@ const App: React.FC = () => {
                  </div>
                  <div>
                     <h1 className="text-white font-bold">{settings.shopName}</h1>
-                    <span className="text-[10px] text-gold-500 uppercase font-bold">{isVip ? 'VIP' : 'PRO'}</span>
+                    <span className={`text-[10px] uppercase font-bold ${
+                      isAdmin ? 'text-red-400' :
+                      isVip ? 'text-gold-500' :
+                      userProfile.isPro ? 'text-blue-400' : 'text-gray-400'
+                    }`}>{planBadgeLabel}</span>
                  </div>
             </div>
             <button onClick={handleLogout} className="text-gray-500 hover:text-red-400"><LogOut size={20}/></button>
@@ -527,6 +566,22 @@ const App: React.FC = () => {
                         <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-transparent border-none text-white text-sm text-center w-full md:w-32 focus:ring-0" />
                         <button onClick={() => changeDate(1)} className="p-2 text-gray-400 hover:text-white"><ChevronRight size={20}/></button>
                     </div>
+                    {barberFilterOptions.length > 1 && (
+                        <div className="relative shrink-0">
+                            <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                            <select
+                                value={selectedBarberFilter}
+                                onChange={(e) => setSelectedBarberFilter(e.target.value)}
+                                className="bg-gray-900 border border-gray-700 text-white text-sm rounded-xl pl-9 pr-3 py-2.5 appearance-none min-w-[180px] focus:ring-2 focus:ring-gold-500 outline-none"
+                            >
+                                {barberFilterOptions.map((barber) => (
+                                    <option key={barber} value={barber}>
+                                        {barber === 'TODOS' ? 'Todos os barbeiros' : barber}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     {/* Botão Baixar Relatório Diário */}
                     <button 
                         onClick={handleDownloadDaily}
@@ -548,7 +603,7 @@ const App: React.FC = () => {
              
              {/* New Dashboard Charts */}
              <div className="mb-6">
-                <DashboardCharts clients={clients} />
+                <DashboardCharts clients={chartClients} />
              </div>
 
              <div id="tour-stats" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -567,7 +622,7 @@ const App: React.FC = () => {
                 <div className="min-h-[200px] bg-gray-900/30">
                     {activeTab === 'clients' ? (
                         <>
-                           {filteredClients.length === 0 ? <p className="text-center py-8 text-gray-500">Sem registros.</p> : (
+                           {filteredClients.length === 0 ? <p className="text-center py-8 text-gray-500">{selectedBarberFilter === 'TODOS' ? 'Sem registros.' : `Sem registros para ${selectedBarberFilter}.`}</p> : (
                                 <>
                                     {/* Mobile View: Cards */}
                                     <div className="md:hidden p-4 space-y-3">
@@ -673,7 +728,7 @@ const App: React.FC = () => {
                         </>
                     ) : (
                         <>
-                           {filteredVales.length === 0 ? <p className="text-center py-8 text-gray-500">Sem vales.</p> : (
+                           {filteredVales.length === 0 ? <p className="text-center py-8 text-gray-500">{selectedBarberFilter === 'TODOS' ? 'Sem vales.' : `Sem vales para ${selectedBarberFilter}.`}</p> : (
                                 <>
                                     {/* Mobile View: Cards for Vales */}
                                     <div className="md:hidden p-4 space-y-3">
