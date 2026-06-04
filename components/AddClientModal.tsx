@@ -34,6 +34,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   // -- Commission State --
   const [commissionValue, setCommissionValue] = useState<string>('');
   const [isCommissionEdited, setIsCommissionEdited] = useState(false);
+  const [formError, setFormError] = useState('');
 
   // -- Initialization Effect --
   useEffect(() => {
@@ -74,6 +75,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
           : (((initialData.serviceValue || 0) + (initialData.extraValue || 0)) * (settings.commissionRate / 100)).toFixed(2);
         setCommissionValue(initialCommissionValue !== undefined ? initialCommissionValue.toString() : fallbackCommission);
         setIsCommissionEdited(initialCommissionValue !== undefined);
+        setFormError('');
       } else {
         // New Mode
         setName('');
@@ -99,6 +101,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
         // Reset Commission Logic
         setCommissionValue('');
         setIsCommissionEdited(false);
+        setFormError('');
       }
     }
   }, [isOpen, initialData, settings]);
@@ -111,7 +114,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
     if (type === ServiceType.CUT) setServiceValue(settings.priceCut.toString());
     else if (type === ServiceType.BEARD) setServiceValue((settings.priceBeard || 0).toString());
     else if (type === ServiceType.COMBO) setServiceValue(settings.priceCombo.toString());
-    else if (type === ServiceType.PRODUCT) setServiceValue((settings.priceProduct || 0).toString());
+    else if (type === ServiceType.PRODUCT) setServiceValue(settings.products?.length ? '0' : (settings.priceProduct || 0).toString());
     else setServiceValue(''); // Other/Custom
   };
 
@@ -155,6 +158,25 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const numericService = getNumericService();
+    const numericExtra = getNumericExtra();
+    const numericCommission = Number(commissionValue);
+
+    if (numericService < 0 || numericExtra < 0) {
+      setFormError('Valores de servico e adicionais nao podem ser negativos.');
+      return;
+    }
+
+    if (!Number.isFinite(numericCommission) || numericCommission < 0) {
+      setFormError('Informe uma comissao valida, maior ou igual a zero.');
+      return;
+    }
+
+    if (getTotal() <= 0) {
+      setFormError('O total do atendimento precisa ser maior que zero.');
+      return;
+    }
+
     // Montar descrição inteligente se estiver vazia
     let finalDesc = description;
     if (!finalDesc && selectedProducts.length > 0) {
@@ -169,10 +191,10 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
       barberName: barber,
       serviceType,
       clientType,
-      serviceValue: getNumericService(),
-      extraValue: getNumericExtra(),
+      serviceValue: numericService,
+      extraValue: numericExtra,
       totalValue: getTotal(),
-      commissionValue: Number(commissionValue),
+      commissionValue: numericCommission,
       timeStr: time,
       description: finalDesc,
       products: selectedProducts
@@ -381,6 +403,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">R$</span>
                         <input
                         type="number"
+                        min="0"
+                        step="0.01"
                         value={serviceValue}
                         onChange={(e) => {
                           setServiceValue(e.target.value);
@@ -397,6 +421,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">+</span>
                         <input
                         type="number"
+                        min="0"
+                        step="0.01"
                         value={extraValue}
                         onChange={(e) => {
                           setExtraValue(e.target.value);
@@ -477,6 +503,8 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
                   <div className="relative">
                       <input
                         type="number"
+                        min="0"
+                        step="0.01"
                         value={commissionValue}
                         onChange={(e) => {
                             setCommissionValue(e.target.value);
@@ -492,6 +520,11 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
 
         {/* Footer: Total & Actions */}
         <div className="p-5 bg-gray-900 border-t border-gray-800 rounded-b-2xl">
+            {formError && (
+                <p className="text-red-400 text-xs font-medium mb-3 text-center">
+                    {formError}
+                </p>
+            )}
             <div className="flex justify-between items-end mb-4">
                 <div>
                     <p className="text-gray-400 text-xs mb-0.5 uppercase tracking-wider font-bold">Total a Receber</p>

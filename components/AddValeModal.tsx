@@ -14,12 +14,14 @@ export const AddValeModal: React.FC<AddValeModalProps> = ({ isOpen, onClose, onA
   const [barber, setBarber] = useState('');
   const [value, setValue] = useState('');
   const [description, setDescription] = useState('');
+  const [formError, setFormError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setBarber(settings?.barbers && settings.barbers.length > 0 ? settings.barbers[0] : '');
       setValue('');
       setDescription('');
+      setFormError('');
     }
   }, [isOpen, settings]);
 
@@ -27,9 +29,16 @@ export const AddValeModal: React.FC<AddValeModalProps> = ({ isOpen, onClose, onA
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+      setFormError('Informe um valor de vale maior que zero.');
+      return;
+    }
+
     onAdd({
       barberName: barber,
-      value: Number(value),
+      value: numericValue,
       description: description || 'Adiantamento'
     });
     onClose();
@@ -79,6 +88,8 @@ export const AddValeModal: React.FC<AddValeModalProps> = ({ isOpen, onClose, onA
             <input
               required
               type="number"
+              min="0.01"
+              step="0.01"
               value={value}
               onChange={(e) => setValue(e.target.value)}
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-red-500 outline-none"
@@ -98,6 +109,11 @@ export const AddValeModal: React.FC<AddValeModalProps> = ({ isOpen, onClose, onA
           </div>
 
           <div className="pt-4">
+            {formError && (
+              <p className="text-red-400 text-xs font-medium mb-3 text-center">
+                {formError}
+              </p>
+            )}
             <button
               type="submit"
               className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors"
