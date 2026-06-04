@@ -61,7 +61,7 @@ const TRIAL_DAYS = 7;
 // Códigos
 const CODES_PRO = ["MENSAL", "PRO", "LIBERADO"];
 const CODES_VIP = ["VIP", "EQUIPE", "TIME", "VIP4"];
-const CODES_ADMIN = ["LEANDRO", "ADMIN", "GABRIEL"];
+const CODES_ADMIN: string[] = [];
 
 const App: React.FC = () => {
   // -- Handle Splash Screen --

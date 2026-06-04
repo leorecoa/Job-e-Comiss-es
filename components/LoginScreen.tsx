@@ -7,14 +7,6 @@ interface LoginScreenProps {
   onLogin: (profile: UserProfile) => void;
 }
 
-// Emails de Admin ofuscados (Base64) para não ficarem explícitos no código
-// leandro@admin -> bGVhbmRyb0BhZG1pbg==
-// gabriel@admin -> Z2FicmllbEBhZG1pbg==
-const ADMIN_HASHES = [
-  "bGVhbmRyb0BhZG1pbg==",
-  "Z2FicmllbEBhZG1pbg=="
-];
-
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [shopName, setShopName] = useState('');
   const [ownerName, setOwnerName] = useState('');
@@ -24,9 +16,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     e.preventDefault();
     if (!shopName || !ownerName) return;
 
-    // Verifica se o email digitado corresponde a um dos hashes de admin
-    const emailHash = btoa(email.toLowerCase().trim());
-    const isAdmin = ADMIN_HASHES.includes(emailHash);
+    const isAdmin = false;
 
     const newProfile: UserProfile = {
       shopName,
