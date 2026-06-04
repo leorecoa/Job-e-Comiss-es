@@ -27,6 +27,28 @@ export const generateId = (): string => {
   return Math.random().toString(36).substr(2, 9);
 };
 
+export const parseLocalDateInput = (dateInput: string): Date => {
+  const [year, month, day] = dateInput.split('-').map(Number);
+  if (!year || !month || !day) {
+    throw new Error(`Invalid date input: ${dateInput}`);
+  }
+
+  return new Date(year, month - 1, day);
+};
+
+export const getLocalDayBounds = (dateInput: string): { start: number; end: number } => {
+  const start = parseLocalDateInput(dateInput);
+  start.setHours(0, 0, 0, 0);
+
+  const end = parseLocalDateInput(dateInput);
+  end.setHours(23, 59, 59, 999);
+
+  return {
+    start: start.getTime(),
+    end: end.getTime()
+  };
+};
+
 // Lógica Centralizada de Comissão
 export const calculateClientCommission = (client: Client, currentRate: number): number => {
   // 1. Produtos nunca geram comissão
@@ -36,7 +58,7 @@ export const calculateClientCommission = (client: Client, currentRate: number): 
 
   // 2. Prioridade: Valor salvo explicitamente (se > 0)
   // Isso garante que comissões antigas (com taxas antigas) sejam preservadas
-  if (client.commissionValue !== undefined && client.commissionValue > 0) {
+  if (client.commissionValue !== undefined) {
     return client.commissionValue;
   }
 
@@ -53,6 +75,15 @@ export const calculateClientCommission = (client: Client, currentRate: number): 
   return baseValue * (currentRate / 100);
 };
 
+const escapeCsvCell = (value: unknown): string => {
+  const text = String(value ?? '');
+  if (/[;"\r\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  return text;
+};
+
 export const generateAndDownloadCSV = (
   filename: string, 
   clients: any[], 
@@ -62,7 +93,7 @@ export const generateAndDownloadCSV = (
   const headers = ["Data", "Hora", "Tipo Movimento", "Cliente", "Detalhe/Produto", "Profissional", "Serviço", "Valor (R$)"];
   
   const rows: string[] = [];
-  rows.push(headers.join(";")); // Usando ponto e vírgula para Excel em PT-BR
+  rows.push(headers.map(escapeCsvCell).join(";")); // Usando ponto e vírgula para Excel em PT-BR
 
   // Adicionar Clientes (Entradas)
   clients.forEach(c => {
@@ -95,7 +126,7 @@ export const generateAndDownloadCSV = (
       c.barberName,
       c.serviceType,
       valueStr
-    ].join(";"));
+    ].map(escapeCsvCell).join(";"));
   });
 
   // Adicionar Vales (Saídas)
@@ -114,7 +145,7 @@ export const generateAndDownloadCSV = (
       v.barberName,
       "Vale",
       valueStr
-    ].join(";"));
+    ].map(escapeCsvCell).join(";"));
   });
 
   // Criar o Blob com BOM para suportar acentos no Excel

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
-import { formatCurrency, formatTime, generateId, formatDate, generateAndDownloadCSV, calculateClientCommission } from './utils';
+import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput } from './utils';
 import { generateReportPDF } from './services/pdfService';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
@@ -195,14 +195,14 @@ const App: React.FC = () => {
     
     const now = Date.now();
     const start = userProfile.startDate;
-    const diffTime = Math.abs(now - start);
+    const diffTime = now - start;
     const diffDays = diffTime / (1000 * 60 * 60 * 24);
     
     // Calculate exact expiration date
     const expirationDate = start + (TRIAL_DAYS * 24 * 60 * 60 * 1000);
 
     return {
-      isExpired: diffDays > TRIAL_DAYS,
+      isExpired: diffDays > TRIAL_DAYS || diffDays < 0,
       daysLeft: Math.max(0, Math.ceil(TRIAL_DAYS - diffDays)),
       daysUsed: diffDays,
       expirationDate
@@ -389,13 +389,16 @@ const App: React.FC = () => {
 
   const handleDownloadRange = (startDate: string, endDate: string, format: 'pdf' | 'csv') => {
     try {
-        const start = new Date(startDate);
-        start.setHours(0,0,0,0);
-        const end = new Date(endDate);
-        end.setHours(23,59,59,999);
+        const start = getLocalDayBounds(startDate);
+        const end = getLocalDayBounds(endDate);
 
-        const rangeClients = clients.filter(c => c.timestamp >= start.getTime() && c.timestamp <= end.getTime());
-        const rangeVales = vales.filter(v => v.timestamp >= start.getTime() && v.timestamp <= end.getTime());
+        if (start.start > end.end) {
+            addToast('A data inicial deve ser anterior ou igual Ã  data final.', 'error');
+            return;
+        }
+
+        const rangeClients = clients.filter(c => c.timestamp >= start.start && c.timestamp <= end.end);
+        const rangeVales = vales.filter(v => v.timestamp >= start.start && v.timestamp <= end.end);
         
         // Safe filename
         const dateLabel = startDate === endDate 
@@ -430,7 +433,7 @@ const App: React.FC = () => {
 
         const displayLabel = startDate === endDate 
             ? startDate 
-            : `De ${new Date(startDate).toLocaleDateString('pt-BR')} a ${new Date(endDate).toLocaleDateString('pt-BR')}`;
+            : `De ${parseLocalDateInput(startDate).toLocaleDateString('pt-BR')} a ${parseLocalDateInput(endDate).toLocaleDateString('pt-BR')}`;
 
         generateReportPDF(
             settings.shopName,
