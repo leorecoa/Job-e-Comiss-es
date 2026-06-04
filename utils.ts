@@ -84,11 +84,10 @@ const escapeCsvCell = (value: unknown): string => {
   return text;
 };
 
-export const generateAndDownloadCSV = (
-  filename: string, 
+export const buildCsvContent = (
   clients: any[], 
   vales: any[]
-) => {
+): string => {
   // Cabeçalho do CSV
   const headers = ["Data", "Hora", "Tipo Movimento", "Cliente", "Detalhe/Produto", "Profissional", "Serviço", "Valor (R$)"];
   
@@ -148,8 +147,16 @@ export const generateAndDownloadCSV = (
     ].map(escapeCsvCell).join(";"));
   });
 
-  // Criar o Blob com BOM para suportar acentos no Excel
-  const csvContent = "\uFEFF" + rows.join("\n");
+  // Criar o conteudo com BOM para suportar acentos no Excel
+  return "\uFEFF" + rows.join("\n");
+};
+
+export const generateAndDownloadCSV = (
+  filename: string, 
+  clients: any[], 
+  vales: any[]
+) => {
+  const csvContent = buildCsvContent(clients, vales);
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   
   // Link de Download
