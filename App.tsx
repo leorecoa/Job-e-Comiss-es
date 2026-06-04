@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
 import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput } from './utils';
-import { generateReportPDF } from './services/pdfService';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
 import { AddValeModal } from './components/AddValeModal';
@@ -387,7 +386,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDownloadRange = (startDate: string, endDate: string, format: 'pdf' | 'csv') => {
+  const handleDownloadRange = async (startDate: string, endDate: string, format: 'pdf' | 'csv') => {
     try {
         const start = getLocalDayBounds(startDate);
         const end = getLocalDayBounds(endDate);
@@ -435,6 +434,7 @@ const App: React.FC = () => {
             ? startDate 
             : `De ${parseLocalDateInput(startDate).toLocaleDateString('pt-BR')} a ${parseLocalDateInput(endDate).toLocaleDateString('pt-BR')}`;
 
+        const { generateReportPDF } = await import('./services/pdfService');
         generateReportPDF(
             settings.shopName,
             displayLabel,
@@ -449,8 +449,9 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDownloadDaily = () => {
+  const handleDownloadDaily = async () => {
     try {
+      const { generateReportPDF } = await import('./services/pdfService');
       generateReportPDF(
         settings.shopName,
         selectedDate,
