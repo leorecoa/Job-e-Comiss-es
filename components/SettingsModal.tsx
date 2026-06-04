@@ -32,10 +32,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
 
-  if (!isOpen) return null;
-
-  const isVip = userProfile.planType === 'vip_monthly' || userProfile.planType === 'admin_life';
-
   useEffect(() => {
     if (isOpen) {
       setFormData(settings);
@@ -44,6 +40,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setNewProductPrice('');
     }
   }, [isOpen, settings]);
+
+  if (!isOpen) return null;
+
+  const isVip = userProfile.planType === 'vip_monthly' || userProfile.planType === 'admin_life';
 
   const planLabel = userProfile.planType === 'admin_life'
     ? 'Admin Vitalício'
@@ -54,9 +54,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         : 'Versão de Teste';
 
   const handleChange = (field: keyof AppSettings, value: string | number) => {
+    if (typeof formData[field] === 'number') {
+      const numericValue = Number(value);
+      const safeValue = Number.isFinite(numericValue) ? numericValue : 0;
+      const normalizedValue = field === 'commissionRate'
+        ? Math.min(100, Math.max(0, safeValue))
+        : Math.max(0, safeValue);
+
+      setFormData(prev => ({
+        ...prev,
+        [field]: normalizedValue
+      }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
-      [field]: typeof prev[field] === 'number' ? Number(value) : value
+      [field]: value
     }));
   };
 
@@ -83,11 +97,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleAddProduct = () => {
-    if (newProductName.trim() && newProductPrice) {
+    const productPrice = Number(newProductPrice);
+    if (newProductName.trim() && Number.isFinite(productPrice) && productPrice > 0) {
         const newItem: ProductItem = {
             id: generateId(),
             name: newProductName.trim(),
-            price: Number(newProductPrice)
+            price: productPrice
         };
         setFormData(prev => ({
             ...prev,
@@ -103,6 +118,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         ...prev,
         products: prev.products?.filter(p => p.id !== id) || []
     }));
+  };
+
+  const isObjectRecord = (value: unknown): value is Record<string, unknown> => {
+      return typeof value === 'object' && value !== null && !Array.isArray(value);
+  };
+
+  const hasValidBackupShape = (data: unknown): data is {
+      clients: Client[];
+      vales: Vale[];
+      settings: AppSettings;
+  } => {
+      if (!isObjectRecord(data)) return false;
+      if (!Array.isArray(data.clients) || !Array.isArray(data.vales)) return false;
+      if (!isObjectRecord(data.settings)) return false;
+
+      const restoredSettings = data.settings;
+      return typeof restoredSettings.shopName === 'string'
+          && typeof restoredSettings.priceCut === 'number'
+          && typeof restoredSettings.priceBeard === 'number'
+          && typeof restoredSettings.priceCombo === 'number'
+          && typeof restoredSettings.commissionRate === 'number'
+          && Array.isArray(restoredSettings.products)
+          && Array.isArray(restoredSettings.barbers);
   };
 
   const handleBackup = () => {
@@ -140,15 +178,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               const content = e.target?.result as string;
               const data = JSON.parse(content);
 
-              if (data.clients && Array.isArray(data.clients)) {
-                  localStorage.setItem('barbearia_clients', JSON.stringify(data.clients));
+              if (!hasValidBackupShape(data)) {
+                  alert("Arquivo de backup invalido ou incompleto.");
+                  return;
               }
-              if (data.vales && Array.isArray(data.vales)) {
-                  localStorage.setItem('barbearia_vales', JSON.stringify(data.vales));
-              }
-              if (data.settings) {
-                  localStorage.setItem('barbearia_settings', JSON.stringify(data.settings));
-              }
+
+              localStorage.setItem('barbearia_clients', JSON.stringify(data.clients));
+              localStorage.setItem('barbearia_vales', JSON.stringify(data.vales));
+              localStorage.setItem('barbearia_settings', JSON.stringify(data.settings));
               // Optional: Restore profile if needed, but risky if moving between users
               // localStorage.setItem('barbearia_profile', JSON.stringify(data.profile));
 
@@ -218,6 +255,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <label className="block text-xs font-medium text-gray-400 mb-1">Corte (R$)</label>
               <input
                 type="number"
+                min="0"
+                step="0.01"
                 value={formData.priceCut}
                 onChange={(e) => handleChange('priceCut', e.target.value)}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
@@ -227,6 +266,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <label className="block text-xs font-medium text-gray-400 mb-1">Barba (R$)</label>
               <input
                 type="number"
+                min="0"
+                step="0.01"
                 value={formData.priceBeard || 0}
                 onChange={(e) => handleChange('priceBeard', e.target.value)}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
@@ -236,6 +277,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <label className="block text-xs font-medium text-gray-400 mb-1">Combo (R$)</label>
               <input
                 type="number"
+                min="0"
+                step="0.01"
                 value={formData.priceCombo}
                 onChange={(e) => handleChange('priceCombo', e.target.value)}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
@@ -245,6 +288,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <label className="block text-xs font-medium text-gray-400 mb-1">Produto (Valor Base)</label>
               <input
                 type="number"
+                min="0"
+                step="0.01"
                 value={formData.priceProduct || 0}
                 onChange={(e) => handleChange('priceProduct', e.target.value)}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
@@ -291,6 +336,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="flex-1 flex gap-1">
                         <input 
                             type="number"
+                            min="0.01"
+                            step="0.01"
                             value={newProductPrice}
                             onChange={(e) => setNewProductPrice(e.target.value)}
                             placeholder="$$"
@@ -358,6 +405,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <label className="block text-sm font-medium text-gray-400 mb-1">Comissão Serviços (%)</label>
                 <input
                 type="number"
+                min="0"
+                max="100"
+                step="0.01"
                 value={formData.commissionRate}
                 onChange={(e) => handleChange('commissionRate', e.target.value)}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
