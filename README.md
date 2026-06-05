@@ -24,6 +24,20 @@ O projeto roda como uma SPA em React com persistencia em `localStorage`, geracao
 - Backup e restauracao de dados locais com validacao de estrutura.
 - Fluxo de trial e planos PRO/VIP.
 
+## Screenshots
+
+As capturas oficiais do projeto devem ficar em [`docs/screenshots`](docs/screenshots).
+
+Checklist recomendado:
+
+- Dashboard diario com resumo financeiro.
+- Modal de novo atendimento.
+- Resumo mensal por barbeiro.
+- Exportacao de relatorio.
+- Configuracoes e backup.
+
+> Dica: mantenha screenshots sem dados reais de clientes.
+
 ## Stack
 
 - React 19
