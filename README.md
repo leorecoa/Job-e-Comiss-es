@@ -116,11 +116,7 @@ Leia o [guia de contribuicao](CONTRIBUTING.md) antes de abrir uma issue ou pull 
 
 ## Roadmap
 
-- Persistencia em backend com autenticacao real.
-- Historico de pagamentos e fechamento por barbeiro.
-- Importacao/exportacao de backup com migracoes versionadas.
-- Mais testes de UI para fluxos de cadastro e relatorio.
-- Deploy publico com ambiente de demonstracao.
+Veja o [roadmap do produto](docs/ROADMAP.md) para proximas melhorias e prioridades.
 
 ## Licenca
 
