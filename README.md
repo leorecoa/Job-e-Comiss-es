@@ -72,6 +72,10 @@ Esse comando executa:
 - Dependencias auditadas com `npm audit`.
 - Gerador de PDF carregado sob demanda para reduzir o bundle inicial.
 
+## Contribuindo
+
+Leia o [guia de contribuicao](CONTRIBUTING.md) antes de abrir uma issue ou pull request.
+
 ## Roadmap
 
 - Persistencia em backend com autenticacao real.
