@@ -109,6 +109,7 @@ Esse comando executa:
 - Dependencias auditadas com `npm audit`.
 - Gerador de PDF carregado sob demanda para reduzir o bundle inicial.
 - Historico de versoes em [CHANGELOG.md](CHANGELOG.md).
+- Guia operacional de [backup e restauracao](docs/BACKUP_RESTORE.md).
 
 ## Contribuindo
 
