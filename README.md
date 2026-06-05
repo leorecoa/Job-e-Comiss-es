@@ -108,6 +108,7 @@ Esse comando executa:
 - Testes cobrindo regras de comissao, datas locais e CSV.
 - Dependencias auditadas com `npm audit`.
 - Gerador de PDF carregado sob demanda para reduzir o bundle inicial.
+- Historico de versoes em [CHANGELOG.md](CHANGELOG.md).
 
 ## Contribuindo
 
