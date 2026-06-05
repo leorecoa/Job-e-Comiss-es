@@ -33,7 +33,13 @@ O projeto roda como uma SPA em React com persistencia em `localStorage`, geracao
 - jsPDF + jspdf-autotable
 - lucide-react
 
-## Como Rodar
+## Requisitos
+
+- Node.js 22 ou superior.
+- npm 10 ou superior.
+- Git instalado para clonar o repositorio.
+
+## Como Rodar Localmente
 
 ```bash
 npm install
@@ -41,6 +47,14 @@ npm run dev
 ```
 
 A aplicacao abre por padrao em `http://localhost:3000`.
+
+## Fluxo Recomendado
+
+1. Instale as dependencias com `npm install`.
+2. Inicie o ambiente local com `npm run dev`.
+3. Faca a alteracao em uma branch pequena.
+4. Rode `npm run check` antes de abrir o pull request.
+5. Confira se o CI passou no GitHub.
 
 ## Verificacao
 
@@ -53,6 +67,15 @@ Esse comando executa:
 - `npm run test`
 - `npm run typecheck`
 - `npm run build`
+
+## Troubleshooting
+
+| Problema | Solucao |
+| --- | --- |
+| `vite` nao reconhecido | Rode `npm install` novamente |
+| Porta `3000` ocupada | Encerre o processo usando a porta ou ajuste `server.port` em `vite.config.ts` |
+| Build falha apos atualizar dependencias | Remova `node_modules`, rode `npm install` e execute `npm run check` |
+| Relatorios PDF nao baixam | Verifique bloqueio de pop-up/download do navegador |
 
 ## Scripts
 
