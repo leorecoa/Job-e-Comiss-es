@@ -88,13 +88,13 @@ Roles iniciais:
 - `owner`: acesso ao painel interno como dono.
 - `barber`: acesso ao painel interno como barbeiro.
 
-Nesta etapa, a role e lida de `user_metadata.role` e tambem documentada na tabela `profiles` do schema SQL para futura migracao das policies. Sem env vars do Supabase, o app continua usando o login local/trial existente.
+Nesta etapa, a role principal e lida da tabela `profiles`; `user_metadata.role` fica apenas como fallback durante a transicao. Sem env vars do Supabase, o app continua usando o login local/trial existente.
 
 Limitacoes atuais de seguranca/RLS:
 
-- O schema documenta uma view publica de slots ocupados sem dados pessoais.
-- Para demo/local MVP, RLS pode ficar desativado temporariamente.
-- Para producao, o proximo passo e ativar Supabase Auth, roles de dono/barbeiro e policies com isolamento por barbearia.
+- O schema inclui uma view publica de slots ocupados sem dados pessoais.
+- O schema inclui policies iniciais para `profiles`, `barbers`, `services` e `appointments`.
+- Para producao, o proximo passo e isolamento por barbearia/tenant e hardening completo das policies.
 
 Proximos passos: auth real, roles, link publico por barbearia, multi-tenant e hardening de RLS.
 
