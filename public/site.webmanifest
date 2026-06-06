@@ -1,0 +1,21 @@
+{
+  "name": "Gestao Maxima",
+  "short_name": "GestaoMax",
+  "description": "Sistema profissional de gestao de clientes, vendas e comissoes.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09111f",
+  "theme_color": "#09111f",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/brand-mark.svg",
+      "sizes": "128x128",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface LoginScreenProps {
   onLogin: (profile: UserProfile) => void;
@@ -32,17 +33,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md overflow-hidden animate-slide-in">
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+        className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md overflow-hidden"
+      >
         <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-8 text-center border-b border-gray-700 relative">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-gold-500 to-transparent"></div>
           
-          <div className="bg-gray-900/50 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-gold-500 border border-gold-500/20 shadow-lg shadow-gold-500/10">
-             {/* Logo Hexagonal SVG */}
-             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="7.5 12 10 14.5 16.5 8"></polyline>
-             </svg>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, rotate: -8, scale: 0.88 }}
+            animate={{ opacity: 1, rotate: 0, scale: 1 }}
+            transition={{ duration: 0.65, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+            className="bg-gray-900/50 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-gold-500 border border-gold-500/20 shadow-lg shadow-gold-500/10"
+          >
+             <img src="/brand-mark.svg" alt="Gestao Maxima" className="w-14 h-14" />
+          </motion.div>
           
           <h1 className="text-2xl font-display font-bold text-white mb-1">Gestao Maxima</h1>
           <p className="text-gold-500 font-bold text-[10px] uppercase tracking-widest mb-2">Sistema Profissional</p>
@@ -86,18 +93,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           </div>
 
           <div className="pt-4">
-            <button
+            <motion.button
               type="submit"
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.98 }}
               className="w-full bg-gold-500 hover:bg-gold-600 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 hover:translate-y-[-2px] shadow-lg shadow-gold-500/20"
             >
               Comecar Agora <ArrowRight size={20} />
-            </button>
+            </motion.button>
             <p className="text-center text-xs text-gray-500 mt-4">
               Ao continuar, voce inicia seu teste gratuito de 7 dias.
             </p>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };
