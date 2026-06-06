@@ -15,7 +15,7 @@ interface PublicBookingPageProps {
   settings: AppSettings;
   appointments: Appointment[];
   userProfile: UserProfile | null;
-  onCreateAppointment: (appointment: Appointment) => void;
+  onCreateAppointment: (appointment: Appointment) => Promise<void> | void;
 }
 
 const getTodayString = () => {
@@ -50,6 +50,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   const [clientPhone, setClientPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
+  const [isSubmitting, setSubmitting] = useState(false);
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
 
   const selectedService = services.find(service => service.id === serviceId);
@@ -70,7 +71,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     setSelectedSlot(null);
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const input: PublicBookingInput = {
       clientName,
@@ -88,9 +89,16 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     }
 
     const appointment = createPublicAppointment(input, generateId());
-    onCreateAppointment(appointment);
-    setCreatedAppointment(appointment);
-    setErrors([]);
+    setSubmitting(true);
+    try {
+      await onCreateAppointment(appointment);
+      setCreatedAppointment(appointment);
+      setErrors([]);
+    } catch {
+      setErrors(['Nao foi possivel confirmar este horario. Tente novamente.']);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleNewBooking = () => {
@@ -256,8 +264,8 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
             </div>
 
-            <button type="submit" disabled={barberOptions.length === 0 || !selectedSlot} className="w-full bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg shadow-gold-500/20">
-              Agendar horario
+            <button type="submit" disabled={barberOptions.length === 0 || !selectedSlot || isSubmitting} className="w-full bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg shadow-gold-500/20">
+              {isSubmitting ? 'Confirmando...' : 'Agendar horario'}
             </button>
           </form>
         </main>

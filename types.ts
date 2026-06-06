@@ -36,6 +36,9 @@ export type AppointmentStatus =
 
 export interface Appointment {
   id: string;
+  barberId?: string;
+  serviceId?: string;
+  financialRecordId?: string;
   clientName: string;
   clientPhone?: string;
   barberName: string;
