@@ -52,6 +52,41 @@ Limitações atuais:
 - Para uso real multi-dispositivo, o proximo passo e Supabase ou backend.
 - O WhatsApp continua manual via link `wa.me`, sem API paga ou automacao.
 
+## Supabase Persistence
+
+O projeto possui uma camada de repository para persistencia online com Supabase e fallback automatico para `localStorage`.
+
+Para configurar:
+
+1. Crie um projeto no Supabase.
+2. Rode o SQL em [`docs/supabase-schema.sql`](docs/supabase-schema.sql).
+3. Copie `.env.example` para `.env`.
+4. Preencha:
+
+```env
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
+
+5. Rode:
+
+```bash
+npm install
+npm run dev
+```
+
+Se `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` nao estiverem configuradas, o app usa `localStorage`, preservando o fluxo local de desenvolvimento.
+
+Com Supabase configurado, a agenda interna e o booking publico passam pela camada de repositories para carregar/criar/atualizar appointments. Barbeiros e servicos ativos tambem podem ser carregados das tabelas `barbers` e `services`.
+
+Limitacoes atuais de seguranca/RLS:
+
+- O schema documenta uma view publica de slots ocupados sem dados pessoais.
+- Para demo/local MVP, RLS pode ficar desativado temporariamente.
+- Para producao, o proximo passo e ativar Supabase Auth, roles de dono/barbeiro e policies com isolamento por barbearia.
+
+Proximos passos: auth real, roles, link publico por barbearia, multi-tenant e hardening de RLS.
+
 ## Screenshots
 
 As capturas oficiais do projeto devem ficar em [`docs/screenshots`](docs/screenshots).

@@ -14,6 +14,10 @@ Este roadmap organiza melhorias futuras por impacto e complexidade.
 
 ## Medio prazo
 
+- Ativar Supabase Auth para painel interno.
+- Criar roles de owner/barber com policies por permissao.
+- Endurecer RLS para appointments, barbers e services.
+- Adicionar suporte multi-barbearia com isolamento por tenant.
 - Criar link publico por barbearia com slug configuravel.
 - Migrar agenda e financeiro para Supabase com sincronizacao multi-dispositivo.
 - Compartilhar agenda entre dispositivos em tempo real.
