@@ -79,6 +79,17 @@ Se `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` nao estiverem configuradas, o 
 
 Com Supabase configurado, a agenda interna e o booking publico passam pela camada de repositories para carregar/criar/atualizar appointments. Barbeiros e servicos ativos tambem podem ser carregados das tabelas `barbers` e `services`.
 
+### Supabase Auth
+
+Quando Supabase esta configurado, o painel interno exige login com email e senha via Supabase Auth. A tela publica `/book` continua aberta para clientes sem login.
+
+Roles iniciais:
+
+- `owner`: acesso ao painel interno como dono.
+- `barber`: acesso ao painel interno como barbeiro.
+
+Nesta etapa, a role e lida de `user_metadata.role` e tambem documentada na tabela `profiles` do schema SQL para futura migracao das policies. Sem env vars do Supabase, o app continua usando o login local/trial existente.
+
 Limitacoes atuais de seguranca/RLS:
 
 - O schema documenta uma view publica de slots ocupados sem dados pessoais.
