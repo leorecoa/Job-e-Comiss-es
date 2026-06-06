@@ -78,7 +78,7 @@ const writeLocalAppointments = (appointments: Appointment[]) => {
   localStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(appointments));
 };
 
-export const listAppointments = async (): Promise<Appointment[]> => {
+export const listInternalAppointments = async (): Promise<Appointment[]> => {
   if (!isSupabaseConfigured || !supabase) return readLocalAppointments();
 
   const { data, error } = await supabase
@@ -118,7 +118,7 @@ export const listPublicAppointmentSlots = async (): Promise<Appointment[]> => {
 };
 
 export const listAppointmentsByDate = async (date: string): Promise<Appointment[]> => {
-  const appointments = await listAppointments();
+  const appointments = await listInternalAppointments();
   return appointments.filter(appointment => getAppointmentDateInput(appointment) === date);
 };
 
@@ -126,7 +126,7 @@ export const createAppointment = async (
   appointment: Appointment,
   existingAppointments?: Appointment[]
 ): Promise<Appointment> => {
-  const appointments = existingAppointments || await listAppointments();
+  const appointments = existingAppointments || await listInternalAppointments();
   if (hasAppointmentConflict(appointments, appointment)) {
     throw new Error('Horario indisponivel para este barbeiro.');
   }
@@ -136,14 +136,12 @@ export const createAppointment = async (
     return appointment;
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('appointments')
-    .insert(mapAppointmentToDb(appointment))
-    .select()
-    .single();
+    .insert(mapAppointmentToDb(appointment));
 
   if (error) throw error;
-  return mapAppointmentFromDb(data as DatabaseAppointmentRow);
+  return appointment;
 };
 
 export const updateAppointment = async (
@@ -163,7 +161,7 @@ export const updateAppointment = async (
     return result;
   }
 
-  const current = (await listAppointments()).find(appointment => appointment.id === id);
+  const current = (await listInternalAppointments()).find(appointment => appointment.id === id);
   if (!current) throw new Error('Agendamento nao encontrado.');
   const next = { ...current, ...patch, updatedAt: patch.updatedAt || new Date().toISOString() };
 

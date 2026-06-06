@@ -20,7 +20,7 @@ import { TourOverlay, TourStep } from './components/TourOverlay';
 import { ReportModal } from './components/ReportModal';
 import { DashboardCharts } from './components/DashboardCharts';
 import { isSupabaseConfigured } from './lib/supabase';
-import { createAppointment as createAppointmentRecord, listAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
+import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { listBarbers } from './services/barberRepository';
 import { listServices } from './services/serviceRepository';
 import { AppRole, AuthSession, canAccessInternalPanel, getCurrentAuthSession, signInWithPassword, signOut as signOutAuth, signUpWithPassword } from './services/authRepository';
@@ -269,12 +269,13 @@ const App: React.FC = () => {
 
     const loadRemoteData = async () => {
       if (!isSupabaseConfigured) return;
+      if (!isPublicBookingRoute && (isAuthLoading || !canAccessInternalPanel(authSession, true))) return;
 
       setAppointmentsLoading(true);
       setAppointmentsError(null);
       try {
         const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([
-          isPublicBookingRoute ? listPublicAppointmentSlots() : listAppointments(),
+          isPublicBookingRoute ? listPublicAppointmentSlots() : listInternalAppointments(),
           listBarbers(),
           listServices()
         ]);
@@ -299,7 +300,7 @@ const App: React.FC = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [authSession, isAuthLoading, isPublicBookingRoute]);
 
   // Check for First Time Tour
   useEffect(() => {
