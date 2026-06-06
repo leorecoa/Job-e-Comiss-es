@@ -40,6 +40,14 @@ create table if not exists appointments (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  display_name text,
+  role text not null default 'owner' check (role in ('owner', 'barber')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists appointments_barber_start_idx on appointments (barber_id, start_at);
 create index if not exists appointments_status_idx on appointments (status);
 create index if not exists appointments_start_at_idx on appointments (start_at);
@@ -67,6 +75,11 @@ create trigger appointments_set_updated_at
 before update on appointments
 for each row execute function set_updated_at();
 
+drop trigger if exists profiles_set_updated_at on profiles;
+create trigger profiles_set_updated_at
+before update on profiles
+for each row execute function set_updated_at();
+
 -- MVP conflict protection remains in the app repository for now.
 -- Next step: add a database-level exclusion constraint using tstzrange + gist
 -- after confirming the desired cancelled/no-show behavior and required extensions.
@@ -88,3 +101,4 @@ where status <> 'cancelled';
 -- 1. Allow public reads only from public_appointment_slots.
 -- 2. Allow public appointment inserts with limited fields.
 -- 3. Protect full appointment rows behind Supabase Auth and owner/barber roles.
+-- 4. Sync auth user metadata with profiles.role or move role checks fully into profiles.

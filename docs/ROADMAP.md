@@ -4,6 +4,7 @@ Este roadmap organiza melhorias futuras por impacto e complexidade.
 
 ## Curto prazo
 
+- Mover roles de `user_metadata` para tabela `profiles` com policies.
 - Melhorar a tela publica de booking com link copiavel e tema por barbearia.
 - Refinar a agenda diaria com atalhos de horario e filtros de status.
 - Capturar screenshots publicas com dados ficticios.
