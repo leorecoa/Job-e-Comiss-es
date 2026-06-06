@@ -94,11 +94,78 @@ select
 from appointments
 where status <> 'cancelled';
 
--- RLS notes:
--- This MVP can run with RLS disabled for local/demo projects.
--- For production, enable RLS and create policies carefully.
--- Recommended next step:
--- 1. Allow public reads only from public_appointment_slots.
--- 2. Allow public appointment inserts with limited fields.
--- 3. Protect full appointment rows behind Supabase Auth and owner/barber roles.
--- 4. Sync auth user metadata with profiles.role or move role checks fully into profiles.
+-- Initial RLS policies for the MVP.
+-- These policies are intentionally simple and should be hardened further
+-- before production multi-tenant usage.
+
+alter table profiles enable row level security;
+alter table barbers enable row level security;
+alter table services enable row level security;
+alter table appointments enable row level security;
+
+drop policy if exists "profiles_select_own" on profiles;
+create policy "profiles_select_own"
+on profiles for select
+using (auth.uid() = id);
+
+drop policy if exists "profiles_insert_own" on profiles;
+create policy "profiles_insert_own"
+on profiles for insert
+with check (auth.uid() = id);
+
+drop policy if exists "profiles_update_own" on profiles;
+create policy "profiles_update_own"
+on profiles for update
+using (auth.uid() = id)
+with check (auth.uid() = id);
+
+drop policy if exists "barbers_public_read_active" on barbers;
+create policy "barbers_public_read_active"
+on barbers for select
+using (active = true);
+
+drop policy if exists "services_public_read_active" on services;
+create policy "services_public_read_active"
+on services for select
+using (active = true);
+
+drop policy if exists "appointments_authenticated_read" on appointments;
+create policy "appointments_authenticated_read"
+on appointments for select
+using (
+  exists (
+    select 1 from profiles
+    where profiles.id = auth.uid()
+      and profiles.role in ('owner', 'barber')
+  )
+);
+
+drop policy if exists "appointments_authenticated_update" on appointments;
+create policy "appointments_authenticated_update"
+on appointments for update
+using (
+  exists (
+    select 1 from profiles
+    where profiles.id = auth.uid()
+      and profiles.role in ('owner', 'barber')
+  )
+)
+with check (
+  exists (
+    select 1 from profiles
+    where profiles.id = auth.uid()
+      and profiles.role in ('owner', 'barber')
+  )
+);
+
+drop policy if exists "appointments_public_insert_scheduled" on appointments;
+create policy "appointments_public_insert_scheduled"
+on appointments for insert
+with check (status = 'scheduled');
+
+-- Privacy note:
+-- Public booking needs slot availability without exposing client names/phones.
+-- Prefer querying public_appointment_slots for public availability once Supabase
+-- policies are fully hardened. The current frontend repository still uses the
+-- full appointments table, so production should add an RPC/view-specific
+-- repository before exposing a real public link.

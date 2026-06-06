@@ -47,4 +47,28 @@ describe('auth role helpers', () => {
       role: 'barber'
     });
   });
+
+  it('prefers database profile role over user metadata role', () => {
+    const session = mapAuthSession({
+      user: {
+        id: 'user-1',
+        email: 'leo@example.com',
+        user_metadata: {
+          display_name: 'Leo Metadata',
+          role: 'owner'
+        }
+      }
+    } as any, {
+      id: 'user-1',
+      display_name: 'Leo Profile',
+      role: 'barber'
+    });
+
+    expect(session).toEqual({
+      userId: 'user-1',
+      email: 'leo@example.com',
+      displayName: 'Leo Profile',
+      role: 'barber'
+    });
+  });
 });
