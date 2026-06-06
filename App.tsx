@@ -1,11 +1,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType } from './types';
+import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType, Appointment, AppointmentStatus } from './types';
 import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput } from './utils';
+import { APPOINTMENT_STORAGE_KEY, completeAppointmentFinancialRecord, getAppointmentDateInput, hasAppointmentConflict } from './scheduling';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
 import { AddValeModal } from './components/AddValeModal';
 import { SettingsModal } from './components/SettingsModal';
+import { AppointmentModal } from './components/AppointmentModal';
+import { DailySchedule } from './components/DailySchedule';
 import { LoginScreen } from './components/LoginScreen';
 import { PaywallScreen } from './components/PaywallScreen';
 import { MonthlySummary } from './components/MonthlySummary';
@@ -39,6 +42,22 @@ import {
   Clock,
   Tag
 } from 'lucide-react';
+
+const normalizeSettings = (settings: Partial<AppSettings> | null | undefined): AppSettings => {
+  const merged = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+  const services = Array.isArray(settings?.services) && settings.services.length > 0
+    ? settings.services
+    : DEFAULT_SETTINGS.services;
+
+  return {
+    ...merged,
+    services: services.map(service => ({
+      ...service,
+      durationMinutes: Math.max(1, Number(service.durationMinutes) || 30),
+      price: Math.max(0, Number(service.price) || 0)
+    }))
+  };
+};
 
 const getTodayString = () => {
   const d = new Date();
@@ -115,11 +134,22 @@ const App: React.FC = () => {
     }
   });
 
+  const [appointments, setAppointments] = useState<Appointment[]>(() => {
+    try {
+      const saved = localStorage.getItem(APPOINTMENT_STORAGE_KEY);
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error("Error loading appointments", e);
+      return [];
+    }
+  });
+
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
       const saved = localStorage.getItem('barbearia_settings');
       const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
-      return { ...DEFAULT_SETTINGS, ...parsed }; 
+      return normalizeSettings(parsed); 
     } catch (e) {
       return DEFAULT_SETTINGS;
     }
@@ -127,15 +157,18 @@ const App: React.FC = () => {
 
   // -- View State --
   const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
-  const [activeTab, setActiveTab] = useState<'clients' | 'vales'>('clients');
+  const [activeTab, setActiveTab] = useState<'appointments' | 'clients' | 'vales'>('appointments');
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthString());
   const [selectedBarberFilter, setSelectedBarberFilter] = useState<string>('TODOS');
+  const [selectedScheduleBarber, setSelectedScheduleBarber] = useState<string>('');
   
   // Modals State
   const [isClientModalOpen, setClientModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isValeModalOpen, setValeModalOpen] = useState(false);
+  const [isAppointmentModalOpen, setAppointmentModalOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
   const [isSubscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
   const [isReportModalOpen, setReportModalOpen] = useState(false);
@@ -167,6 +200,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('barbearia_vales', JSON.stringify(vales));
   }, [vales]);
+
+  useEffect(() => {
+    localStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(appointments));
+  }, [appointments]);
 
   useEffect(() => {
     localStorage.setItem('barbearia_settings', JSON.stringify(settings));
@@ -235,6 +272,21 @@ const App: React.FC = () => {
     return ['TODOS', ...Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR'))];
   }, [settings.barbers, clients, vales]);
 
+  const scheduleBarberOptions = useMemo(() => {
+    const names = new Set<string>();
+    (settings.barbers || []).forEach(barber => {
+      if (barber?.trim()) names.add(barber.trim());
+    });
+    appointments.forEach(appointment => {
+      if (appointment.barberName?.trim()) names.add(appointment.barberName.trim());
+    });
+    clients.forEach(client => {
+      if (client.barberName?.trim()) names.add(client.barberName.trim());
+    });
+    if (userProfile?.ownerName?.trim()) names.add(userProfile.ownerName.trim());
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [settings.barbers, appointments, clients, userProfile?.ownerName]);
+
   const chartClients = useMemo(() => {
     if (selectedBarberFilter === 'TODOS') return clients;
     return clients.filter(client => client.barberName === selectedBarberFilter);
@@ -245,6 +297,13 @@ const App: React.FC = () => {
       setSelectedBarberFilter('TODOS');
     }
   }, [selectedBarberFilter, barberFilterOptions]);
+
+  useEffect(() => {
+    if (scheduleBarberOptions.length === 0) return;
+    if (!selectedScheduleBarber || !scheduleBarberOptions.includes(selectedScheduleBarber)) {
+      setSelectedScheduleBarber(scheduleBarberOptions[0]);
+    }
+  }, [selectedScheduleBarber, scheduleBarberOptions]);
 
   // -- Filtering (Only for Daily View) --
   const filteredClients = useMemo(() => {
@@ -278,6 +337,13 @@ const App: React.FC = () => {
     });
     return filtered.sort((a, b) => b.timestamp - a.timestamp);
   }, [vales, selectedDate, selectedBarberFilter]);
+
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter(appointment => {
+      if (!selectedScheduleBarber || appointment.barberName !== selectedScheduleBarber) return false;
+      return getAppointmentDateInput(appointment) === selectedDate;
+    });
+  }, [appointments, selectedDate, selectedScheduleBarber]);
 
   // -- Calculations --
   const stats = useMemo(() => {
@@ -351,6 +417,73 @@ const App: React.FC = () => {
       setClients(prev => [newClient, ...prev]);
       addToast('Novo atendimento salvo!', 'success');
     }
+  };
+
+  const handleOpenAppointment = () => {
+    if (scheduleBarberOptions.length === 0) {
+      addToast('Cadastre um barbeiro antes de agendar.', 'error');
+      setSettingsModalOpen(true);
+      return;
+    }
+    setEditingAppointment(null);
+    setAppointmentModalOpen(true);
+  };
+
+  const handleSaveAppointment = (appointment: Appointment) => {
+    const editingId = editingAppointment?.id;
+    if (hasAppointmentConflict(appointments, appointment, editingId)) {
+      addToast('Horario indisponivel para este barbeiro.', 'error');
+      return;
+    }
+
+    setAppointments(prev => {
+      if (editingId) {
+        return prev.map(item => item.id === editingId ? appointment : item);
+      }
+      return [appointment, ...prev];
+    });
+
+    setSelectedDate(getAppointmentDateInput(appointment));
+    setSelectedScheduleBarber(appointment.barberName);
+    setAppointmentModalOpen(false);
+    setEditingAppointment(null);
+    addToast(editingId ? 'Agendamento atualizado!' : 'Agendamento criado!', 'success');
+  };
+
+  const handleEditAppointment = (appointment: Appointment) => {
+    setEditingAppointment(appointment);
+    setAppointmentModalOpen(true);
+  };
+
+  const handleAppointmentStatusChange = (appointment: Appointment, status: AppointmentStatus) => {
+    const updatedAppointment: Appointment = {
+      ...appointment,
+      status,
+      updatedAt: new Date().toISOString()
+    };
+
+    let createdFinancialRecord = false;
+    if (status === 'completed') {
+      setClients(prev => {
+        const result = completeAppointmentFinancialRecord(updatedAppointment, prev, settings, generateId);
+        createdFinancialRecord = result.created;
+        return result.clients;
+      });
+    }
+
+    setAppointments(prev => prev.map(item => item.id === appointment.id ? updatedAppointment : item));
+
+    if (status === 'completed') {
+      addToast(createdFinancialRecord ? 'Agendamento concluido e financeiro lancado!' : 'Agendamento concluido sem duplicar financeiro.', 'success');
+      return;
+    }
+
+    addToast('Status do agendamento atualizado.', 'success');
+  };
+
+  const handleCancelAppointment = (appointment: Appointment) => {
+    if (!window.confirm('Cancelar este agendamento?')) return;
+    handleAppointmentStatusChange(appointment, 'cancelled');
   };
 
   const handleEditClient = (client: Client) => {
@@ -549,10 +682,13 @@ const App: React.FC = () => {
         {viewMode === 'daily' && (
           <div className="animate-slide-in">
              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-                <div id="tour-actions" className="flex gap-2 w-full md:w-auto">
-                    <button id="tour-new-client-btn" onClick={handleOpenAddClient} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95">
-                        <Plus size={18} /> Novo
+                 <div id="tour-actions" className="flex gap-2 w-full md:w-auto">
+                    <button onClick={handleOpenAppointment} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-800 border border-gold-500/30 text-gold-400 px-4 py-2.5 rounded-xl font-bold transition-colors active:scale-95">
+                        <Calendar size={18} /> Agendar
                     </button>
+                     <button id="tour-new-client-btn" onClick={handleOpenAddClient} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95">
+                        <Plus size={18} /> Atendimento
+                     </button>
                     <button onClick={() => setValeModalOpen(true)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-800 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95">
                         <MinusCircle size={18} /> Vale
                     </button>
@@ -616,15 +752,29 @@ const App: React.FC = () => {
                 <StatsCard title="Líquido" value={formatCurrency(stats.netCommission)} icon={<TrendingUp size={20} />} colorClass="bg-gray-800 border-gold-500/30 text-gold-500" />
              </div>
 
-             {/* Lists */}
-             <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
-                <div className="flex border-b border-gray-700 bg-gray-900/50">
-                    <button onClick={() => setActiveTab('clients')} className={`flex-1 py-3 text-sm font-bold ${activeTab === 'clients' ? 'text-white border-b-2 border-gold-500' : 'text-gray-500'}`}>Clientes</button>
-                    <button onClick={() => setActiveTab('vales')} className={`flex-1 py-3 text-sm font-bold ${activeTab === 'vales' ? 'text-white border-b-2 border-red-500' : 'text-gray-500'}`}>Vales</button>
-                </div>
-                
-                <div className="min-h-[200px] bg-gray-900/30">
-                    {activeTab === 'clients' ? (
+              {/* Lists */}
+              <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+                 <div className="flex border-b border-gray-700 bg-gray-900/50">
+                    <button onClick={() => setActiveTab('appointments')} className={`flex-1 py-3 text-sm font-bold ${activeTab === 'appointments' ? 'text-white border-b-2 border-blue-400' : 'text-gray-500'}`}>Agenda</button>
+                     <button onClick={() => setActiveTab('clients')} className={`flex-1 py-3 text-sm font-bold ${activeTab === 'clients' ? 'text-white border-b-2 border-gold-500' : 'text-gray-500'}`}>Clientes</button>
+                     <button onClick={() => setActiveTab('vales')} className={`flex-1 py-3 text-sm font-bold ${activeTab === 'vales' ? 'text-white border-b-2 border-red-500' : 'text-gray-500'}`}>Vales</button>
+                 </div>
+                 
+                 <div className="min-h-[200px] bg-gray-900/30">
+                    {activeTab === 'appointments' ? (
+                        <DailySchedule
+                          appointments={filteredAppointments}
+                          selectedDate={selectedDate}
+                          selectedBarber={selectedScheduleBarber}
+                          barberOptions={scheduleBarberOptions}
+                          onDateChange={setSelectedDate}
+                          onBarberChange={setSelectedScheduleBarber}
+                          onNew={handleOpenAppointment}
+                          onEdit={handleEditAppointment}
+                          onStatusChange={handleAppointmentStatusChange}
+                          onCancel={handleCancelAppointment}
+                        />
+                    ) : activeTab === 'clients' ? (
                         <>
                            {filteredClients.length === 0 ? <p className="text-center py-8 text-gray-500">{selectedBarberFilter === 'TODOS' ? 'Sem registros.' : `Sem registros para ${selectedBarberFilter}.`}</p> : (
                                 <>
@@ -812,11 +962,22 @@ const App: React.FC = () => {
         isOpen={isSettingsModalOpen} 
         onClose={() => setSettingsModalOpen(false)} 
         settings={settings} 
-        onSave={setSettings} 
+        onSave={(nextSettings) => setSettings(normalizeSettings(nextSettings))} 
         userProfile={userProfile} 
         onSubscribe={() => setSubscriptionModalOpen(true)} 
         clients={clients}
         vales={vales}
+        appointments={appointments}
+      />
+      <AppointmentModal
+        isOpen={isAppointmentModalOpen}
+        onClose={() => { setAppointmentModalOpen(false); setEditingAppointment(null); }}
+        onSave={handleSaveAppointment}
+        settings={settings}
+        selectedDate={selectedDate}
+        selectedBarber={selectedScheduleBarber}
+        initialData={editingAppointment}
+        createId={generateId}
       />
       <SubscriptionModal isOpen={isSubscriptionModalOpen} onClose={() => setSubscriptionModalOpen(false)} onSubscribe={handleSubscribe} />
     </div>
