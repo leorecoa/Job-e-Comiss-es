@@ -1,3 +1,4 @@
+
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Appointment } from '../types';
 import { APPOINTMENT_STORAGE_KEY, getAppointmentDateInput, hasAppointmentConflict } from '../scheduling';
@@ -20,7 +21,10 @@ export type DatabaseAppointmentRow = {
   updated_at: string;
 };
 
-type DatabaseAppointmentInsert = Omit<DatabaseAppointmentRow, 'created_at' | 'updated_at'>;
+type DatabaseAppointmentInsert = Omit<
+  DatabaseAppointmentRow,
+  'id' | 'created_at' | 'updated_at'
+>;
 
 type DatabasePublicAppointmentSlotRow = {
   barber_id: string | null;
@@ -28,6 +32,11 @@ type DatabasePublicAppointmentSlotRow = {
   start_at: string;
   end_at: string;
   status: Appointment['status'];
+};
+
+const nullableUuid = (value?: string | null): string | null => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 };
 
 export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment => ({
@@ -49,12 +58,11 @@ export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment =
 });
 
 export const mapAppointmentToDb = (appointment: Appointment): DatabaseAppointmentInsert => ({
-  id: appointment.id,
   client_name: appointment.clientName,
   client_phone: appointment.clientPhone || '',
-  barber_id: appointment.barberId || null,
+  barber_id: nullableUuid(appointment.barberId),
   barber_name: appointment.barberName,
-  service_id: appointment.serviceId || null,
+  service_id: nullableUuid(appointment.serviceId),
   service_type: appointment.serviceType,
   service_value: appointment.serviceValue,
   start_at: appointment.startAt,
@@ -127,6 +135,7 @@ export const createAppointment = async (
   existingAppointments?: Appointment[]
 ): Promise<Appointment> => {
   const appointments = existingAppointments || await listInternalAppointments();
+
   if (hasAppointmentConflict(appointments, appointment)) {
     throw new Error('Horario indisponivel para este barbeiro.');
   }
@@ -136,12 +145,18 @@ export const createAppointment = async (
     return appointment;
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('appointments')
-    .insert(mapAppointmentToDb(appointment));
+    .insert(mapAppointmentToDb(appointment))
+    .select()
+    .single();
 
-  if (error) throw error;
-  return appointment;
+  if (error) {
+    console.error('Failed to create appointment', error);
+    throw error;
+  }
+
+  return mapAppointmentFromDb(data as DatabaseAppointmentRow);
 };
 
 export const updateAppointment = async (
@@ -150,20 +165,29 @@ export const updateAppointment = async (
 ): Promise<Appointment> => {
   if (!isSupabaseConfigured || !supabase) {
     const appointments = readLocalAppointments();
+
     const updated = appointments.map(appointment => (
       appointment.id === id
         ? { ...appointment, ...patch, updatedAt: patch.updatedAt || new Date().toISOString() }
         : appointment
     ));
+
     writeLocalAppointments(updated);
+
     const result = updated.find(appointment => appointment.id === id);
     if (!result) throw new Error('Agendamento nao encontrado.');
+
     return result;
   }
 
   const current = (await listInternalAppointments()).find(appointment => appointment.id === id);
   if (!current) throw new Error('Agendamento nao encontrado.');
-  const next = { ...current, ...patch, updatedAt: patch.updatedAt || new Date().toISOString() };
+
+  const next = {
+    ...current,
+    ...patch,
+    updatedAt: patch.updatedAt || new Date().toISOString()
+  };
 
   const { data, error } = await supabase
     .from('appointments')
@@ -172,7 +196,11 @@ export const updateAppointment = async (
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Failed to update appointment', error);
+    throw error;
+  }
+
   return mapAppointmentFromDb(data as DatabaseAppointmentRow);
 };
 
@@ -182,6 +210,13 @@ export const deleteAppointment = async (id: string): Promise<void> => {
     return;
   }
 
-  const { error } = await supabase.from('appointments').delete().eq('id', id);
-  if (error) throw error;
+  const { error } = await supabase
+    .from('appointments')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Failed to delete appointment', error);
+    throw error;
+  }
 };
