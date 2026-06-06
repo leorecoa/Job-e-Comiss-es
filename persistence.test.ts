@@ -1,3 +1,4 @@
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Appointment } from './types';
 
@@ -33,6 +34,7 @@ const makeAppointment = (overrides: Partial<Appointment> = {}): Appointment => (
 
 const installLocalStorageMock = () => {
   const store = new Map<string, string>();
+
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => store.set(key, value),
@@ -45,18 +47,41 @@ describe('appointment persistence mappers', () => {
   it('maps appointment app model to database shape and back', () => {
     const appointment = makeAppointment({ financialRecordId: 'client-1' });
     const db = mapAppointmentToDb(appointment);
+
+    expect(db).not.toHaveProperty('id');
+    expect(db.client_name).toBe('Joao');
+    expect(db.client_phone).toBe('11999990000');
+    expect(db.barber_id).toBe('barber-1');
+    expect(db.service_id).toBe('service-1');
+    expect(db.service_value).toBe(50);
+    expect(db.start_at).toBe(appointment.startAt);
+    expect(db.end_at).toBe(appointment.endAt);
+    expect(db.financial_record_id).toBe('client-1');
+
     const mapped = mapAppointmentFromDb({
+      id: appointment.id,
       ...db,
       created_at: appointment.createdAt,
       updated_at: appointment.updatedAt
     });
 
-    expect(db.client_name).toBe('Joao');
-    expect(db.client_phone).toBe('11999990000');
-    expect(db.service_value).toBe(50);
-    expect(db.start_at).toBe(appointment.startAt);
-    expect(db.financial_record_id).toBe('client-1');
-    expect(mapped).toEqual(appointment);
+    expect(mapped).toEqual({
+      ...appointment,
+      notes: undefined
+    });
+  });
+
+  it('maps empty uuid fields to null before sending to database', () => {
+    const appointment = makeAppointment({
+      barberId: '',
+      serviceId: ''
+    });
+
+    const db = mapAppointmentToDb(appointment);
+
+    expect(db).not.toHaveProperty('id');
+    expect(db.barber_id).toBeNull();
+    expect(db.service_id).toBeNull();
   });
 });
 
@@ -76,6 +101,7 @@ describe('appointment repository local fallback', () => {
 
   it('validates conflict before saving in fallback mode', async () => {
     const existing = makeAppointment();
+
     await expect(createAppointment(makeAppointment({ id: 'appointment-2' }), [existing]))
       .rejects
       .toThrow('Horario indisponivel para este barbeiro.');
@@ -83,6 +109,7 @@ describe('appointment repository local fallback', () => {
 
   it('updates a completed appointment with financial record reference', async () => {
     const appointment = makeAppointment();
+
     localStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify([appointment]));
 
     const updated = await updateAppointment(appointment.id, {
@@ -114,3 +141,4 @@ describe('appointment repository local fallback', () => {
     expect(slots.find(slot => slot.label === '09:30')?.available).toBe(false);
   });
 });
+
