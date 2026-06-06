@@ -18,6 +18,10 @@ import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { TourOverlay, TourStep } from './components/TourOverlay';
 import { ReportModal } from './components/ReportModal';
 import { DashboardCharts } from './components/DashboardCharts';
+import { isSupabaseConfigured } from './lib/supabase';
+import { createAppointment as createAppointmentRecord, listAppointments, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
+import { listBarbers } from './services/barberRepository';
+import { listServices } from './services/serviceRepository';
 import { 
   Scissors, 
   Users, 
@@ -175,6 +179,8 @@ const App: React.FC = () => {
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
   const [isSubscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
   const [isReportModalOpen, setReportModalOpen] = useState(false);
+  const [isAppointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
 
   // Tour State
   const [isTourOpen, setTourOpen] = useState(false);
@@ -205,12 +211,51 @@ const App: React.FC = () => {
   }, [vales]);
 
   useEffect(() => {
-    localStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(appointments));
+    if (!isSupabaseConfigured) {
+      localStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(appointments));
+    }
   }, [appointments]);
 
   useEffect(() => {
     localStorage.setItem('barbearia_settings', JSON.stringify(settings));
   }, [settings]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadRemoteData = async () => {
+      if (!isSupabaseConfigured) return;
+
+      setAppointmentsLoading(true);
+      setAppointmentsError(null);
+      try {
+        const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([
+          listAppointments(),
+          listBarbers(),
+          listServices()
+        ]);
+
+        if (!active) return;
+        setAppointments(remoteAppointments);
+        setSettings(prev => normalizeSettings({
+          ...prev,
+          barbers: remoteBarbers.length > 0 ? remoteBarbers : prev.barbers,
+          services: remoteServices.length > 0 ? remoteServices : prev.services
+        }));
+      } catch (error) {
+        if (!active) return;
+        console.error(error);
+        setAppointmentsError('Erro ao carregar dados online. Verifique o Supabase.');
+      } finally {
+        if (active) setAppointmentsLoading(false);
+      }
+    };
+
+    loadRemoteData();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Check for First Time Tour
   useEffect(() => {
@@ -432,34 +477,50 @@ const App: React.FC = () => {
     setAppointmentModalOpen(true);
   };
 
-  const handleSaveAppointment = (appointment: Appointment) => {
+  const handleSaveAppointment = async (appointment: Appointment) => {
     const editingId = editingAppointment?.id;
     if (hasAppointmentConflict(appointments, appointment, editingId)) {
       addToast('Horario indisponivel para este barbeiro.', 'error');
       return;
     }
 
-    setAppointments(prev => {
-      if (editingId) {
-        return prev.map(item => item.id === editingId ? appointment : item);
-      }
-      return [appointment, ...prev];
-    });
+    try {
+      const savedAppointment = editingId
+        ? await updateAppointmentRecord(editingId, appointment)
+        : await createAppointmentRecord(appointment, appointments);
 
-    setSelectedDate(getAppointmentDateInput(appointment));
-    setSelectedScheduleBarber(appointment.barberName);
-    setAppointmentModalOpen(false);
-    setEditingAppointment(null);
-    addToast(editingId ? 'Agendamento atualizado!' : 'Agendamento criado!', 'success');
+      setAppointments(prev => {
+        if (editingId) {
+          return prev.map(item => item.id === editingId ? savedAppointment : item);
+        }
+        return [savedAppointment, ...prev];
+      });
+
+      setSelectedDate(getAppointmentDateInput(savedAppointment));
+      setSelectedScheduleBarber(savedAppointment.barberName);
+      setAppointmentModalOpen(false);
+      setEditingAppointment(null);
+      addToast(editingId ? 'Agendamento atualizado!' : 'Agendamento criado!', 'success');
+    } catch (error) {
+      console.error(error);
+      addToast('Erro ao salvar agendamento.', 'error');
+    }
   };
 
-  const handleCreatePublicAppointment = (appointment: Appointment) => {
+  const handleCreatePublicAppointment = async (appointment: Appointment) => {
     if (hasAppointmentConflict(appointments, appointment)) {
       addToast('Horario indisponivel para este barbeiro.', 'error');
-      return;
+      throw new Error('Horario indisponivel para este barbeiro.');
     }
 
-    setAppointments(prev => [appointment, ...prev]);
+    try {
+      const savedAppointment = await createAppointmentRecord(appointment, appointments);
+      setAppointments(prev => [savedAppointment, ...prev]);
+    } catch (error) {
+      console.error(error);
+      addToast('Erro ao confirmar agendamento.', 'error');
+      throw error;
+    }
   };
 
   const handleEditAppointment = (appointment: Appointment) => {
@@ -467,30 +528,43 @@ const App: React.FC = () => {
     setAppointmentModalOpen(true);
   };
 
-  const handleAppointmentStatusChange = (appointment: Appointment, status: AppointmentStatus) => {
+  const handleAppointmentStatusChange = async (appointment: Appointment, status: AppointmentStatus) => {
     const updatedAppointment: Appointment = {
       ...appointment,
       status,
       updatedAt: new Date().toISOString()
     };
 
+    let patch: Partial<Appointment> = updatedAppointment;
     let createdFinancialRecord = false;
-    if (status === 'completed') {
+    if (status === 'completed' && !appointment.financialRecordId) {
       setClients(prev => {
         const result = completeAppointmentFinancialRecord(updatedAppointment, prev, settings, generateId);
         createdFinancialRecord = result.created;
+        if (createdFinancialRecord) {
+          patch = {
+            ...patch,
+            financialRecordId: result.clients[0]?.id
+          };
+        }
         return result.clients;
       });
     }
 
-    setAppointments(prev => prev.map(item => item.id === appointment.id ? updatedAppointment : item));
+    try {
+      const savedAppointment = await updateAppointmentRecord(appointment.id, patch);
+      setAppointments(prev => prev.map(item => item.id === appointment.id ? savedAppointment : item));
 
-    if (status === 'completed') {
-      addToast(createdFinancialRecord ? 'Agendamento concluido e financeiro lancado!' : 'Agendamento concluido sem duplicar financeiro.', 'success');
-      return;
+      if (status === 'completed') {
+        addToast(createdFinancialRecord ? 'Agendamento concluido e financeiro lancado!' : 'Agendamento concluido sem duplicar financeiro.', 'success');
+        return;
+      }
+
+      addToast('Status do agendamento atualizado.', 'success');
+    } catch (error) {
+      console.error(error);
+      addToast('Erro ao atualizar agendamento.', 'error');
     }
-
-    addToast('Status do agendamento atualizado.', 'success');
   };
 
   const handleCancelAppointment = (appointment: Appointment) => {
@@ -779,6 +853,16 @@ const App: React.FC = () => {
              </div>
 
               {/* Lists */}
+              {isAppointmentsLoading && (
+                <div className="mb-4 bg-blue-500/10 border border-blue-500/20 text-blue-200 text-sm rounded-xl p-3">
+                  Carregando agenda online...
+                </div>
+              )}
+              {appointmentsError && (
+                <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-200 text-sm rounded-xl p-3">
+                  {appointmentsError}
+                </div>
+              )}
               <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
                  <div className="flex border-b border-gray-700 bg-gray-900/50">
                     <button onClick={() => setActiveTab('appointments')} className={`flex-1 py-3 text-sm font-bold ${activeTab === 'appointments' ? 'text-white border-b-2 border-blue-400' : 'text-gray-500'}`}>Agenda</button>
