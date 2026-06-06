@@ -39,6 +39,19 @@ Limitações atuais:
 
 Proximos passos planejados: Supabase, sincronizacao multi-dispositivo, autenticacao real e lembretes automaticos.
 
+## Public Booking MVP
+
+Clientes podem criar agendamentos pela tela publica em `/book` ou `/agendar`. O fluxo permite escolher barbeiro, servico, data e apenas horarios disponiveis, informar nome e WhatsApp, confirmar o horario e ver uma mensagem clara de sucesso.
+
+Os agendamentos criados pela tela publica usam o mesmo modelo `Appointment` e o mesmo storage da agenda interna, entao barbeiros/dono visualizam esses horarios no painel existente.
+
+Limitações atuais:
+
+- A persistencia ainda usa `localStorage`.
+- O booking publico funciona bem para demonstracao/local MVP no mesmo navegador/dispositivo.
+- Para uso real multi-dispositivo, o proximo passo e Supabase ou backend.
+- O WhatsApp continua manual via link `wa.me`, sem API paga ou automacao.
+
 ## Screenshots
 
 As capturas oficiais do projeto devem ficar em [`docs/screenshots`](docs/screenshots).

@@ -4,6 +4,7 @@ Este roadmap organiza melhorias futuras por impacto e complexidade.
 
 ## Curto prazo
 
+- Melhorar a tela publica de booking com link copiavel e tema por barbearia.
 - Refinar a agenda diaria com atalhos de horario e filtros de status.
 - Capturar screenshots publicas com dados ficticios.
 - Criar ambiente de demonstracao.
@@ -13,9 +14,12 @@ Este roadmap organiza melhorias futuras por impacto e complexidade.
 
 ## Medio prazo
 
+- Criar link publico por barbearia com slug configuravel.
 - Migrar agenda e financeiro para Supabase com sincronizacao multi-dispositivo.
+- Compartilhar agenda entre dispositivos em tempo real.
 - Persistencia em backend para multi-dispositivo.
 - Autenticacao real e controle de plano fora do frontend.
+- Autenticacao com papeis para dono, barbeiro e cliente.
 - Lembretes automaticos para agendamentos confirmados.
 - Fechamento mensal por barbeiro.
 - Historico de pagamentos e status de comissao.

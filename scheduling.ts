@@ -1,6 +1,30 @@
-import { Appointment, AppSettings, Client, ClientType, ServiceType } from './types';
+import { Appointment, AppSettings, Client, ClientType, Service, ServiceType } from './types';
 
 export const APPOINTMENT_STORAGE_KEY = 'barbearia_appointments';
+export const PUBLIC_BOOKING_WORKDAY_START = '09:00';
+export const PUBLIC_BOOKING_WORKDAY_END = '18:00';
+export const PUBLIC_BOOKING_SLOT_STEP_MINUTES = 30;
+
+export type TimeSlot = {
+  startAt: string;
+  endAt: string;
+  label: string;
+  available: boolean;
+};
+
+export type PublicBookingInput = {
+  clientName: string;
+  clientPhone: string;
+  barberName: string;
+  service?: Service;
+  selectedSlot?: TimeSlot | null;
+  notes?: string;
+};
+
+export type PublicBookingValidationResult = {
+  valid: boolean;
+  errors: string[];
+};
 
 export const normalizePhoneDigits = (phone?: string): string => {
   return (phone || '').replace(/\D/g, '');
@@ -29,6 +53,17 @@ export const addMinutesIso = (isoDate: string, minutes: number): string => {
   return new Date(new Date(isoDate).getTime() + minutes * 60 * 1000).toISOString();
 };
 
+const getMinutesFromTimeInput = (timeInput: string): number => {
+  const [hours, minutes] = timeInput.split(':').map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+};
+
+const getTimeInputFromMinutes = (totalMinutes: number): string => {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
 export const getAppointmentDateInput = (appointment: Appointment): string => {
   return toLocalDateInputValue(new Date(appointment.startAt));
 };
@@ -50,6 +85,108 @@ export const hasAppointmentConflict = (
     const existingEnd = new Date(existing.endAt).getTime();
     return newStart < existingEnd && newEnd > existingStart;
   });
+};
+
+export const getAvailableTimeSlots = (params: {
+  date: string;
+  barberName: string;
+  serviceDurationMinutes: number;
+  appointments: Appointment[];
+  workdayStart?: string;
+  workdayEnd?: string;
+  slotStepMinutes?: number;
+  now?: Date;
+}): TimeSlot[] => {
+  const {
+    date,
+    barberName,
+    serviceDurationMinutes,
+    appointments,
+    workdayStart = PUBLIC_BOOKING_WORKDAY_START,
+    workdayEnd = PUBLIC_BOOKING_WORKDAY_END,
+    slotStepMinutes = PUBLIC_BOOKING_SLOT_STEP_MINUTES,
+    now = new Date()
+  } = params;
+
+  if (!date || !barberName || serviceDurationMinutes <= 0) return [];
+
+  const startMinutes = getMinutesFromTimeInput(workdayStart);
+  const endMinutes = getMinutesFromTimeInput(workdayEnd);
+  const slots: TimeSlot[] = [];
+
+  for (let minutes = startMinutes; minutes + serviceDurationMinutes <= endMinutes; minutes += slotStepMinutes) {
+    const startAt = buildLocalDateTimeIso(date, getTimeInputFromMinutes(minutes));
+    const endAt = addMinutesIso(startAt, serviceDurationMinutes);
+    const startDate = new Date(startAt);
+
+    if (startDate.getTime() <= now.getTime()) {
+      continue;
+    }
+
+    const available = !hasAppointmentConflict(appointments, { barberName, startAt, endAt });
+    slots.push({
+      startAt,
+      endAt,
+      label: toLocalTimeInputValue(startDate),
+      available
+    });
+  }
+
+  return slots;
+};
+
+export const validatePublicBookingInput = (
+  input: PublicBookingInput,
+  appointments: Appointment[]
+): PublicBookingValidationResult => {
+  const errors: string[] = [];
+  const phoneDigits = normalizePhoneDigits(input.clientPhone);
+
+  if (!input.barberName) errors.push('Escolha um barbeiro.');
+  if (!input.service) errors.push('Escolha um servico.');
+  if (!input.selectedSlot) errors.push('Escolha um horario disponivel.');
+  if (!input.clientName.trim()) errors.push('Informe seu nome.');
+  if (!phoneDigits || phoneDigits.length < 10) errors.push('Informe um WhatsApp valido com DDD.');
+
+  if (input.selectedSlot && input.barberName) {
+    const hasConflict = hasAppointmentConflict(appointments, {
+      barberName: input.barberName,
+      startAt: input.selectedSlot.startAt,
+      endAt: input.selectedSlot.endAt
+    });
+    if (hasConflict) errors.push('Este horario acabou de ficar indisponivel.');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+};
+
+export const createPublicAppointment = (
+  input: PublicBookingInput,
+  id: string,
+  now: Date = new Date()
+): Appointment => {
+  if (!input.service || !input.selectedSlot) {
+    throw new Error('Cannot create appointment without service and slot.');
+  }
+
+  const timestamp = now.toISOString();
+  return {
+    id,
+    clientName: input.clientName.trim(),
+    clientPhone: normalizePhoneDigits(input.clientPhone),
+    barberName: input.barberName,
+    serviceType: input.service.name,
+    serviceValue: input.service.price,
+    startAt: input.selectedSlot.startAt,
+    endAt: input.selectedSlot.endAt,
+    status: 'scheduled',
+    notes: input.notes?.trim() || undefined,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
 };
 
 export const buildWhatsAppLink = (appointment: Appointment): string | null => {

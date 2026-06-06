@@ -9,6 +9,7 @@ import { AddValeModal } from './components/AddValeModal';
 import { SettingsModal } from './components/SettingsModal';
 import { AppointmentModal } from './components/AppointmentModal';
 import { DailySchedule } from './components/DailySchedule';
+import { PublicBookingPage } from './components/PublicBookingPage';
 import { LoginScreen } from './components/LoginScreen';
 import { PaywallScreen } from './components/PaywallScreen';
 import { MonthlySummary } from './components/MonthlySummary';
@@ -82,6 +83,8 @@ const CODES_VIP = ["VIP", "EQUIPE", "TIME", "VIP4"];
 const CODES_ADMIN: string[] = [];
 
 const App: React.FC = () => {
+  const isPublicBookingRoute = window.location.pathname === '/book' || window.location.pathname === '/agendar';
+
   // -- Handle Splash Screen --
   useEffect(() => {
     const splash = document.getElementById('splash-screen');
@@ -450,6 +453,15 @@ const App: React.FC = () => {
     addToast(editingId ? 'Agendamento atualizado!' : 'Agendamento criado!', 'success');
   };
 
+  const handleCreatePublicAppointment = (appointment: Appointment) => {
+    if (hasAppointmentConflict(appointments, appointment)) {
+      addToast('Horario indisponivel para este barbeiro.', 'error');
+      return;
+    }
+
+    setAppointments(prev => [appointment, ...prev]);
+  };
+
   const handleEditAppointment = (appointment: Appointment) => {
     setEditingAppointment(appointment);
     setAppointmentModalOpen(true);
@@ -642,6 +654,20 @@ const App: React.FC = () => {
         position: 'bottom'
     }
   ];
+
+  if (isPublicBookingRoute) {
+    return (
+      <>
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <PublicBookingPage
+          settings={settings}
+          appointments={appointments}
+          userProfile={userProfile}
+          onCreateAppointment={handleCreatePublicAppointment}
+        />
+      </>
+    );
+  }
 
   if (!userProfile) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><LoginScreen onLogin={handleLogin} /></>;
   if (trialStatus.isExpired) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><PaywallScreen onSubscribe={handleSubscribe} daysUsed={trialStatus.daysUsed} expirationDate={trialStatus.expirationDate} /></>;
