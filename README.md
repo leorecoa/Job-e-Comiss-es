@@ -24,6 +24,21 @@ O projeto roda como uma SPA em React com persistencia em `localStorage`, geracao
 - Backup e restauracao de dados locais com validacao de estrutura.
 - Fluxo de trial e planos PRO/VIP.
 
+## Scheduling MVP
+
+O app agora inclui um MVP de agenda interna para barbearias. A agenda permite escolher uma data e um barbeiro, criar horarios futuros, editar agendamentos e acompanhar status como agendado, confirmado, concluido, cancelado e nao compareceu.
+
+Quando um agendamento e marcado como concluido, ele gera um lancamento financeiro no fluxo atual de atendimentos e comissoes, mantendo rastreabilidade por `appointmentId` e evitando duplicidade se o mesmo agendamento for concluido mais de uma vez.
+
+Limitações atuais:
+
+- A visualizacao inicial e diaria por barbeiro, sem calendario semanal complexo.
+- Os dados ainda ficam em `localStorage`.
+- O WhatsApp e manual via link `wa.me`; nao ha WhatsApp Business API, SMS ou lembrete automatico.
+- A agenda ainda nao sincroniza entre dispositivos.
+
+Proximos passos planejados: Supabase, sincronizacao multi-dispositivo, autenticacao real e lembretes automaticos.
+
 ## Screenshots
 
 As capturas oficiais do projeto devem ficar em [`docs/screenshots`](docs/screenshots).
