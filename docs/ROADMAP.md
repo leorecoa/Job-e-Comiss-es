@@ -4,6 +4,7 @@ Este roadmap organiza melhorias futuras por impacto e complexidade.
 
 ## Curto prazo
 
+- Refinar a agenda diaria com atalhos de horario e filtros de status.
 - Capturar screenshots publicas com dados ficticios.
 - Criar ambiente de demonstracao.
 - Adicionar testes de interface para cadastro de atendimento.
@@ -12,8 +13,10 @@ Este roadmap organiza melhorias futuras por impacto e complexidade.
 
 ## Medio prazo
 
+- Migrar agenda e financeiro para Supabase com sincronizacao multi-dispositivo.
 - Persistencia em backend para multi-dispositivo.
 - Autenticacao real e controle de plano fora do frontend.
+- Lembretes automaticos para agendamentos confirmados.
 - Fechamento mensal por barbeiro.
 - Historico de pagamentos e status de comissao.
 - Exportacao de backup versionado com migracoes.

@@ -19,8 +19,39 @@ export interface ProductItem {
   // Commission rate removed as requested
 }
 
+export interface Service {
+  id: string;
+  name: string;
+  price: number;
+  durationMinutes: number;
+  commissionRate?: number;
+}
+
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'confirmed'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show';
+
+export interface Appointment {
+  id: string;
+  clientName: string;
+  clientPhone?: string;
+  barberName: string;
+  serviceType: string;
+  serviceValue: number;
+  startAt: string;
+  endAt: string;
+  status: AppointmentStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Client {
   id: string;
+  appointmentId?: string;
   name: string;
   phone?: string;        // Optional Phone
   birthDate?: string;    // Optional Birth Date (YYYY-MM-DD)
@@ -73,6 +104,7 @@ export interface AppSettings {
   products: ProductItem[]; // List of specific products
   commissionRate: number; // Service Commission Percentage (e.g., 50)
   barbers: string[]; // List of registered barbers
+  services: Service[];
 }
 
 export type PlanType = 'trial' | 'pro_monthly' | 'vip_monthly' | 'admin_life';
@@ -95,5 +127,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   priceProduct: 0,
   products: [],
   commissionRate: 50,
-  barbers: []
+  barbers: [],
+  services: [
+    { id: 'cut', name: ServiceType.CUT, price: 50, durationMinutes: 30 },
+    { id: 'beard', name: ServiceType.BEARD, price: 30, durationMinutes: 20 },
+    { id: 'combo', name: ServiceType.COMBO, price: 70, durationMinutes: 50 },
+    { id: 'other', name: ServiceType.OTHER, price: 0, durationMinutes: 30 }
+  ]
 };

@@ -1,8 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
-import { AppSettings, UserProfile, ProductItem, Client, Vale } from '../types';
+import { AppSettings, UserProfile, ProductItem, Client, Vale, Appointment } from '../types';
 import { X, Save, Crown, Users, Trash2, Plus, Package, DollarSign, Percent, Download, Upload, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { generateId } from '../utils';
+import { APPOINTMENT_STORAGE_KEY } from '../scheduling';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface SettingsModalProps {
   onSubscribe: () => void;
   clients: Client[];
   vales: Vale[];
+  appointments: Appointment[];
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -23,7 +25,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   userProfile,
   onSubscribe,
   clients,
-  vales
+  vales,
+  appointments
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [newBarberName, setNewBarberName] = useState('');
@@ -120,6 +123,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }));
   };
 
+  const handleServiceChange = (id: string, field: 'price' | 'durationMinutes', value: string) => {
+    const numericValue = Math.max(field === 'durationMinutes' ? 1 : 0, Number(value) || 0);
+    setFormData(prev => ({
+      ...prev,
+      services: (prev.services || []).map(service => (
+        service.id === id ? { ...service, [field]: numericValue } : service
+      ))
+    }));
+  };
+
   const isObjectRecord = (value: unknown): value is Record<string, unknown> => {
       return typeof value === 'object' && value !== null && !Array.isArray(value);
   };
@@ -127,6 +140,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const hasValidBackupShape = (data: unknown): data is {
       clients: Client[];
       vales: Vale[];
+      appointments?: Appointment[];
       settings: AppSettings;
   } => {
       if (!isObjectRecord(data)) return false;
@@ -147,6 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const data = {
           clients,
           vales,
+          appointments,
           settings: formData,
           profile: userProfile,
           backupDate: new Date().toISOString(),
@@ -185,6 +200,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               localStorage.setItem('barbearia_clients', JSON.stringify(data.clients));
               localStorage.setItem('barbearia_vales', JSON.stringify(data.vales));
+              localStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(data.appointments || []));
               localStorage.setItem('barbearia_settings', JSON.stringify(data.settings));
               // Optional: Restore profile if needed, but risky if moving between users
               // localStorage.setItem('barbearia_profile', JSON.stringify(data.profile));
@@ -294,7 +310,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onChange={(e) => handleChange('priceProduct', e.target.value)}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
               />
-            </div>
+             </div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-gold-500/20 bg-gold-500/5 space-y-3">
+              <div className="flex items-center gap-2 text-gold-400 mb-2">
+                  <DollarSign size={18} />
+                  <h3 className="font-bold text-sm">Servicos da Agenda</h3>
+              </div>
+              <div className="space-y-2">
+                {(formData.services || []).map(service => (
+                  <div key={service.id} className="grid grid-cols-[1fr_90px_80px] gap-2 items-end bg-gray-900 p-2 rounded-lg border border-gray-700">
+                    <div className="min-w-0">
+                      <span className="block text-white text-sm font-medium truncate">{service.name}</span>
+                      <span className="text-[10px] text-gray-500 uppercase tracking-wider">Agenda</span>
+                    </div>
+                    <label className="text-xs text-gray-400">
+                      Valor
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={service.price}
+                        onChange={(e) => handleServiceChange(service.id, 'price', e.target.value)}
+                        className="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-white text-xs focus:ring-1 focus:ring-gold-500 outline-none"
+                      />
+                    </label>
+                    <label className="text-xs text-gray-400">
+                      Min
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={service.durationMinutes}
+                        onChange={(e) => handleServiceChange(service.id, 'durationMinutes', e.target.value)}
+                        className="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-white text-xs focus:ring-1 focus:ring-gold-500 outline-none"
+                      />
+                    </label>
+                  </div>
+                ))}
+              </div>
           </div>
 
            {/* Products List Section */}
