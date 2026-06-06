@@ -22,6 +22,14 @@ export type DatabaseAppointmentRow = {
 
 type DatabaseAppointmentInsert = Omit<DatabaseAppointmentRow, 'created_at' | 'updated_at'>;
 
+type DatabasePublicAppointmentSlotRow = {
+  barber_id: string | null;
+  barber_name: string;
+  start_at: string;
+  end_at: string;
+  status: Appointment['status'];
+};
+
 export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment => ({
   id: row.id,
   barberId: row.barber_id || undefined,
@@ -80,6 +88,33 @@ export const listAppointments = async (): Promise<Appointment[]> => {
 
   if (error) throw error;
   return ((data || []) as DatabaseAppointmentRow[]).map(mapAppointmentFromDb);
+};
+
+export const listPublicAppointmentSlots = async (): Promise<Appointment[]> => {
+  if (!isSupabaseConfigured || !supabase) return readLocalAppointments();
+
+  const { data, error } = await supabase
+    .from('public_appointment_slots')
+    .select('barber_id,barber_name,start_at,end_at,status')
+    .order('start_at', { ascending: true });
+
+  if (error) throw error;
+
+  return ((data || []) as DatabasePublicAppointmentSlotRow[]).map((row, index) => ({
+    id: `slot-${row.barber_id || row.barber_name}-${row.start_at}-${index}`,
+    barberId: row.barber_id || undefined,
+    clientName: 'Horario ocupado',
+    clientPhone: '',
+    barberName: row.barber_name,
+    serviceType: 'Ocupado',
+    serviceValue: 0,
+    startAt: row.start_at,
+    endAt: row.end_at,
+    status: row.status,
+    createdAt: row.start_at,
+    updatedAt: row.start_at,
+    notes: undefined
+  }));
 };
 
 export const listAppointmentsByDate = async (date: string): Promise<Appointment[]> => {
