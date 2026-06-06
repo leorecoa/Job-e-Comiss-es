@@ -104,6 +104,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             <p className="text-center text-xs text-gray-500 mt-4">
               Ao continuar, voce inicia seu teste gratuito de 7 dias.
             </p>
+            <p className="text-center text-xs text-gray-500 mt-3">
+              <a href="/book" className="text-gold-400 hover:text-gold-300 font-bold">Abrir agendamento publico</a>
+            </p>
           </div>
         </form>
       </motion.div>
