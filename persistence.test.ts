@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Appointment } from './types';
+
+vi.mock('./lib/supabase', () => ({
+  isSupabaseConfigured: false,
+  supabase: null
+}));
+
 import {
   createAppointment,
   mapAppointmentFromDb,
