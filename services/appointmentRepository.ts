@@ -95,6 +95,7 @@ export const listInternalAppointments = async (): Promise<Appointment[]> => {
     .order('start_at', { ascending: true });
 
   if (error) throw error;
+
   return ((data || []) as DatabaseAppointmentRow[]).map(mapAppointmentFromDb);
 };
 
@@ -127,6 +128,7 @@ export const listPublicAppointmentSlots = async (): Promise<Appointment[]> => {
 
 export const listAppointmentsByDate = async (date: string): Promise<Appointment[]> => {
   const appointments = await listInternalAppointments();
+
   return appointments.filter(appointment => getAppointmentDateInput(appointment) === date);
 };
 
@@ -134,7 +136,7 @@ export const createAppointment = async (
   appointment: Appointment,
   existingAppointments?: Appointment[]
 ): Promise<Appointment> => {
-  const appointments = existingAppointments || await listInternalAppointments();
+  const appointments = existingAppointments || await listPublicAppointmentSlots();
 
   if (hasAppointmentConflict(appointments, appointment)) {
     throw new Error('Horario indisponivel para este barbeiro.');
@@ -145,18 +147,16 @@ export const createAppointment = async (
     return appointment;
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('appointments')
-    .insert(mapAppointmentToDb(appointment))
-    .select()
-    .single();
+    .insert(mapAppointmentToDb(appointment));
 
   if (error) {
     console.error('Failed to create appointment', error);
     throw error;
   }
 
-  return mapAppointmentFromDb(data as DatabaseAppointmentRow);
+  return appointment;
 };
 
 export const updateAppointment = async (
@@ -220,3 +220,4 @@ export const deleteAppointment = async (id: string): Promise<void> => {
     throw error;
   }
 };
+
