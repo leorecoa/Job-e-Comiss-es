@@ -10,6 +10,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { AppointmentModal } from './components/AppointmentModal';
 import { DailySchedule } from './components/DailySchedule';
 import { PublicBookingPage } from './components/PublicBookingPage';
+import { AuthScreen } from './components/AuthScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { PaywallScreen } from './components/PaywallScreen';
 import { MonthlySummary } from './components/MonthlySummary';
@@ -22,6 +23,7 @@ import { isSupabaseConfigured } from './lib/supabase';
 import { createAppointment as createAppointmentRecord, listAppointments, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { listBarbers } from './services/barberRepository';
 import { listServices } from './services/serviceRepository';
+import { AppRole, AuthSession, canAccessInternalPanel, getCurrentAuthSession, signInWithPassword, signOut as signOutAuth, signUpWithPassword } from './services/authRepository';
 import { 
   Scissors, 
   Users, 
@@ -181,6 +183,9 @@ const App: React.FC = () => {
   const [isReportModalOpen, setReportModalOpen] = useState(false);
   const [isAppointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
+  const [isAuthLoading, setAuthLoading] = useState(isSupabaseConfigured);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Tour State
   const [isTourOpen, setTourOpen] = useState(false);
@@ -201,6 +206,45 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('barbearia_profile', JSON.stringify(userProfile));
   }, [userProfile]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadAuthSession = async () => {
+      if (!isSupabaseConfigured) {
+        setAuthLoading(false);
+        return;
+      }
+
+      setAuthLoading(true);
+      try {
+        const session = await getCurrentAuthSession();
+        if (!active) return;
+        setAuthSession(session);
+        if (session) {
+          setUserProfile(prev => ({
+            ownerName: session.displayName,
+            shopName: prev?.shopName || settings.shopName || 'Gestao Maxima',
+            email: session.email,
+            startDate: prev?.startDate || Date.now(),
+            isPro: true,
+            planType: session.role === 'owner' ? 'admin_life' : 'vip_monthly'
+          }));
+        }
+      } catch (error) {
+        if (!active) return;
+        console.error(error);
+        setAuthError('Nao foi possivel validar sua sessao.');
+      } finally {
+        if (active) setAuthLoading(false);
+      }
+    };
+
+    loadAuthSession();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('barbearia_clients', JSON.stringify(clients));
@@ -419,6 +463,52 @@ const App: React.FC = () => {
     setUserProfile(profile);
     setSettings(prev => ({ ...prev, shopName: profile.shopName }));
     addToast(`Bem-vindo, ${profile.ownerName}!`, 'success');
+  };
+
+  const handleAuthProfile = (session: AuthSession) => {
+    setAuthSession(session);
+    setUserProfile(prev => ({
+      ownerName: session.displayName,
+      shopName: prev?.shopName || settings.shopName || 'Gestao Maxima',
+      email: session.email,
+      startDate: prev?.startDate || Date.now(),
+      isPro: true,
+      planType: session.role === 'owner' ? 'admin_life' : 'vip_monthly'
+    }));
+  };
+
+  const handleAuthSignIn = async (email: string, password: string) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const session = await signInWithPassword(email, password);
+      handleAuthProfile(session);
+      addToast(`Bem-vindo, ${session.displayName}!`, 'success');
+    } catch (error) {
+      console.error(error);
+      setAuthError('Email ou senha invalidos.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleAuthSignUp = async (email: string, password: string, displayName: string, role: AppRole) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const session = await signUpWithPassword(email, password, displayName, role);
+      if (session) {
+        handleAuthProfile(session);
+        addToast(`Bem-vindo, ${session.displayName}!`, 'success');
+      } else {
+        setAuthError('Cadastro criado. Confirme seu email antes de entrar.');
+      }
+    } catch (error) {
+      console.error(error);
+      setAuthError('Nao foi possivel criar o acesso.');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleSubscribe = (codeInput: string): boolean => {
@@ -690,8 +780,16 @@ const App: React.FC = () => {
     setClientModalOpen(true);
   };
   
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if(window.confirm("Deseja sair?")) {
+       if (isSupabaseConfigured) {
+         try {
+           await signOutAuth();
+         } catch (error) {
+           console.error(error);
+         }
+       }
+       setAuthSession(null);
        setUserProfile(null);
     }
   }
@@ -738,6 +836,31 @@ const App: React.FC = () => {
           appointments={appointments}
           userProfile={userProfile}
           onCreateAppointment={handleCreatePublicAppointment}
+        />
+      </>
+    );
+  }
+
+  if (isAuthLoading) {
+    return (
+      <>
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <div className="min-h-screen flex items-center justify-center bg-transparent text-gray-300">
+          Validando sessao...
+        </div>
+      </>
+    );
+  }
+
+  if (isSupabaseConfigured && !canAccessInternalPanel(authSession, true)) {
+    return (
+      <>
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <AuthScreen
+          onSignIn={handleAuthSignIn}
+          onSignUp={handleAuthSignUp}
+          loading={isAuthLoading}
+          error={authError}
         />
       </>
     );
