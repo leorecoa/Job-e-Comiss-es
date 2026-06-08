@@ -20,6 +20,7 @@ import { TourOverlay, TourStep } from './components/TourOverlay';
 import { ReportModal } from './components/ReportModal';
 import { DashboardCharts } from './components/DashboardCharts';
 import { isSupabaseConfigured } from './lib/supabase';
+import { BarberDashboard } from './components/BarberDashboard';
 import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { listBarbers } from './services/barberRepository';
 import { listServices } from './services/serviceRepository';
@@ -274,11 +275,7 @@ const App: React.FC = () => {
       setAppointmentsLoading(true);
       setAppointmentsError(null);
       try {
-        const barberIdForAppointments = authSession?.role === 'barber' && authSession.barberId
-          ? authSession.barberId
-          : undefined;
-
-        const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([
+        const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([ //
           isPublicBookingRoute ? listPublicAppointmentSlots() : listInternalAppointments(),
           listBarbers(),
           listServices()
@@ -584,7 +581,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const savedAppointment = editingId
+      const savedAppointment = editingId //
         ? await updateAppointmentRecord(editingId, appointment)
         : await createAppointmentRecord(appointment, appointments);
 
@@ -606,6 +603,67 @@ const App: React.FC = () => {
     }
   };
 
+  // Function for barber to create appointments
+  const handleCreateBarberAppointment = async (appointment: Appointment) => {
+    if (hasAppointmentConflict(appointments, appointment)) {
+      addToast('Horario indisponivel para este barbeiro.', 'error');
+      return;
+    }
+
+    try {
+      const savedAppointment = await createAppointmentRecord(appointment, appointments);
+
+      setAppointments(prev => [savedAppointment, ...prev]);
+      setSelectedDate(getAppointmentDateInput(savedAppointment));
+      setSelectedScheduleBarber(savedAppointment.barberName);
+
+      addToast('Agendamento criado!', 'success');
+    } catch (error) {
+      console.error(error);
+      addToast('Erro ao salvar agendamento.', 'error');
+    }
+  };
+
+  // Function for barber to update appointments with a patch
+  const handleUpdateAppointmentPatch = async (
+    id: string,
+    patch: Partial<Appointment>
+  ) => {
+    const currentAppointment = appointments.find((appointment) => appointment.id === id);
+
+    if (!currentAppointment) {
+      addToast('Agendamento nao encontrado.', 'error');
+      return;
+    }
+
+    const updatedAppointment: Appointment = {
+      ...currentAppointment,
+      ...patch,
+      updatedAt: patch.updatedAt || new Date().toISOString()
+    };
+
+    let persistencePatch: Partial<Appointment> = {
+      ...patch,
+      updatedAt: updatedAppointment.updatedAt
+    };
+
+    let createdFinancialRecord = false;
+
+    if (updatedAppointment.status === 'completed' && !currentAppointment.financialRecordId) {
+      const result = completeAppointmentFinancialRecord(updatedAppointment, clients, settings, generateId);
+      createdFinancialRecord = result.created;
+      setClients(result.clients);
+
+      if (createdFinancialRecord) {
+        persistencePatch = { ...persistencePatch, financialRecordId: result.clients[0]?.id };
+      }
+    }
+
+    await updateAppointmentRecord(id, persistencePatch);
+    setAppointments(prev => prev.map(item => item.id === id ? updatedAppointment : item));
+    addToast('Agendamento atualizado!', 'success');
+  };
+
   const handleCreatePublicAppointment = async (appointment: Appointment) => {
     if (hasAppointmentConflict(appointments, appointment)) {
       addToast('Horario indisponivel para este barbeiro.', 'error');
@@ -613,7 +671,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const savedAppointment = await createAppointmentRecord(appointment, appointments);
+      const savedAppointment = await createAppointmentRecord(appointment, appointments); //
       setAppointments(prev => [savedAppointment, ...prev]);
     } catch (error) {
       console.error(error);
@@ -651,7 +709,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const savedAppointment = await updateAppointmentRecord(appointment.id, patch);
+      const savedAppointment = await updateAppointmentRecord(appointment.id, patch); //
       setAppointments(prev => prev.map(item => item.id === appointment.id ? savedAppointment : item));
 
       if (status === 'completed') {
@@ -850,6 +908,7 @@ const App: React.FC = () => {
     );
   }
 
+  // If authenticated and role is barber, show BarberDashboard
   if (isAuthLoading) {
     return (
       <>
@@ -875,6 +934,24 @@ const App: React.FC = () => {
     );
   }
 
+  if (authSession?.role === 'barber') {
+    return (
+      <>
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <BarberDashboard
+          authSession={authSession}
+          appointments={appointments}
+          settings={settings}
+          onCreateAppointment={handleCreateBarberAppointment}
+          onUpdateAppointment={handleUpdateAppointmentPatch}
+          onCancelAppointment={handleCancelAppointment}
+          addToast={addToast}
+        />
+      </>
+    );
+  }
+
+  // If not authenticated (local storage mode) or trial expired, show respective screens
   if (!userProfile) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><LoginScreen onLogin={handleLogin} /></>;
   if (trialStatus.isExpired) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><PaywallScreen onSubscribe={handleSubscribe} daysUsed={trialStatus.daysUsed} expirationDate={trialStatus.expirationDate} /></>;
 
