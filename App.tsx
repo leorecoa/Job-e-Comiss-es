@@ -477,7 +477,8 @@ const App: React.FC = () => {
       email: session.email,
       startDate: prev?.startDate || Date.now(), // Preserve existing startDate if available
       isPro: true,
-      planType: session.role === 'owner' ? 'admin_life' : 'vip_monthly'
+      planType: session.role === 'owner' ? 'admin_life' : 'vip_monthly',
+      barberId: session.barberId, // Propagate barberId from AuthSession to UserProfile
     }));
   };
 

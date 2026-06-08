@@ -9,12 +9,14 @@ export type AuthSession = {
   email: string;
   role: AppRole;
   displayName: string;
+  barberId?: string;
 };
 
 export type ProfileRow = {
   id: string;
   display_name: string | null;
   role: AppRole | string;
+  barber_id: string | null;
 };
 
 export const normalizeRole = (role: unknown): AppRole => {
@@ -36,7 +38,8 @@ export const mapAuthSession = (
       profile?.display_name ||
       user.user_metadata?.display_name ||
       user.email.split('@')[0]
-    )
+    ),
+    barberId: profile?.barber_id || undefined,
   };
 };
 
@@ -166,7 +169,7 @@ export const getProfile = async (userId: string): Promise<ProfileRow | null> => 
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,display_name,role')
+    .select('id,display_name,role,barber_id')
     .eq('id', userId)
     .maybeSingle();
 
@@ -181,12 +184,13 @@ export const upsertProfile = async (
   role: AppRole
 ): Promise<ProfileRow> => {
   if (!isSupabaseConfigured || !supabase) {
-    return {
-      id: userId,
-      display_name: displayName,
-      role
-    };
-  }
+  return {
+    id: userId,
+    display_name: displayName,
+    role,
+    barber_id: null
+  };
+}
 
   const authenticatedUserId = await getAuthenticatedUserId();
 
@@ -206,12 +210,11 @@ export const upsertProfile = async (
       id: userId,
       display_name: displayName,
       role: safeRole
-    }, { onConflict: 'id' })
-    .select('id,display_name,role')
+    }, { onConflict: 'id' }) // upsert does not take barber_id as an argument in this context, as it's not part of signup.
+    .select('id,display_name,role,barber_id')
     .single();
 
   if (error) throw error;
 
   return data as ProfileRow;
 };
-

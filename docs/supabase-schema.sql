@@ -72,6 +72,7 @@ create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   role text not null default 'barber' check (role in ('owner', 'barber')),
+  barber_id uuid references barbers(id),
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

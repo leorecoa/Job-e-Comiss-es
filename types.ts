@@ -44,6 +44,7 @@ export interface Appointment {
   barberId?: string;
   serviceId?: string;
   financialRecordId?: string;
+  commissionRate?: number; // Added to preserve the commission rate at the time of booking
   clientName: string;
   clientPhone?: string;
   barberName: string;
@@ -124,6 +125,7 @@ export interface UserProfile {
   startDate: number;
   isPro: boolean;
   planType: PlanType;
+  barberId?: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
