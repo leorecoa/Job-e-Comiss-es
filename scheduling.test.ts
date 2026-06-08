@@ -5,6 +5,7 @@ import {
   completeAppointmentFinancialRecord,
   createPublicAppointment,
   getAvailableTimeSlots,
+  getPublicBookingWorkdayForDate,
   hasAppointmentConflict,
   TimeSlot,
   validatePublicBookingInput
@@ -12,6 +13,8 @@ import {
 
 const makeAppointment = (overrides: Partial<Appointment> = {}): Appointment => ({
   id: 'appointment-1',
+  barberId: 'barber-1',
+  serviceId: 'service-1',
   clientName: 'Joao',
   clientPhone: '(11) 99999-0000',
   barberName: 'Carlos',
@@ -53,11 +56,63 @@ describe('hasAppointmentConflict', () => {
     expect(hasAppointmentConflict([existing], candidate)).toBe(false);
   });
 
-  it('does not block different barbers', () => {
-    const existing = makeAppointment();
-    const candidate = makeAppointment({ id: 'appointment-2', barberName: 'Marcos' });
+  it('does not block different barbers by name when barberId is missing', () => {
+    const existing = makeAppointment({ barberId: undefined });
+    const candidate = makeAppointment({
+      id: 'appointment-2',
+      barberId: undefined,
+      barberName: 'Marcos'
+    });
 
     expect(hasAppointmentConflict([existing], candidate)).toBe(false);
+  });
+
+  it('detects conflict when barberId is the same', () => {
+    const existing = makeAppointment({
+      id: 'appointment-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos'
+    });
+
+    const candidate = makeAppointment({
+      id: 'appointment-2',
+      barberId: 'barber-1',
+      barberName: 'Carlos'
+    });
+
+    expect(hasAppointmentConflict([existing], candidate)).toBe(true);
+  });
+
+  it('does not detect conflict when barberName is the same but barberId is different', () => {
+    const existing = makeAppointment({
+      id: 'appointment-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos'
+    });
+
+    const candidate = makeAppointment({
+      id: 'appointment-2',
+      barberId: 'barber-2',
+      barberName: 'Carlos'
+    });
+
+    expect(hasAppointmentConflict([existing], candidate)).toBe(false);
+  });
+
+  it('falls back to barberName when barberId is missing', () => {
+    const existing = makeAppointment({
+      id: 'appointment-1',
+      barberId: undefined,
+      barberName: 'Carlos'
+    });
+
+    const candidate = makeAppointment({
+      id: 'appointment-2',
+      barberId: undefined,
+      barberName: 'Carlos'
+    });
+
+    expect(hasAppointmentConflict([existing], candidate)).toBe(true);
   });
 
   it('ignores cancelled appointments', () => {
@@ -116,12 +171,16 @@ describe('getAvailableTimeSlots', () => {
   it('marks occupied slots unavailable', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-10',
+      barberId: 'barber-1',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
-      appointments: [makeAppointment({
-        startAt: new Date(2026, 5, 10, 9, 30).toISOString(),
-        endAt: new Date(2026, 5, 10, 10, 0).toISOString()
-      })],
+      appointments: [
+        makeAppointment({
+          barberId: 'barber-1',
+          startAt: new Date(2026, 5, 10, 9, 30).toISOString(),
+          endAt: new Date(2026, 5, 10, 10, 0).toISOString()
+        })
+      ],
       workdayStart: '09:00',
       workdayEnd: '10:30',
       slotStepMinutes: 30,
@@ -136,11 +195,13 @@ describe('getAvailableTimeSlots', () => {
       date: '2026-06-10',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
-      appointments: [makeAppointment({
-        status: 'cancelled',
-        startAt: new Date(2026, 5, 10, 9, 30).toISOString(),
-        endAt: new Date(2026, 5, 10, 10, 0).toISOString()
-      })],
+      appointments: [
+        makeAppointment({
+          status: 'cancelled',
+          startAt: new Date(2026, 5, 10, 9, 30).toISOString(),
+          endAt: new Date(2026, 5, 10, 10, 0).toISOString()
+        })
+      ],
       workdayStart: '09:00',
       workdayEnd: '10:30',
       slotStepMinutes: 30,
@@ -150,16 +211,42 @@ describe('getAvailableTimeSlots', () => {
     expect(slots.find(slot => slot.label === '09:30')?.available).toBe(true);
   });
 
-  it('does not block slots for another barber', () => {
+  it('does not block slots for another barber by barberId', () => {
+    const slots = getAvailableTimeSlots({
+      date: '2026-06-10',
+      barberId: 'barber-2',
+      barberName: 'Carlos',
+      serviceDurationMinutes: 30,
+      appointments: [
+        makeAppointment({
+          barberId: 'barber-1',
+          barberName: 'Carlos',
+          startAt: new Date(2026, 5, 10, 9, 30).toISOString(),
+          endAt: new Date(2026, 5, 10, 10, 0).toISOString()
+        })
+      ],
+      workdayStart: '09:00',
+      workdayEnd: '10:30',
+      slotStepMinutes: 30,
+      now: new Date(2026, 5, 9, 8, 0)
+    });
+
+    expect(slots.find(slot => slot.label === '09:30')?.available).toBe(true);
+  });
+
+  it('does not block slots for another barber by name fallback', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-10',
       barberName: 'Marcos',
       serviceDurationMinutes: 30,
-      appointments: [makeAppointment({
-        barberName: 'Carlos',
-        startAt: new Date(2026, 5, 10, 9, 30).toISOString(),
-        endAt: new Date(2026, 5, 10, 10, 0).toISOString()
-      })],
+      appointments: [
+        makeAppointment({
+          barberId: undefined,
+          barberName: 'Carlos',
+          startAt: new Date(2026, 5, 10, 9, 30).toISOString(),
+          endAt: new Date(2026, 5, 10, 10, 0).toISOString()
+        })
+      ],
       workdayStart: '09:00',
       workdayEnd: '10:30',
       slotStepMinutes: 30,
@@ -174,10 +261,12 @@ describe('getAvailableTimeSlots', () => {
       date: '2026-06-10',
       barberName: 'Carlos',
       serviceDurationMinutes: 60,
-      appointments: [makeAppointment({
-        startAt: new Date(2026, 5, 10, 10, 30).toISOString(),
-        endAt: new Date(2026, 5, 10, 11, 0).toISOString()
-      })],
+      appointments: [
+        makeAppointment({
+          startAt: new Date(2026, 5, 10, 10, 30).toISOString(),
+          endAt: new Date(2026, 5, 10, 11, 0).toISOString()
+        })
+      ],
       workdayStart: '10:00',
       workdayEnd: '12:00',
       slotStepMinutes: 30,
@@ -206,6 +295,56 @@ describe('getAvailableTimeSlots', () => {
   });
 });
 
+describe('public booking business hours', () => {
+  it('closes on monday', () => {
+    expect(getPublicBookingWorkdayForDate('2026-06-08')).toBeNull();
+  });
+
+  it('opens from 08:00 to 20:00 from tuesday to saturday', () => {
+    expect(getPublicBookingWorkdayForDate('2026-06-09')).toEqual({
+      start: '08:00',
+      end: '20:00'
+    });
+
+    expect(getPublicBookingWorkdayForDate('2026-06-13')).toEqual({
+      start: '08:00',
+      end: '20:00'
+    });
+  });
+
+  it('opens from 10:00 to 18:00 on sunday', () => {
+    expect(getPublicBookingWorkdayForDate('2026-06-14')).toEqual({
+      start: '10:00',
+      end: '18:00'
+    });
+  });
+
+  it('does not generate slots on monday', () => {
+    const slots = getAvailableTimeSlots({
+      date: '2026-06-08',
+      barberName: 'Carlos',
+      serviceDurationMinutes: 30,
+      appointments: [],
+      now: new Date(2026, 5, 7, 8, 0)
+    });
+
+    expect(slots).toEqual([]);
+  });
+
+  it('generates sunday slots between 10:00 and 18:00', () => {
+    const slots = getAvailableTimeSlots({
+      date: '2026-06-14',
+      barberName: 'Carlos',
+      serviceDurationMinutes: 30,
+      appointments: [],
+      now: new Date(2026, 5, 13, 8, 0)
+    });
+
+    expect(slots[0]?.label).toBe('10:00');
+    expect(slots.at(-1)?.label).toBe('17:30');
+  });
+});
+
 describe('public booking helpers', () => {
   const slot: TimeSlot = {
     startAt: new Date(2026, 5, 10, 9, 0).toISOString(),
@@ -218,6 +357,7 @@ describe('public booking helpers', () => {
     const appointment = createPublicAppointment({
       clientName: ' Maria ',
       clientPhone: '(85) 98888-7777',
+      barberId: 'barber-1',
       barberName: 'Carlos',
       service: settings.services[0],
       selectedSlot: slot,
@@ -225,6 +365,8 @@ describe('public booking helpers', () => {
     }, 'public-1', new Date(2026, 5, 9, 8, 0));
 
     expect(appointment.id).toBe('public-1');
+    expect(appointment.barberId).toBe('barber-1');
+    expect(appointment.serviceId).toBe(settings.services[0].id);
     expect(appointment.status).toBe('scheduled');
     expect(appointment.clientName).toBe('Maria');
     expect(appointment.clientPhone).toBe('85988887777');
