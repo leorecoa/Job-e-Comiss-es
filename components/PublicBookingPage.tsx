@@ -133,16 +133,32 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     () => services.find((service) => service.id === serviceId),
     [services, serviceId]
   );
+  const selectedWorkday = useMemo(
+  () => getPublicBookingWorkdayForDate(date),
+  [date]
+);
 
+const workdayLabel = selectedWorkday
+  ? `${selectedWorkday.start} - ${selectedWorkday.end}`
+  : 'Fechado';
+
+const workdayDescription = selectedWorkday
+  ? 'Expediente do dia selecionado'
+  : 'Sem atendimento neste dia';
+
+const emptySlotsMessage = selectedWorkday
+  ? 'Nenhum horario disponivel para esta combinacao.'
+  : 'A barbearia nao atende neste dia.';
+  
   const availableSlots = useMemo(() => {
     if (!selectedBarber || !selectedService || !date) return [];
 
-    return getAvailableTimeSlots({
-      date,
-      barberName: selectedBarber.name,
-      serviceDurationMinutes: selectedService.durationMinutes,
-      appointments
-    }).filter((slot) => slot.available);
+   return getAvailableTimeSlots({
+  date,
+  barberName: selectedBarber.name,
+  serviceDurationMinutes: selectedService.durationMinutes,
+  appointments
+}).filter((slot) => slot.available);
   }, [appointments, date, selectedBarber, selectedService]);
 
   const handleBarberChange = (value: string) => {
@@ -159,14 +175,14 @@ const handleSubmit = async (event: React.FormEvent) => {
   event.preventDefault();
 
   const input: PublicBookingInput = {
-    clientName,
-    clientPhone,
-    barberName: selectedBarber?.name || '',
-    service: selectedService,
-    selectedSlot,
-    notes
-  };
-
+  clientName,
+  clientPhone,
+  barberId: selectedBarber?.id,
+  barberName: selectedBarber?.name || '',
+  service: selectedService,
+  selectedSlot,
+  notes
+};
   const validation = validatePublicBookingInput(input, appointments);
 
   if (!validation.valid) {
@@ -176,19 +192,7 @@ const handleSubmit = async (event: React.FormEvent) => {
 
   const appointment = createPublicAppointment(input, generateId());
 
-  if (selectedBarber) {
-    appointment.barberName = selectedBarber.name;
-
-    if (selectedBarber.id) {
-      appointment.barberId = selectedBarber.id;
-    }
-  }
-
-  if (selectedService) {
-    appointment.serviceId = selectedService.id;
-    appointment.serviceType = selectedService.name;
-    appointment.serviceValue = selectedService.price;
-  }
+  
 
   setSubmitting(true);
 
@@ -280,8 +284,8 @@ const handleSubmit = async (event: React.FormEvent) => {
             <div className="grid xs:grid-cols-2 gap-3">
               <div className="bg-gray-900/50 border border-gray-700 rounded-xl p-4">
                 <Clock className="text-blue-300 mb-2" size={20} />
-                <p className="text-white font-bold text-sm">09:00 - 18:00</p>
-                <p className="text-gray-500 text-xs">Expediente padrao</p>
+                <p className="text-white font-bold text-sm">{workdayLabel}</p>
+<p className="text-gray-500 text-xs">{workdayDescription}</p>
               </div>
               <div className="bg-gray-900/50 border border-gray-700 rounded-xl p-4">
                 <Scissors className="text-gold-400 mb-2" size={20} />
@@ -347,7 +351,9 @@ const handleSubmit = async (event: React.FormEvent) => {
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-2">Horarios disponiveis</label>
               {availableSlots.length === 0 ? (
-                <p className="text-sm text-gray-500 bg-gray-900/50 border border-gray-700 rounded-xl p-4">Nenhum horario disponivel para esta combinacao.</p>
+                <p className="text-sm text-gray-500 bg-gray-900/50 border border-gray-700 rounded-xl p-4">
+  {emptySlotsMessage}
+</p>
               ) : (
                 <div className="grid grid-cols-3 xs:grid-cols-4 md:grid-cols-5 gap-2">
                   {availableSlots.map(slot => (
