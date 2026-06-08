@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, CheckCircle, Clock, MessageCircle, Scissors } from 'lucide-react';
-import { Appointment, AppSettings, Service, UserProfile } from '../types';
+import { Appointment, AppSettings, BarberOption, Service, UserProfile } from '../types';
 import {
   buildWhatsAppLink,
   createPublicAppointment,
@@ -18,12 +18,73 @@ interface PublicBookingPageProps {
   onCreateAppointment: (appointment: Appointment) => Promise<void> | void;
 }
 
-const getTodayString = () => {
+type PublicBarberOption = {
+  value: string;
+  id?: string;
+  name: string;
+};
+
+const getTodayString = (): string => {
   const d = new Date();
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
+
   return `${year}-${month}-${day}`;
+};
+
+const isBarberOption = (barber: unknown): barber is BarberOption => {
+  return (
+    typeof barber === 'object' &&
+    barber !== null &&
+    'id' in barber &&
+    'name' in barber
+  );
+};
+
+const normalizeBarberOptions = (
+  barbers: Array<BarberOption | string> = [],
+  ownerName?: string
+): PublicBarberOption[] => {
+  const byValue = new Map<string, PublicBarberOption>();
+
+  barbers.forEach((barber) => {
+    if (typeof barber === 'string') {
+      const name = barber.trim();
+      if (!name) return;
+
+      byValue.set(`name:${name}`, {
+        value: `name:${name}`,
+        name
+      });
+
+      return;
+    }
+
+    if (isBarberOption(barber)) {
+      const id = barber.id?.trim();
+      const name = barber.name?.trim();
+
+      if (!name) return;
+
+      byValue.set(id ? `id:${id}` : `name:${name}`, {
+        value: id ? `id:${id}` : `name:${name}`,
+        id: id || undefined,
+        name
+      });
+    }
+  });
+
+  const owner = ownerName?.trim();
+
+  if (owner && byValue.size === 0) {
+    byValue.set(`name:${owner}`, {
+      value: `name:${owner}`,
+      name: owner
+    });
+  }
+
+  return Array.from(byValue.values());
 };
 
 export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
@@ -32,18 +93,15 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   userProfile,
   onCreateAppointment
 }) => {
-  const barberOptions = useMemo(() => {
-    const names = new Set<string>();
-    (settings.barbers || []).forEach(barber => {
-      if (barber?.trim()) names.add(barber.trim());
-    });
-    if (userProfile?.ownerName?.trim()) names.add(userProfile.ownerName.trim());
-    return Array.from(names);
-  }, [settings.barbers, userProfile?.ownerName]);
+  const barberOptions = useMemo(
+    () => normalizeBarberOptions(settings.barbers || [], userProfile?.ownerName),
+    [settings.barbers, userProfile?.ownerName]
+  );
 
   const services = settings.services || [];
-  const [barberName, setBarberName] = useState(barberOptions[0] || '');
-  const [serviceId, setServiceId] = useState(services[0]?.id || '');
+
+  const [selectedBarberValue, setSelectedBarberValue] = useState('');
+  const [serviceId, setServiceId] = useState('');
   const [date, setDate] = useState(getTodayString());
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [clientName, setClientName] = useState('');
@@ -53,53 +111,96 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   const [isSubmitting, setSubmitting] = useState(false);
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
 
-  const selectedService = services.find(service => service.id === serviceId);
+  useEffect(() => {
+    if (!selectedBarberValue && barberOptions[0]) {
+      setSelectedBarberValue(barberOptions[0].value);
+    }
+  }, [barberOptions, selectedBarberValue]);
+
+  useEffect(() => {
+    if (!serviceId && services[0]) {
+      setServiceId(services[0].id);
+    }
+  }, [services, serviceId]);
+
+  const selectedBarber = useMemo(
+    () => barberOptions.find((barber) => barber.value === selectedBarberValue) || null,
+    [barberOptions, selectedBarberValue]
+  );
+
+  const selectedService = useMemo(
+    () => services.find((service) => service.id === serviceId),
+    [services, serviceId]
+  );
 
   const availableSlots = useMemo(() => {
-    if (!barberName || !selectedService || !date) return [];
+    if (!selectedBarber || !selectedService || !date) return [];
 
     return getAvailableTimeSlots({
       date,
-      barberName,
+      barberName: selectedBarber.name,
       serviceDurationMinutes: selectedService.durationMinutes,
       appointments
-    }).filter(slot => slot.available);
-  }, [appointments, barberName, date, selectedService]);
+    }).filter((slot) => slot.available);
+  }, [appointments, date, selectedBarber, selectedService]);
+
+  const handleBarberChange = (value: string) => {
+    setSelectedBarberValue(value);
+    setSelectedSlot(null);
+  };
 
   const handleServiceChange = (id: string) => {
     setServiceId(id);
     setSelectedSlot(null);
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const input: PublicBookingInput = {
-      clientName,
-      clientPhone,
-      barberName,
-      service: selectedService,
-      selectedSlot,
-      notes
-    };
+const handleSubmit = async (event: React.FormEvent) => {
+  event.preventDefault();
 
-    const validation = validatePublicBookingInput(input, appointments);
-    if (!validation.valid) {
-      setErrors(validation.errors);
-      return;
-    }
-
-    const appointment = createPublicAppointment(input, generateId());
-    setSubmitting(true);
-    try {
-      await onCreateAppointment(appointment);
-      setCreatedAppointment(appointment);
-      setErrors([]);
-    } catch {
-      setErrors(['Nao foi possivel confirmar este horario. Tente novamente.']);
-    } finally {
-      setSubmitting(false);
-    }
+  const input: PublicBookingInput = {
+    clientName,
+    clientPhone,
+    barberName: selectedBarber?.name || '',
+    service: selectedService,
+    selectedSlot,
+    notes
   };
+
+  const validation = validatePublicBookingInput(input, appointments);
+
+  if (!validation.valid) {
+    setErrors(validation.errors);
+    return;
+  }
+
+  const appointment = createPublicAppointment(input, generateId());
+
+  if (selectedBarber) {
+    appointment.barberName = selectedBarber.name;
+
+    if (selectedBarber.id) {
+      appointment.barberId = selectedBarber.id;
+    }
+  }
+
+  if (selectedService) {
+    appointment.serviceId = selectedService.id;
+    appointment.serviceType = selectedService.name;
+    appointment.serviceValue = selectedService.price;
+  }
+
+  setSubmitting(true);
+
+  try {
+    await onCreateAppointment(appointment);
+    setCreatedAppointment(appointment);
+    setErrors([]);
+  } catch {
+    setErrors(['Nao foi possivel confirmar este horario. Tente novamente.']);
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const handleNewBooking = () => {
     setCreatedAppointment(null);
@@ -205,13 +306,31 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1.5">Barbeiro</label>
-                <select required value={barberName} onChange={(e) => { setBarberName(e.target.value); setSelectedSlot(null); }} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500">
-                  {barberOptions.map(barber => <option key={barber} value={barber}>{barber}</option>)}
-                </select>
+                <select
+  id="public-booking-barber"
+  name="barberId"
+  required
+  value={selectedBarber?.value || ''}
+  onChange={(e) => handleBarberChange(e.target.value)}
+  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+>
+  <option value="" disabled>
+    Selecione um barbeiro
+  </option>
+
+  {barberOptions.map((barber) => (
+    <option key={barber.value} value={barber.value}>
+      {barber.name}
+    </option>
+  ))}
+</select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1.5">Servico</label>
-                <select required value={serviceId} onChange={(e) => handleServiceChange(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500">
+                <select required
+                  value={selectedService?.id || ''}
+                  onChange={(e) => handleServiceChange(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500">
                   {services.map((service: Service) => (
                     <option key={service.id} value={service.id}>{service.name} · {formatCurrency(service.price)}</option>
                   ))}
@@ -264,7 +383,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
             </div>
 
-            <button type="submit" disabled={barberOptions.length === 0 || !selectedSlot || isSubmitting} className="w-full bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg shadow-gold-500/20">
+            <button type="submit" disabled={!selectedBarber || !selectedService || !selectedSlot || isSubmitting} className="w-full bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg shadow-gold-500/20">
               {isSubmitting ? 'Confirmando...' : 'Agendar horario'}
             </button>
           </form>

@@ -18,7 +18,7 @@ export const AddValeModal: React.FC<AddValeModalProps> = ({ isOpen, onClose, onA
 
   useEffect(() => {
     if (isOpen) {
-      setBarber(settings?.barbers && settings.barbers.length > 0 ? settings.barbers[0] : '');
+      setBarber(settings?.barbers && settings.barbers.length > 0 ? settings.barbers[0].name : '');
       setValue('');
       setDescription('');
       setFormError('');
@@ -65,9 +65,11 @@ export const AddValeModal: React.FC<AddValeModalProps> = ({ isOpen, onClose, onA
                         onChange={(e) => setBarber(e.target.value)}
                         className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-red-500 outline-none appearance-none"
                     >
-                        {settings.barbers.map(b => (
-                            <option key={b} value={b}>{b}</option>
-                        ))}
+                       {settings.barbers.map((barberOption) => (
+  <option key={barberOption.id} value={barberOption.name}>
+    {barberOption.name}
+  </option>
+))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={16} />
                  </div>

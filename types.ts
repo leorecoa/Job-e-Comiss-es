@@ -12,6 +12,11 @@ export enum ClientType {
   RETURNING = 'Da Casa'
 }
 
+export type BarberOption = {
+  id: string;
+  name: string;
+};
+
 export interface ProductItem {
   id: string;
   name: string;
@@ -106,7 +111,7 @@ export interface AppSettings {
   priceProduct: number; // Default/Fallback price
   products: ProductItem[]; // List of specific products
   commissionRate: number; // Service Commission Percentage (e.g., 50)
-  barbers: string[]; // List of registered barbers
+  barbers: BarberOption[]; // List of registered barbers
   services: Service[];
 }
 
@@ -130,7 +135,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   priceProduct: 0,
   products: [],
   commissionRate: 50,
-  barbers: [],
+  barbers: [], // Will be updated to BarberOption[]
   services: [
     { id: 'cut', name: ServiceType.CUT, price: 50, durationMinutes: 30 },
     { id: 'beard', name: ServiceType.BEARD, price: 30, durationMinutes: 20 },
