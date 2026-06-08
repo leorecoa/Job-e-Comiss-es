@@ -1,9 +1,15 @@
 import { Appointment, AppSettings, Client, ClientType, Service, ServiceType } from './types';
 
 export const APPOINTMENT_STORAGE_KEY = 'barbearia_appointments';
-export const PUBLIC_BOOKING_WORKDAY_START = '09:00';
-export const PUBLIC_BOOKING_WORKDAY_END = '18:00';
+
+export const PUBLIC_BOOKING_WEEKDAY_START = '08:00';
+export const PUBLIC_BOOKING_WEEKDAY_END = '20:00';
+export const PUBLIC_BOOKING_SUNDAY_START = '10:00';
+export const PUBLIC_BOOKING_SUNDAY_END = '18:00';
 export const PUBLIC_BOOKING_SLOT_STEP_MINUTES = 30;
+
+export const PUBLIC_BOOKING_WORKDAY_START = PUBLIC_BOOKING_WEEKDAY_START;
+export const PUBLIC_BOOKING_WORKDAY_END = PUBLIC_BOOKING_WEEKDAY_END;
 
 export type TimeSlot = {
   startAt: string;
@@ -15,6 +21,7 @@ export type TimeSlot = {
 export type PublicBookingInput = {
   clientName: string;
   clientPhone: string;
+  barberId?: string;
   barberName: string;
   service?: Service;
   selectedSlot?: TimeSlot | null;
@@ -26,6 +33,11 @@ export type PublicBookingValidationResult = {
   errors: string[];
 };
 
+export type PublicBookingWorkday = {
+  start: string;
+  end: string;
+};
+
 export const normalizePhoneDigits = (phone?: string): string => {
   return (phone || '').replace(/\D/g, '');
 };
@@ -34,18 +46,21 @@ export const toLocalDateInputValue = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
+
   return `${year}-${month}-${day}`;
 };
 
 export const toLocalTimeInputValue = (date: Date): string => {
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
+
   return `${hours}:${minutes}`;
 };
 
 export const buildLocalDateTimeIso = (dateInput: string, timeInput: string): string => {
   const [year, month, day] = dateInput.split('-').map(Number);
   const [hours, minutes] = timeInput.split(':').map(Number);
+
   return new Date(year, month - 1, day, hours, minutes || 0, 0, 0).toISOString();
 };
 
@@ -55,40 +70,88 @@ export const addMinutesIso = (isoDate: string, minutes: number): string => {
 
 const getMinutesFromTimeInput = (timeInput: string): number => {
   const [hours, minutes] = timeInput.split(':').map(Number);
+
   return (hours || 0) * 60 + (minutes || 0);
 };
 
 const getTimeInputFromMinutes = (totalMinutes: number): string => {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
+
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+const getLocalDayOfWeekFromDateInput = (dateInput: string): number | null => {
+  const [year, month, day] = dateInput.split('-').map(Number);
+
+  if (!year || !month || !day) return null;
+
+  return new Date(year, month - 1, day).getDay();
+};
+
+export const getPublicBookingWorkdayForDate = (dateInput: string): PublicBookingWorkday | null => {
+  const dayOfWeek = getLocalDayOfWeekFromDateInput(dateInput);
+
+  if (dayOfWeek === null) return null;
+
+  // 0 = domingo
+  if (dayOfWeek === 0) {
+    return {
+      start: PUBLIC_BOOKING_SUNDAY_START,
+      end: PUBLIC_BOOKING_SUNDAY_END
+    };
+  }
+
+  // 1 = segunda-feira
+  if (dayOfWeek === 1) {
+    return null;
+  }
+
+  // 2 a 6 = terça-feira a sábado
+  return {
+    start: PUBLIC_BOOKING_WEEKDAY_START,
+    end: PUBLIC_BOOKING_WEEKDAY_END
+  };
 };
 
 export const getAppointmentDateInput = (appointment: Appointment): string => {
   return toLocalDateInputValue(new Date(appointment.startAt));
 };
 
+const isSameBarberForConflict = (
+  existing: Pick<Appointment, 'barberId' | 'barberName'>,
+  candidate: Pick<Appointment, 'barberId' | 'barberName'>
+): boolean => {
+  if (existing.barberId && candidate.barberId) {
+    return existing.barberId === candidate.barberId;
+  }
+
+  return existing.barberName === candidate.barberName;
+};
+
 export const hasAppointmentConflict = (
   appointments: Appointment[],
-  candidate: Pick<Appointment, 'barberName' | 'startAt' | 'endAt'>,
+  candidate: Pick<Appointment, 'barberId' | 'barberName' | 'startAt' | 'endAt'>,
   editingAppointmentId?: string
 ): boolean => {
   const newStart = new Date(candidate.startAt).getTime();
   const newEnd = new Date(candidate.endAt).getTime();
 
-  return appointments.some(existing => {
+  return appointments.some((existing) => {
     if (existing.id === editingAppointmentId) return false;
     if (existing.status === 'cancelled') return false;
-    if (existing.barberName !== candidate.barberName) return false;
+    if (!isSameBarberForConflict(existing, candidate)) return false;
 
     const existingStart = new Date(existing.startAt).getTime();
     const existingEnd = new Date(existing.endAt).getTime();
+
     return newStart < existingEnd && newEnd > existingStart;
   });
 };
 
 export const getAvailableTimeSlots = (params: {
   date: string;
+  barberId?: string;
   barberName: string;
   serviceDurationMinutes: number;
   appointments: Appointment[];
@@ -99,22 +162,45 @@ export const getAvailableTimeSlots = (params: {
 }): TimeSlot[] => {
   const {
     date,
+    barberId,
     barberName,
     serviceDurationMinutes,
     appointments,
-    workdayStart = PUBLIC_BOOKING_WORKDAY_START,
-    workdayEnd = PUBLIC_BOOKING_WORKDAY_END,
+    workdayStart,
+    workdayEnd,
     slotStepMinutes = PUBLIC_BOOKING_SLOT_STEP_MINUTES,
     now = new Date()
   } = params;
 
   if (!date || !barberName || serviceDurationMinutes <= 0) return [];
 
-  const startMinutes = getMinutesFromTimeInput(workdayStart);
-  const endMinutes = getMinutesFromTimeInput(workdayEnd);
+  const publicWorkday = getPublicBookingWorkdayForDate(date);
+
+  if (!publicWorkday && (!workdayStart || !workdayEnd)) {
+    return [];
+  }
+
+  const resolvedWorkdayStart = workdayStart || publicWorkday?.start;
+  const resolvedWorkdayEnd = workdayEnd || publicWorkday?.end;
+
+  if (!resolvedWorkdayStart || !resolvedWorkdayEnd) {
+    return [];
+  }
+
+  const startMinutes = getMinutesFromTimeInput(resolvedWorkdayStart);
+  const endMinutes = getMinutesFromTimeInput(resolvedWorkdayEnd);
+
+  if (startMinutes >= endMinutes) {
+    return [];
+  }
+
   const slots: TimeSlot[] = [];
 
-  for (let minutes = startMinutes; minutes + serviceDurationMinutes <= endMinutes; minutes += slotStepMinutes) {
+  for (
+    let minutes = startMinutes;
+    minutes + serviceDurationMinutes <= endMinutes;
+    minutes += slotStepMinutes
+  ) {
     const startAt = buildLocalDateTimeIso(date, getTimeInputFromMinutes(minutes));
     const endAt = addMinutesIso(startAt, serviceDurationMinutes);
     const startDate = new Date(startAt);
@@ -123,7 +209,13 @@ export const getAvailableTimeSlots = (params: {
       continue;
     }
 
-    const available = !hasAppointmentConflict(appointments, { barberName, startAt, endAt });
+    const available = !hasAppointmentConflict(appointments, {
+      barberId,
+      barberName,
+      startAt,
+      endAt
+    });
+
     slots.push({
       startAt,
       endAt,
@@ -150,11 +242,15 @@ export const validatePublicBookingInput = (
 
   if (input.selectedSlot && input.barberName) {
     const hasConflict = hasAppointmentConflict(appointments, {
+      barberId: input.barberId,
       barberName: input.barberName,
       startAt: input.selectedSlot.startAt,
       endAt: input.selectedSlot.endAt
     });
-    if (hasConflict) errors.push('Este horario acabou de ficar indisponivel.');
+
+    if (hasConflict) {
+      errors.push('Este horario acabou de ficar indisponivel.');
+    }
   }
 
   return {
@@ -173,8 +269,11 @@ export const createPublicAppointment = (
   }
 
   const timestamp = now.toISOString();
+
   return {
     id,
+    barberId: input.barberId,
+    serviceId: input.service.id,
     clientName: input.clientName.trim(),
     clientPhone: normalizePhoneDigits(input.clientPhone),
     barberName: input.barberName,
@@ -191,18 +290,24 @@ export const createPublicAppointment = (
 
 export const buildWhatsAppLink = (appointment: Appointment): string | null => {
   const digits = normalizePhoneDigits(appointment.clientPhone);
+
   if (!digits) return null;
 
   const localDate = new Date(appointment.startAt);
   const date = localDate.toLocaleDateString('pt-BR');
-  const time = localDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const time = localDate.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
   const message = `Ola, ${appointment.clientName}. Seu horario com ${appointment.barberName} esta agendado para ${date} as ${time}. Servico: ${appointment.serviceType}.`;
 
   return `https://wa.me/55${digits}?text=${encodeURIComponent(message)}`;
 };
 
 export const serviceNameToServiceType = (serviceName: string): ServiceType => {
-  const service = Object.values(ServiceType).find(value => value === serviceName);
+  const service = Object.values(ServiceType).find((value) => value === serviceName);
+
   return service || ServiceType.OTHER;
 };
 
@@ -212,9 +317,14 @@ export const appointmentToClient = (
   id: string
 ): Client => {
   const serviceType = serviceNameToServiceType(appointment.serviceType);
-  const rate = settings.services.find(service => service.name === appointment.serviceType)?.commissionRate
+  const rate =
+    settings.services.find((service) => service.name === appointment.serviceType)?.commissionRate
     ?? settings.commissionRate;
-  const commissionValue = serviceType === ServiceType.PRODUCT ? 0 : appointment.serviceValue * (rate / 100);
+
+  const commissionValue =
+    serviceType === ServiceType.PRODUCT
+      ? 0
+      : appointment.serviceValue * (rate / 100);
 
   return {
     id,
@@ -240,9 +350,13 @@ export const completeAppointmentFinancialRecord = (
   settings: AppSettings,
   createId: () => string
 ): { clients: Client[]; created: boolean } => {
-  const alreadyExists = clients.some(client => client.appointmentId === appointment.id);
+  const alreadyExists = clients.some((client) => client.appointmentId === appointment.id);
+
   if (alreadyExists) {
-    return { clients, created: false };
+    return {
+      clients,
+      created: false
+    };
   }
 
   return {
