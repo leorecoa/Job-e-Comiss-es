@@ -1,6 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-
-const SETTINGS_STORAGE_KEY = 'barbearia_settings';
+import { BarberOption } from '../types';
 
 type DatabaseBarberRow = {
   id: string;
@@ -8,18 +7,64 @@ type DatabaseBarberRow = {
   active: boolean;
 };
 
-const listLocalBarbers = (): string[] => {
+const LOCAL_BARBERS_STORAGE_KEY = 'gestao-maxima-barbers';
+
+const mapBarberFromDb = (row: DatabaseBarberRow): BarberOption => ({
+  id: row.id,
+  name: row.name
+});
+
+const normalizeLocalBarber = (barber: unknown, index: number): BarberOption | null => {
+  if (typeof barber === 'string') {
+    const name = barber.trim();
+
+    if (!name) return null;
+
+    return {
+      id: `local-barber-${index}`,
+      name
+    };
+  }
+
+  if (
+    typeof barber === 'object' &&
+    barber !== null &&
+    'id' in barber &&
+    'name' in barber
+  ) {
+    const candidate = barber as Partial<BarberOption>;
+    const name = candidate.name?.trim();
+
+    if (!name) return null;
+
+    return {
+      id: candidate.id?.trim() || `local-barber-${index}`,
+      name
+    };
+  }
+
+  return null;
+};
+
+const readLocalBarbers = (): BarberOption[] => {
   try {
-    const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    const settings = saved ? JSON.parse(saved) : {};
-    return Array.isArray(settings.barbers) ? settings.barbers : [];
+    const saved = localStorage.getItem(LOCAL_BARBERS_STORAGE_KEY);
+    const parsed = saved ? JSON.parse(saved) : [];
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map(normalizeLocalBarber)
+      .filter((barber): barber is BarberOption => Boolean(barber));
   } catch {
     return [];
   }
 };
 
-export const listBarbers = async (): Promise<string[]> => {
-  if (!isSupabaseConfigured || !supabase) return listLocalBarbers();
+export const listBarbers = async (): Promise<BarberOption[]> => {
+  if (!isSupabaseConfigured || !supabase) {
+    return readLocalBarbers();
+  }
 
   const { data, error } = await supabase
     .from('barbers')
@@ -28,18 +73,6 @@ export const listBarbers = async (): Promise<string[]> => {
     .order('name', { ascending: true });
 
   if (error) throw error;
-  return ((data || []) as DatabaseBarberRow[]).map(row => row.name);
-};
 
-export const createBarber = async (name: string): Promise<string> => {
-  if (!isSupabaseConfigured || !supabase) return name;
-
-  const { data, error } = await supabase
-    .from('barbers')
-    .insert({ name })
-    .select('name')
-    .single();
-
-  if (error) throw error;
-  return (data as { name: string }).name;
+  return ((data || []) as DatabaseBarberRow[]).map(mapBarberFromDb);
 };

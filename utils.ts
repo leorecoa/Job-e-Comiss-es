@@ -1,5 +1,6 @@
 
 import { Client, ServiceType } from './types';
+import { BarberOption } from './types';
 
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
@@ -167,4 +168,13 @@ export const generateAndDownloadCSV = (
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+};
+
+export const getBarberNameById = (
+  barbers: BarberOption[],
+  barberId?: string
+): string => {
+  if (!barberId) return '';
+
+  return barbers.find((barber) => barber.id === barberId)?.name || '';
 };

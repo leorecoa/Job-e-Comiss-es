@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType, Appointment, AppointmentStatus } from './types';
-import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput } from './utils';
+import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType, Appointment, AppointmentStatus, BarberOption, Service } from './types';
+import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById } from './utils';
 import { APPOINTMENT_STORAGE_KEY, completeAppointmentFinancialRecord, getAppointmentDateInput, hasAppointmentConflict } from './scheduling';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
@@ -53,12 +53,12 @@ import {
 const normalizeSettings = (settings: Partial<AppSettings> | null | undefined): AppSettings => {
   const merged = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   const services = Array.isArray(settings?.services) && settings.services.length > 0
-    ? settings.services
+    ? settings.services.map((service: Service) => ({ ...service, price: Number(service.price) || 0, durationMinutes: Number(service.durationMinutes) || 30 }))
     : DEFAULT_SETTINGS.services;
 
   return {
     ...merged,
-    services: services.map(service => ({
+    services: services.map((service: Service) => ({ // Explicitly type service here
       ...service,
       durationMinutes: Math.max(1, Number(service.durationMinutes) || 30),
       price: Math.max(0, Number(service.price) || 0)
@@ -320,20 +320,22 @@ const App: React.FC = () => {
   // -- Derived State --
   const trialStatus = useMemo(() => {
     if (!userProfile) return { isExpired: false, daysLeft: 7, daysUsed: 0, expirationDate: Date.now() + (7 * 24 * 60 * 60 * 1000) };
-    if (userProfile.isPro) return { isExpired: false, daysLeft: 999, daysUsed: 0, expirationDate: Date.now() + (3650 * 24 * 60 * 60 * 1000) };
-    
+    if (userProfile.isPro) return { isExpired: false, daysLeft: 999, daysUsed: 0, expirationDate: Date.now() + (3650 * 24 * 60 * 60 * 1000) }; // 10 years
+
     const now = Date.now();
     const start = userProfile.startDate;
     const diffTime = now - start;
     const diffDays = diffTime / (1000 * 60 * 60 * 24);
-    
+
     // Calculate exact expiration date
     const expirationDate = start + (TRIAL_DAYS * 24 * 60 * 60 * 1000);
 
     return {
       isExpired: diffDays > TRIAL_DAYS || diffDays < 0,
       daysLeft: Math.max(0, Math.ceil(TRIAL_DAYS - diffDays)),
-      daysUsed: diffDays,
+      // Ensure daysUsed is not negative if startDate is in the future (e.g., due to clock sync issues)
+      daysUsed: Math.max(0, Math.floor(diffDays)),
+
       expirationDate
     };
   }, [userProfile]);
@@ -349,26 +351,24 @@ const App: React.FC = () => {
 
   const barberFilterOptions = useMemo(() => {
     const names = new Set<string>();
-
-    (settings.barbers || []).forEach(barber => {
-      if (barber?.trim()) names.add(barber.trim());
+    (settings.barbers || []).forEach(barber => { // settings.barbers is now BarberOption[]
+      if (barber.name?.trim()) names.add(barber.name.trim());
     });
 
     clients.forEach(client => {
       if (client.barberName?.trim()) names.add(client.barberName.trim());
     });
-
     vales.forEach(vale => {
       if (vale.barberName?.trim()) names.add(vale.barberName.trim());
     });
-
     return ['TODOS', ...Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR'))];
   }, [settings.barbers, clients, vales]);
 
   const scheduleBarberOptions = useMemo(() => {
     const names = new Set<string>();
+    // Extract names from BarberOption[]
     (settings.barbers || []).forEach(barber => {
-      if (barber?.trim()) names.add(barber.trim());
+      if (barber.name?.trim()) names.add(barber.name.trim());
     });
     appointments.forEach(appointment => {
       if (appointment.barberName?.trim()) names.add(appointment.barberName.trim());
@@ -376,7 +376,7 @@ const App: React.FC = () => {
     clients.forEach(client => {
       if (client.barberName?.trim()) names.add(client.barberName.trim());
     });
-    if (userProfile?.ownerName?.trim()) names.add(userProfile.ownerName.trim());
+    if (userProfile?.ownerName?.trim()) names.add(userProfile.ownerName.trim()); // Add owner name if it's not already there
     return Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [settings.barbers, appointments, clients, userProfile?.ownerName]);
 
@@ -394,7 +394,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (scheduleBarberOptions.length === 0) return;
     if (!selectedScheduleBarber || !scheduleBarberOptions.includes(selectedScheduleBarber)) {
-      setSelectedScheduleBarber(scheduleBarberOptions[0]);
+      setSelectedScheduleBarber(scheduleBarberOptions[0]); // Set to the first barber name
     }
   }, [selectedScheduleBarber, scheduleBarberOptions]);
 
@@ -461,7 +461,10 @@ const App: React.FC = () => {
 
   // -- Handlers --
   const handleLogin = (profile: UserProfile) => {
-    setUserProfile(profile);
+    setUserProfile(prev => ({
+      ...prev,
+      ...profile
+    }));
     setSettings(prev => ({ ...prev, shopName: profile.shopName }));
     addToast(`Bem-vindo, ${profile.ownerName}!`, 'success');
   };
@@ -472,7 +475,7 @@ const App: React.FC = () => {
       ownerName: session.displayName,
       shopName: prev?.shopName || settings.shopName || 'Gestao Maxima',
       email: session.email,
-      startDate: prev?.startDate || Date.now(),
+      startDate: prev?.startDate || Date.now(), // Preserve existing startDate if available
       isPro: true,
       planType: session.role === 'owner' ? 'admin_life' : 'vip_monthly'
     }));
@@ -499,7 +502,7 @@ const App: React.FC = () => {
     try {
       const session = await signUpWithPassword(email, password, displayName, role);
       if (session) {
-        handleAuthProfile(session);
+        handleAuthProfile(session); // This will update userProfile and settings
         addToast(`Bem-vindo, ${session.displayName}!`, 'success');
       } else {
         setAuthError('Cadastro criado. Confirme seu email antes de entrar.');
@@ -702,7 +705,7 @@ const App: React.FC = () => {
         const end = getLocalDayBounds(endDate);
 
         if (start.start > end.end) {
-            addToast('A data inicial deve ser anterior ou igual Ã  data final.', 'error');
+            addToast('A data inicial deve ser anterior ou igual à data final.', 'error');
             return;
         }
 
@@ -712,7 +715,7 @@ const App: React.FC = () => {
         // Safe filename
         const dateLabel = startDate === endDate 
             ? startDate 
-            : `De ${startDate} a ${endDate}`;
+            : `De ${startDate} a ${endDate}`; // This is fine, just a string for filename
         const safeName = `Relatorio_${dateLabel.replace(/\//g, '-').replace(/ /g, '_')}`;
 
         if (format === 'csv') {
@@ -741,7 +744,7 @@ const App: React.FC = () => {
         };
 
         const displayLabel = startDate === endDate 
-            ? startDate 
+            ? startDate // This is fine, just a string for display
             : `De ${parseLocalDateInput(startDate).toLocaleDateString('pt-BR')} a ${parseLocalDateInput(endDate).toLocaleDateString('pt-BR')}`;
 
         const { generateReportPDF } = await import('./services/pdfService');
@@ -878,7 +881,7 @@ const App: React.FC = () => {
       <ReportModal isOpen={isReportModalOpen} onClose={() => setReportModalOpen(false)} onDownload={handleDownloadRange} initialDate={selectedDate} />
 
       {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-gray-900/90">
+      <header className="border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-gray-900/90">
          <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
             <div className="flex items-center gap-3">
                  <div className="bg-gold-500/10 p-2 rounded-lg">
@@ -925,7 +928,7 @@ const App: React.FC = () => {
                     <button onClick={() => setViewMode('monthly')} className="bg-gray-800 text-blue-400 px-4 py-2.5 rounded-xl border border-gray-700 shrink-0">
                         <BarChart3 size={18} />
                     </button>
-                    <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5 flex-1 justify-between md:flex-none min-w-[140px]">
+                    <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5 flex-1 justify-between md:flex-none min-w-[140px]" id="tour-date-picker">
                         <button onClick={() => changeDate(-1)} className="p-2 text-gray-400 hover:text-white"><ChevronLeft size={20}/></button>
                         <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-transparent border-none text-white text-sm text-center w-full md:w-32 focus:ring-0" />
                         <button onClick={() => changeDate(1)} className="p-2 text-gray-400 hover:text-white"><ChevronRight size={20}/></button>
@@ -937,7 +940,7 @@ const App: React.FC = () => {
                                 value={selectedBarberFilter}
                                 onChange={(e) => setSelectedBarberFilter(e.target.value)}
                                 className="bg-gray-900 border border-gray-700 text-white text-sm rounded-xl pl-9 pr-3 py-2.5 appearance-none min-w-[180px] focus:ring-2 focus:ring-gold-500 outline-none"
-                            >
+                            > {/* This filter still uses names, which is fine for display */}
                                 {barberFilterOptions.map((barber) => (
                                     <option key={barber} value={barber}>
                                         {barber === 'TODOS' ? 'Todos os barbeiros' : barber}
