@@ -1,3 +1,4 @@
+
 import { Session, User } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
@@ -20,7 +21,10 @@ export const normalizeRole = (role: unknown): AppRole => {
   return role === 'barber' ? 'barber' : 'owner';
 };
 
-export const mapAuthSession = (session: Session | null, profile?: ProfileRow | null): AuthSession | null => {
+export const mapAuthSession = (
+  session: Session | null,
+  profile?: ProfileRow | null
+): AuthSession | null => {
   const user = session?.user;
   if (!user?.email) return null;
 
@@ -28,7 +32,11 @@ export const mapAuthSession = (session: Session | null, profile?: ProfileRow | n
     userId: user.id,
     email: user.email,
     role: normalizeRole(profile?.role ?? user.user_metadata?.role),
-    displayName: String(profile?.display_name || user.user_metadata?.display_name || user.email.split('@')[0])
+    displayName: String(
+      profile?.display_name ||
+      user.user_metadata?.display_name ||
+      user.email.split('@')[0]
+    )
   };
 };
 
@@ -40,24 +48,54 @@ export const canAccessInternalPanel = (
   return authSession?.role === 'owner' || authSession?.role === 'barber';
 };
 
+const getAuthenticatedUserId = async (): Promise<string | null> => {
+  if (!isSupabaseConfigured || !supabase) return null;
+
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data.user) return null;
+
+  return data.user.id;
+};
+
 export const getCurrentAuthSession = async (): Promise<AuthSession | null> => {
   if (!isSupabaseConfigured || !supabase) return null;
+
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
-  const profile = data.session?.user ? await getProfile(data.session.user.id) : null;
+
+  const profile = data.session?.user
+    ? await getProfile(data.session.user.id)
+    : null;
+
   return mapAuthSession(data.session, profile);
 };
 
-export const signInWithPassword = async (email: string, password: string): Promise<AuthSession> => {
+export const signInWithPassword = async (
+  email: string,
+  password: string
+): Promise<AuthSession> => {
   if (!isSupabaseConfigured || !supabase) {
     throw new Error('Supabase Auth nao esta configurado.');
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
   if (error) throw error;
-  const profile = data.session?.user ? await getProfile(data.session.user.id) : null;
+
+  const profile = data.session?.user
+    ? await getProfile(data.session.user.id)
+    : null;
+
   const authSession = mapAuthSession(data.session, profile);
-  if (!authSession) throw new Error('Sessao invalida.');
+
+  if (!authSession) {
+    throw new Error('Sessao invalida.');
+  }
+
   return authSession;
 };
 
@@ -65,7 +103,7 @@ export const signUpWithPassword = async (
   email: string,
   password: string,
   displayName: string,
-  role: AppRole = 'owner'
+  role: AppRole = 'barber'
 ): Promise<AuthSession | null> => {
   if (!isSupabaseConfigured || !supabase) {
     throw new Error('Supabase Auth nao esta configurado.');
@@ -77,29 +115,54 @@ export const signUpWithPassword = async (
     options: {
       data: {
         display_name: displayName,
-        role
+        role: 'barber'
       }
     }
   });
+
   if (error) throw error;
-  const profile = data.user
-    ? await upsertProfile(data.user.id, displayName, role)
-    : null;
+
+  /*
+   * Supabase pode retornar user sem session quando confirmação por e-mail está ativa.
+   * Sem sessão autenticada, não tente inserir em profiles porque o RLS vai bloquear.
+   */
+  if (!data.session?.user) {
+    return null;
+  }
+
+  const profile = await upsertProfile(
+    data.session.user.id,
+    displayName,
+    role
+  );
+
   return mapAuthSession(data.session, profile);
 };
 
 export const signOut = async (): Promise<void> => {
   if (!isSupabaseConfigured || !supabase) return;
+
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 };
 
-export const getUserProfileName = (user: Pick<User, 'email' | 'user_metadata'>): string => {
-  return String(user.user_metadata?.display_name || user.email?.split('@')[0] || 'Usuario');
+export const getUserProfileName = (
+  user: Pick<User, 'email' | 'user_metadata'>
+): string => {
+  return String(
+    user.user_metadata?.display_name ||
+    user.email?.split('@')[0] ||
+    'Usuario'
+  );
 };
 
 export const getProfile = async (userId: string): Promise<ProfileRow | null> => {
   if (!isSupabaseConfigured || !supabase) return null;
+
+  const authenticatedUserId = await getAuthenticatedUserId();
+
+  if (!authenticatedUserId) return null;
+  if (authenticatedUserId !== userId) return null;
 
   const { data, error } = await supabase
     .from('profiles')
@@ -108,6 +171,7 @@ export const getProfile = async (userId: string): Promise<ProfileRow | null> => 
     .maybeSingle();
 
   if (error) throw error;
+
   return data as ProfileRow | null;
 };
 
@@ -124,16 +188,30 @@ export const upsertProfile = async (
     };
   }
 
+  const authenticatedUserId = await getAuthenticatedUserId();
+
+  if (!authenticatedUserId) {
+    throw new Error('Usuario nao autenticado para atualizar profile.');
+  }
+
+  if (authenticatedUserId !== userId) {
+    throw new Error('Nao e permitido atualizar profile de outro usuario.');
+  }
+
+  const safeRole: AppRole = role === 'owner' ? 'barber' : role;
+
   const { data, error } = await supabase
     .from('profiles')
     .upsert({
       id: userId,
       display_name: displayName,
-      role
+      role: safeRole
     }, { onConflict: 'id' })
     .select('id,display_name,role')
     .single();
 
   if (error) throw error;
+
   return data as ProfileRow;
 };
+
