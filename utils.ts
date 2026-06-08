@@ -1,5 +1,5 @@
 
-import { Client, ServiceType } from './types';
+import { Appointment, Client, ServiceType, AppSettings } from './types';
 import { BarberOption } from './types';
 
 export const formatCurrency = (value: number): string => {
@@ -177,4 +177,13 @@ export const getBarberNameById = (
   if (!barberId) return '';
 
   return barbers.find((barber) => barber.id === barberId)?.name || '';
+};
+
+export const calculateEstimatedCommission = (
+  appointment: Appointment,
+  settings: AppSettings
+): number => {
+  const service = settings.services.find(s => s.id === appointment.serviceId);
+  const rate = service?.commissionRate ?? settings.commissionRate;
+  return appointment.serviceValue * (rate / 100);
 };
