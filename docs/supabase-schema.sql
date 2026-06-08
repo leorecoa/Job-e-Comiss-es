@@ -1,7 +1,35 @@
 -- Job e Comissoes - Supabase Scheduling MVP schema
 -- Run this SQL in the Supabase SQL editor.
 
-create extension if not exists pgcrypto;
+-- Create internal schema for RLS helpers
+create schema if not exists private;
+
+revoke all on schema private from public;
+revoke all on schema private from anon;
+revoke all on schema private from authenticated;
+
+grant usage on schema private to authenticated;
+
+-- Helper to get role of current authenticated active user.
+create or replace function private.current_user_role()
+returns text
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select role
+  from public.profiles
+  where id = auth.uid()
+    and active = true
+  limit 1;
+$$;
+
+revoke all on function private.current_user_role() from public;
+revoke all on function private.current_user_role() from anon;
+revoke all on function private.current_user_role() from authenticated;
+
+grant execute on function private.current_user_role() to authenticated;
 
 create table if not exists barbers (
   id uuid primary key default gen_random_uuid(),
@@ -43,7 +71,8 @@ create table if not exists appointments (
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
-  role text not null default 'owner' check (role in ('owner', 'barber')),
+  role text not null default 'barber' check (role in ('owner', 'barber')),
+  active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -58,7 +87,7 @@ begin
   new.updated_at = now();
   return new;
 end;
-$$ language plpgsql;
+$$ language plpgsql set search_path = public;
 
 drop trigger if exists barbers_set_updated_at on barbers;
 create trigger barbers_set_updated_at
@@ -84,7 +113,9 @@ for each row execute function set_updated_at();
 -- Next step: add a database-level exclusion constraint using tstzrange + gist
 -- after confirming the desired cancelled/no-show behavior and required extensions.
 
-create or replace view public_appointment_slots as
+create or replace view public_appointment_slots 
+with (security_invoker = true)
+as
 select
   barber_id,
   barber_name,
@@ -124,39 +155,36 @@ create policy "barbers_public_read_active"
 on barbers for select
 using (active = true);
 
+drop policy if exists "barbers_owner_all" on barbers;
+create policy "barbers_owner_all"
+on barbers for all
+using (private.current_user_role() = 'owner');
+
 drop policy if exists "services_public_read_active" on services;
 create policy "services_public_read_active"
 on services for select
 using (active = true);
 
+drop policy if exists "services_owner_all" on services;
+create policy "services_owner_all"
+on services for all
+using (private.current_user_role() = 'owner');
+
 drop policy if exists "appointments_authenticated_read" on appointments;
 create policy "appointments_authenticated_read"
 on appointments for select
-using (
-  exists (
-    select 1 from profiles
-    where profiles.id = auth.uid()
-      and profiles.role in ('owner', 'barber')
-  )
-);
+using (private.current_user_role() in ('owner', 'barber'));
 
 drop policy if exists "appointments_authenticated_update" on appointments;
 create policy "appointments_authenticated_update"
 on appointments for update
-using (
-  exists (
-    select 1 from profiles
-    where profiles.id = auth.uid()
-      and profiles.role in ('owner', 'barber')
-  )
-)
-with check (
-  exists (
-    select 1 from profiles
-    where profiles.id = auth.uid()
-      and profiles.role in ('owner', 'barber')
-  )
-);
+using (private.current_user_role() in ('owner', 'barber'))
+with check (private.current_user_role() in ('owner', 'barber'));
+
+drop policy if exists "appointments_authenticated_insert" on appointments;
+create policy "appointments_authenticated_insert"
+on appointments for insert
+with check (private.current_user_role() in ('owner', 'barber'));
 
 drop policy if exists "appointments_public_insert_scheduled" on appointments;
 create policy "appointments_public_insert_scheduled"
@@ -169,3 +197,11 @@ with check (status = 'scheduled');
 -- policies are fully hardened. The current frontend repository still uses the
 -- full appointments table, so production should add an RPC/view-specific
 -- repository before exposing a real public link.
+
+-- Future production hardening (roadmap):
+-- - financial_records
+-- - commission snapshots
+-- - barbershop_id / multi-tenant
+-- - database-level appointment conflict protection
+-- - schedule blocks / unavailable slots
+-- - RPC or Edge Function for public booking
