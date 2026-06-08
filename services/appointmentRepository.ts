@@ -11,6 +11,7 @@ export type DatabaseAppointmentRow = {
   barber_name: string;
   service_id: string | null;
   service_type: string;
+  commission_rate: number | null;
   service_value: number | string;
   start_at: string;
   end_at: string;
@@ -48,6 +49,7 @@ export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment =
   clientPhone: row.client_phone,
   barberName: row.barber_name,
   serviceType: row.service_type,
+  commissionRate: row.commission_rate === null ? undefined : Number(row.commission_rate),
   serviceValue: Number(row.service_value) || 0,
   startAt: row.start_at,
   endAt: row.end_at,
@@ -64,6 +66,7 @@ export const mapAppointmentToDb = (appointment: Appointment): DatabaseAppointmen
   barber_name: appointment.barberName,
   service_id: nullableUuid(appointment.serviceId),
   service_type: appointment.serviceType,
+  commission_rate: appointment.commissionRate ?? null,
   service_value: appointment.serviceValue,
   start_at: appointment.startAt,
   end_at: appointment.endAt,
@@ -220,4 +223,3 @@ export const deleteAppointment = async (id: string): Promise<void> => {
     throw error;
   }
 };
-

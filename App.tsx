@@ -274,6 +274,10 @@ const App: React.FC = () => {
       setAppointmentsLoading(true);
       setAppointmentsError(null);
       try {
+        const barberIdForAppointments = authSession?.role === 'barber' && authSession.barberId
+          ? authSession.barberId
+          : undefined;
+
         const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([
           isPublicBookingRoute ? listPublicAppointmentSlots() : listInternalAppointments(),
           listBarbers(),
