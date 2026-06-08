@@ -5,6 +5,7 @@ import {
   buildWhatsAppLink,
   createPublicAppointment,
   getAvailableTimeSlots,
+  getPublicBookingWorkdayForDate,
   PublicBookingInput,
   TimeSlot,
   validatePublicBookingInput
