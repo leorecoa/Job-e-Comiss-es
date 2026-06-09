@@ -3,6 +3,7 @@ import { Appointment, AppSettings, DEFAULT_SETTINGS } from './types';
 import {
   buildWhatsAppLink,
   completeAppointmentFinancialRecord,
+  appointmentToClient,
   createPublicAppointment,
   getAvailableTimeSlots,
   getPublicBookingWorkdayForDate,
@@ -18,6 +19,7 @@ const makeAppointment = (overrides: Partial<Appointment> = {}): Appointment => (
   clientName: 'Joao',
   clientPhone: '(11) 99999-0000',
   barberName: 'Carlos',
+  commissionRate: 50,
   serviceType: 'Corte',
   serviceValue: 50,
   startAt: new Date(2026, 5, 4, 10, 0).toISOString(),
@@ -134,6 +136,50 @@ describe('buildWhatsAppLink', () => {
 
   it('returns null without a phone', () => {
     expect(buildWhatsAppLink(makeAppointment({ clientPhone: undefined }))).toBeNull();
+  });
+});
+
+describe('appointmentToClient', () => {
+  it('uses appointment.commissionRate when available (snapshot priority)', () => {
+    const appointment = makeAppointment({
+      serviceValue: 100,
+      commissionRate: 80, // Snapshot salvo no agendamento
+      serviceType: 'Corte'
+    });
+
+    const customSettings: AppSettings = {
+      ...settings,
+      commissionRate: 40, // Taxa global diferente
+      services: [
+        { id: 'cut', name: 'Corte', price: 50, durationMinutes: 30, commissionRate: 50 } // Taxa atual do serviço diferente
+      ]
+    };
+
+    const client = appointmentToClient(appointment, customSettings, 'client-1');
+
+    // Deve usar os 80% do snapshot: 100 * 0.8 = 80
+    expect(client.commissionValue).toBe(80);
+  });
+
+  it('falls back to service configuration when appointment.commissionRate is missing', () => {
+    const appointment = makeAppointment({
+      serviceValue: 100,
+      commissionRate: undefined, // Sem snapshot
+      serviceType: 'Corte'
+    });
+
+    const customSettings: AppSettings = {
+      ...settings,
+      commissionRate: 40, // Taxa global
+      services: [
+        { id: 'cut', name: 'Corte', price: 50, durationMinutes: 30, commissionRate: 45 } // Taxa do serviço
+      ]
+    };
+
+    const client = appointmentToClient(appointment, customSettings, 'client-1');
+
+    // Deve usar os 45% da configuração do serviço: 100 * 0.45 = 45
+    expect(client.commissionValue).toBe(45);
   });
 });
 
