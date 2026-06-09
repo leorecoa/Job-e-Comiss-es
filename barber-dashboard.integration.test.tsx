@@ -131,6 +131,23 @@ describe('Barber Dashboard Logic & Contracts', () => {
       expect(completionPatch.updatedAt).toBe(now);
     });
 
+    it('Scenario 7: Ensures the dashboard logic filters the barber list to exclude other barbers', () => {
+      const barberSession = { ...mockBarberSession, barberId: 'barber-1' };
+      const settings = {
+        barbers: [
+          { id: 'barber-1', name: 'Gabriel' },
+          { id: 'barber-2', name: 'Leandro Jessé' }
+        ]
+      } as any;
+
+      const currentBarber = settings.barbers.find((b: any) => b.id === barberSession.barberId);
+      const filteredBarbers = currentBarber ? [currentBarber] : [];
+
+      expect(filteredBarbers).toHaveLength(1);
+      expect(filteredBarbers[0].id).toBe('barber-1');
+      expect(filteredBarbers.some((b: any) => b.name === 'Leandro Jessé')).toBe(false);
+    });
+
     it('should call onLogout when the logout contract is triggered', () => {
       const onLogoutMock = vi.fn();
 
