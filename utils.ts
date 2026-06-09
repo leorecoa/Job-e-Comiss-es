@@ -183,7 +183,11 @@ export const calculateEstimatedCommission = (
   appointment: Appointment,
   settings: AppSettings
 ): number => {
-  const service = settings.services.find(s => s.id === appointment.serviceId);
-  const rate = service?.commissionRate ?? settings.commissionRate;
+  // Prefer snapshot from appointment
+  const rate =
+    appointment.commissionRate ??
+    settings.services.find(s => s.id === appointment.serviceId || s.name === appointment.serviceType)?.commissionRate ??
+    settings.commissionRate;
+
   return appointment.serviceValue * (rate / 100);
 };

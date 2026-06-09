@@ -141,6 +141,11 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         ? selectedBarberOption.id
         : undefined;
 
+    const isServiceChanged = !initialData || initialData.serviceType !== serviceName;
+    const commissionRate = isServiceChanged
+      ? selectedService?.commissionRate
+      : (initialData?.commissionRate ?? selectedService?.commissionRate);
+
     onSave({
       id: initialData?.id || createId(),
       barberId,
@@ -150,6 +155,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
       barberName,
       serviceType: serviceName,
       serviceValue: Math.max(0, Number(serviceValue) || 0),
+      commissionRate,
       startAt,
       endAt,
       status: initialData?.status || 'scheduled',

@@ -151,7 +151,7 @@ export const hasAppointmentConflict = (
 
 export const getAvailableTimeSlots = (params: {
   date: string;
-  barberId?: string;
+  barberId?: string; // Now optional, but preferred
   barberName: string;
   serviceDurationMinutes: number;
   appointments: Appointment[];
@@ -279,6 +279,7 @@ export const createPublicAppointment = (
     barberName: input.barberName,
     serviceType: input.service.name,
     serviceValue: input.service.price,
+    commissionRate: input.service.commissionRate,
     startAt: input.selectedSlot.startAt,
     endAt: input.selectedSlot.endAt,
     status: 'scheduled',
@@ -317,9 +318,12 @@ export const appointmentToClient = (
   id: string
 ): Client => {
   const serviceType = serviceNameToServiceType(appointment.serviceType);
+
+  // Prefer snapshot from appointment
   const rate =
-    settings.services.find((service) => service.name === appointment.serviceType)?.commissionRate
-    ?? settings.commissionRate;
+    appointment.commissionRate ??
+    settings.services.find((service) => service.name === appointment.serviceType)?.commissionRate ??
+    settings.commissionRate;
 
   const commissionValue =
     serviceType === ServiceType.PRODUCT

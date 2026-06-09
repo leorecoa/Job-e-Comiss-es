@@ -59,6 +59,7 @@ create table if not exists appointments (
   service_id uuid references services(id) on delete restrict,
   service_type text not null,
   service_value numeric(10,2) not null default 0,
+  commission_rate numeric(5,2),
   start_at timestamptz not null,
   end_at timestamptz not null,
   status text not null check (status in ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show')),
@@ -201,7 +202,7 @@ with check (status = 'scheduled');
 
 -- Future production hardening (roadmap):
 -- - financial_records
--- - commission snapshots
+-- - commission snapshots stored in appointments.commission_rate
 -- - barbershop_id / multi-tenant
 -- - database-level appointment conflict protection
 -- - schedule blocks / unavailable slots
