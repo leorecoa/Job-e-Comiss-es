@@ -31,6 +31,21 @@ revoke all on function private.current_user_role() from authenticated;
 
 grant execute on function private.current_user_role() to authenticated;
 
+-- Helper to get barber_id of current authenticated active user.
+create or replace function private.current_user_barber_id()
+returns uuid
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select barber_id
+  from public.profiles
+  where id = auth.uid()
+    and active = true
+  limit 1;
+$$;
+
 create table if not exists barbers (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -175,18 +190,39 @@ using (private.current_user_role() = 'owner');
 drop policy if exists "appointments_authenticated_read" on appointments;
 create policy "appointments_authenticated_read"
 on appointments for select
-using (private.current_user_role() in ('owner', 'barber'));
+to authenticated
+using (
+  private.current_user_role() = 'owner'
+  or (private.current_user_role() = 'barber' and barber_id = private.current_user_barber_id())
+);
 
 drop policy if exists "appointments_authenticated_update" on appointments;
 create policy "appointments_authenticated_update"
 on appointments for update
-using (private.current_user_role() in ('owner', 'barber'))
-with check (private.current_user_role() in ('owner', 'barber'));
+to authenticated
+using (
+  private.current_user_role() = 'owner'
+  or (private.current_user_role() = 'barber' and barber_id = private.current_user_barber_id())
+)
+with check (
+  private.current_user_role() = 'owner'
+  or (private.current_user_role() = 'barber' and barber_id = private.current_user_barber_id())
+);
 
 drop policy if exists "appointments_authenticated_insert" on appointments;
 create policy "appointments_authenticated_insert"
 on appointments for insert
-with check (private.current_user_role() in ('owner', 'barber'));
+to authenticated
+with check (
+  private.current_user_role() = 'owner'
+  or (private.current_user_role() = 'barber' and barber_id = private.current_user_barber_id())
+);
+
+drop policy if exists "appointments_authenticated_delete" on appointments;
+create policy "appointments_authenticated_delete"
+on appointments for delete
+to authenticated
+using (private.current_user_role() = 'owner');
 
 drop policy if exists "appointments_public_insert_scheduled" on appointments;
 create policy "appointments_public_insert_scheduled"

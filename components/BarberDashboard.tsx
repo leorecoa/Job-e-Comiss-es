@@ -68,11 +68,13 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
 
   const barberId = authSession.barberId;
 
-  const barberName = useMemo(() => {
-    const barber = settings.barbers?.find((item) => item.id === barberId);
+  const currentBarber = useMemo(() =>
+    settings.barbers?.find((item) => item.id === barberId),
+  [barberId, settings.barbers]);
 
-    return barber?.name || authSession.displayName || 'Barbeiro';
-  }, [authSession.displayName, barberId, settings.barbers]);
+  const barberName = useMemo(() => {
+    return currentBarber?.name || authSession.displayName || 'Barbeiro';
+  }, [authSession.displayName, currentBarber]);
 
   const barberAppointments = useMemo(() => {
     if (!barberId) return [];
@@ -114,6 +116,13 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       ))
       .reduce((sum, appointment) => sum + calculateEstimatedCommission(appointment, settings), 0);
   }, [barberAppointments, settings]);
+
+  const barberScopedSettings = useMemo(() => {
+    return {
+      ...settings,
+      barbers: currentBarber ? [currentBarber] : []
+    };
+  }, [currentBarber, settings]);
 
   const handleOpenNewAppointment = () => {
     setEditingAppointment(null);
@@ -175,7 +184,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
     setSelectedDate(`${newYear}-${newMonth}-${newDay}`);
   };
 
-  if (!barberId) {
+  if (!barberId || !currentBarber) {
     return (
       <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
         <div className="glass-card w-full max-w-lg rounded-2xl p-7 text-center">
@@ -436,7 +445,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
           setEditingAppointment(null);
         }}
         onSave={handleSaveAppointment}
-        settings={settings}
+        settings={barberScopedSettings}
         selectedDate={selectedDate}
         selectedBarber={barberName}
         initialData={editingAppointment}
