@@ -15,6 +15,7 @@ import {
   DollarSign,
   MessageCircle,
   Plus,
+  LogOut,
   TrendingUp,
   XCircle,
   CheckCircle,
@@ -31,6 +32,7 @@ type BarberDashboardProps = {
   onUpdateAppointment: (id: string, patch: Partial<Appointment>) => Promise<void> | void;
   onCancelAppointment: (appointment: Appointment) => void;
   addToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  onLogout: () => void;
 };
 
 const getTodayString = (): string => {
@@ -57,7 +59,8 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   onCreateAppointment,
   onUpdateAppointment,
   onCancelAppointment,
-  addToast
+  addToast,
+  onLogout
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [isAppointmentModalOpen, setAppointmentModalOpen] = useState(false);
@@ -205,6 +208,16 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
               </span>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="text-gray-500 hover:text-red-400 transition-colors"
+            title="Sair"
+            aria-label="Sair"
+          >
+            <LogOut size={20} />
+          </button>
         </div>
       </header>
 
