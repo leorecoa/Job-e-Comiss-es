@@ -946,6 +946,7 @@ const App: React.FC = () => {
           onUpdateAppointment={handleUpdateAppointmentPatch}
           onCancelAppointment={handleCancelAppointment}
           addToast={addToast}
+          onLogout={handleLogout}
         />
       </>
     );
