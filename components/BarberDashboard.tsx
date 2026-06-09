@@ -197,12 +197,12 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   return (
     <div className="min-h-screen bg-transparent pb-24 font-sans selection:bg-gold-500/30">
       <header className="border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-gray-900/90">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <img src="/brand-mark.svg" alt="Gestao Maxima" className="w-12 h-12" />
+        <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <img src="/brand-mark.svg" alt="Gestao Maxima" className="w-12 h-12 shrink-0" />
 
-            <div>
-              <h1 className="text-white font-bold">{barberName}</h1>
+            <div className="min-w-0">
+              <h1 className="text-white font-bold truncate">{barberName}</h1>
               <span className="text-[10px] uppercase font-bold text-blue-400">
                 Barbeiro
               </span>
@@ -212,7 +212,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
           <button
             type="button"
             onClick={onLogout}
-            className="text-gray-500 hover:text-red-400 transition-colors"
+            className="text-gray-500 hover:text-red-400 transition-colors shrink-0"
             title="Sair"
             aria-label="Sair"
           >
