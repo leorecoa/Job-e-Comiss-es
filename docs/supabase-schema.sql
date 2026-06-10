@@ -46,16 +46,45 @@ as $$
   limit 1;
 $$;
 
-create table if not exists barbers (
+-- Multi-tenant foundation: Barbershops (Tenants)
+create table if not exists public.barbershops (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  slug text not null unique,
+  phone text,
+  address text,
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+-- Helper to get barbershop_id of current authenticated user.
+create or replace function private.current_user_barbershop_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public, private
+as $$
+  select p.barbershop_id
+  from public.profiles p
+  where p.id = auth.uid()
+  limit 1;
+$$;
+
+create table if not exists barbers (
+  id uuid primary key default gen_random_uuid(),
+  barbershop_id uuid not null references public.barbershops(id) on delete restrict,
+  name text not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+-- Note: Existing production data must be associated with a barbershop_id before enforcing NOT NULL.
+
 create table if not exists services (
   id uuid primary key default gen_random_uuid(),
+  barbershop_id uuid not null references public.barbershops(id) on delete restrict,
   name text not null,
   price numeric(10,2) not null default 0,
   duration_minutes integer not null default 30,
@@ -68,6 +97,7 @@ create table if not exists services (
 create table if not exists appointments (
   id uuid primary key default gen_random_uuid(),
   client_name text not null,
+  barbershop_id uuid not null references public.barbershops(id) on delete restrict,
   client_phone text not null,
   barber_id uuid references barbers(id) on delete restrict,
   barber_name text not null,
@@ -88,6 +118,7 @@ create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   role text not null default 'barber' check (role in ('owner', 'barber')),
+  barbershop_id uuid references public.barbershops(id) on delete restrict,
   barber_id uuid references barbers(id),
   active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -105,6 +136,11 @@ begin
   return new;
 end;
 $$ language plpgsql set search_path = public;
+
+drop trigger if exists barbershops_set_updated_at on barbershops;
+create trigger barbershops_set_updated_at
+before update on barbershops
+for each row execute function set_updated_at();
 
 drop trigger if exists barbers_set_updated_at on barbers;
 create trigger barbers_set_updated_at
@@ -131,9 +167,11 @@ for each row execute function set_updated_at();
 -- after confirming the desired cancelled/no-show behavior and required extensions.
 
 create or replace view public_appointment_slots 
+-- TODO: Update view to filter by barbershop_id (e.g. where barbershop_id = (select current_setting('app.current_barbershop_id')::uuid))
 with (security_invoker = true)
 as
 select
+  barbershop_id,
   barber_id,
   barber_name,
   start_at,
@@ -146,6 +184,7 @@ where status <> 'cancelled';
 -- These policies are intentionally simple and should be hardened further
 -- before production multi-tenant usage.
 
+alter table barbershops enable row level security;
 alter table profiles enable row level security;
 alter table barbers enable row level security;
 alter table services enable row level security;
@@ -186,6 +225,10 @@ drop policy if exists "services_owner_all" on services;
 create policy "services_owner_all"
 on services for all
 using (private.current_user_role() = 'owner');
+
+-- Future RLS Tenant Hardening (Plan):
+-- All tables (barbers, services, appointments) should include:
+-- using (barbershop_id = private.current_user_barbershop_id())
 
 drop policy if exists "appointments_authenticated_read" on appointments;
 create policy "appointments_authenticated_read"
