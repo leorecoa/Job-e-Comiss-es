@@ -15,6 +15,16 @@ export enum ClientType {
 export type BarberOption = {
   id: string;
   name: string;
+  barbershopId?: string; // Added for multi-tenancy
+};
+
+export type Barbershop = {
+  id: string;
+  name: string;
+  slug: string;
+  phone?: string | null;
+  address?: string | null;
+  active: boolean;
 };
 
 export interface ProductItem {
@@ -28,6 +38,7 @@ export interface Service {
   id: string;
   name: string;
   price: number;
+  barbershopId?: string; // Added for multi-tenancy
   durationMinutes: number;
   commissionRate?: number;
 }
@@ -41,6 +52,7 @@ export type AppointmentStatus =
 
 export interface Appointment {
   id: string;
+  barbershopId?: string; // New field for multi-tenancy
   barberId?: string;
   serviceId?: string;
   financialRecordId?: string;

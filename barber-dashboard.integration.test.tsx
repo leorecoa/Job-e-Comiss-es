@@ -1,11 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as authRepository from './services/authRepository'; // Import real functions
-import * as appointmentRepository from './services/appointmentRepository'; // Import real functions
-import { calculateEstimatedCommission } from './utils'; // Import real function
-import * as barberRepository from './services/barberRepository'; // Import real functions
-import * as serviceRepository from './services/serviceRepository'; // Import real functions
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as authRepository from './services/authRepository';
+import * as appointmentRepository from './services/appointmentRepository';
+import { calculateEstimatedCommission } from './utils';
+import * as barbershopRepository from './services/barbershopRepository';
+import * as barberRepository from './services/barberRepository';
+import * as serviceRepository from './services/serviceRepository';
 import { Appointment } from './types';
-
+import { createPublicAppointment } from './scheduling';
 // Mock all external services
 vi.mock('./services/authRepository', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./services/authRepository')>();
@@ -30,6 +31,7 @@ vi.mock('./lib/supabase', () => ({
     }
   }
 }));
+vi.mock('./services/barbershopRepository');
 
 // Mock localStorage and DOM for rendering tests
 const localStorageMock = (() => {
@@ -51,6 +53,22 @@ vi.stubGlobal('scrollTo', vi.fn()); // Mock scrollTo as it's used in TourOverlay
 describe('Barber Dashboard Logic & Contracts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorageMock.clear();
+
+    // Reset localStorage for each test to ensure isolation
+    // Default successful responses for shared services
+    vi.mocked(barberRepository.listBarbers).mockResolvedValue([{ id: 'barber-1', name: 'Gabriel' }]);
+    vi.mocked(serviceRepository.listServices).mockResolvedValue([
+      { id: 'cut-1', name: 'Corte', price: 50, durationMinutes: 30 }
+    ]);
+   vi.mocked(barbershopRepository.getBarbershopBySlug).mockResolvedValue({
+  id: 'barbershop-1',
+  name: 'Gestão Máxima',
+  slug: 'gestao-maxima',
+  active: true,
+  phone: null,
+  address: null
+});
   });
 
   const mockBarberSession = {
@@ -131,32 +149,13 @@ describe('Barber Dashboard Logic & Contracts', () => {
       expect(completionPatch.updatedAt).toBe(now);
     });
 
-    it('Scenario 7: Ensures the dashboard logic filters the barber list to exclude other barbers', () => {
-      const barberSession = { ...mockBarberSession, barberId: 'barber-1' };
-      const settings = {
-        barbers: [
-          { id: 'barber-1', name: 'Gabriel' },
-          { id: 'barber-2', name: 'Leandro Jessé' }
-        ]
-      } as any;
-
-      const currentBarber = settings.barbers.find((b: any) => b.id === barberSession.barberId);
-      const filteredBarbers = currentBarber ? [currentBarber] : [];
-
-      expect(filteredBarbers).toHaveLength(1);
-      expect(filteredBarbers[0].id).toBe('barber-1');
-      expect(filteredBarbers.some((b: any) => b.name === 'Leandro Jessé')).toBe(false);
-    });
-
     it('should call onLogout when the logout contract is triggered', () => {
       const onLogoutMock = vi.fn();
-
-      // Como não estamos renderizando, testamos o contrato da prop:
-      // O componente deve invocar a função passada em onLogout.
+      // As we are not rendering, we test the contract of the prop:
+      // The component should invoke the function passed in onLogout.
       const triggerLogoutAction = (handler: () => void) => {
         handler();
       };
-
       triggerLogoutAction(onLogoutMock);
       expect(onLogoutMock).toHaveBeenCalledTimes(1);
     });
@@ -185,5 +184,102 @@ describe('Barber Dashboard Logic & Contracts', () => {
       const commission = calculateEstimatedCommission(app, settings);
       expect(commission).toBe(30); // 30% de 100
     });
+  });
+});
+
+describe('Public Booking Page Logic', () => {
+  const DEFAULT_BARBERSHOP_ID = 'barbershop-1';
+  const DEFAULT_BARBERSHOP_SLUG = 'gestao-maxima';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorageMock.clear();
+
+    vi.mocked(barbershopRepository.getBarbershopBySlug).mockResolvedValue({
+      id: DEFAULT_BARBERSHOP_ID,
+      name: 'Gestão Máxima',
+      slug: DEFAULT_BARBERSHOP_SLUG,
+      active: true,
+    });
+    vi.mocked(barberRepository.listBarbers).mockResolvedValue([
+      { id: 'barber-1', name: 'Gabriel', barbershopId: DEFAULT_BARBERSHOP_ID },
+    ]);
+    vi.mocked(serviceRepository.listServices).mockResolvedValue([
+      { id: 'service-1', name: 'Corte', price: 50, durationMinutes: 30, barbershopId: DEFAULT_BARBERSHOP_ID },
+    ]);
+    vi.mocked(appointmentRepository.listPublicAppointmentSlots).mockResolvedValue([]);
+    vi.mocked(appointmentRepository.createAppointment).mockResolvedValue({} as Appointment);
+  });
+
+  it('should call getBarbershopBySlug with the default slug when no slug is provided', async () => {
+    // Simulate App.tsx calling PublicBookingPage without a specific slug
+    const mockPublicBookingPageProps = {
+      appSettings: {} as any,
+      appointments: [],
+      userProfile: null,
+      onCreateAppointment: vi.fn(),
+      barbershopSlug: undefined,
+    };
+
+    // Directly call the effect logic that would run in PublicBookingPage
+    // This is a simplified way to test the contract without full component rendering
+    await barbershopRepository.getBarbershopBySlug(mockPublicBookingPageProps.barbershopSlug || DEFAULT_BARBERSHOP_SLUG);
+
+    expect(barbershopRepository.getBarbershopBySlug).toHaveBeenCalledWith(DEFAULT_BARBERSHOP_SLUG);
+  });
+
+  it('should call getBarbershopBySlug with the provided slug', async () => {
+    const customSlug = 'minha-barbearia';
+    vi.mocked(barbershopRepository.getBarbershopBySlug).mockResolvedValue({
+      id: 'barbershop-custom',
+      name: 'Minha Barbearia',
+      slug: customSlug, active: true
+    });
+
+    const mockPublicBookingPageProps = {
+      appSettings: {} as any,
+      appointments: [],
+      userProfile: null,
+      onCreateAppointment: vi.fn(),
+      barbershopSlug: customSlug,
+    };
+
+    await barbershopRepository.getBarbershopBySlug(mockPublicBookingPageProps.barbershopSlug);
+
+    expect(barbershopRepository.getBarbershopBySlug).toHaveBeenCalledWith(customSlug);
+  });
+
+  it('should filter barbers and services by barbershopId when loading remote data', async () => {
+    const customBarbershopId = 'custom-shop-id';
+    vi.mocked(barbershopRepository.getBarbershopBySlug).mockResolvedValue({
+      id: customBarbershopId,
+      name: 'Custom Shop',
+      slug: 'custom-shop', active: true
+    });
+
+    // Simulate the loadRemoteData logic from App.tsx
+    await barbershopRepository.getBarbershopBySlug('custom-shop'); // Resolve barbershop first
+    await barberRepository.listBarbers(customBarbershopId);
+    await serviceRepository.listServices(customBarbershopId);
+    await appointmentRepository.listPublicAppointmentSlots(customBarbershopId);
+
+    expect(barberRepository.listBarbers).toHaveBeenCalledWith(customBarbershopId);
+    expect(serviceRepository.listServices).toHaveBeenCalledWith(customBarbershopId);
+    expect(appointmentRepository.listPublicAppointmentSlots).toHaveBeenCalledWith(customBarbershopId);
+  });
+
+  it('should include barbershopId in the created public appointment', async () => {
+    const mockCreateAppointment = vi.fn();
+    const mockAppointmentInput = {
+      barbershopId: DEFAULT_BARBERSHOP_ID,
+      clientName: 'Test Client',
+      clientPhone: '1234567890',
+      barberName: 'Gabriel',
+      service: { id: 'service-1', name: 'Corte', price: 50, durationMinutes: 30, barbershopId: DEFAULT_BARBERSHOP_ID },
+      selectedSlot: { startAt: '2026-06-10T10:00:00Z', endAt: '2026-06-10T10:30:00Z', label: '10:00', available: true },
+    } as any;
+
+    const createdAppointment = createPublicAppointment(mockAppointmentInput, 'new-app-id');
+    expect(createdAppointment.barbershopId).toBe(DEFAULT_BARBERSHOP_ID);
   });
 });

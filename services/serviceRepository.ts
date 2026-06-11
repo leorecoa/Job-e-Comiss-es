@@ -24,21 +24,31 @@ const listLocalServices = (): Service[] => {
   try {
     const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
     const settings = saved ? JSON.parse(saved) : {};
-    return Array.isArray(settings.services) && settings.services.length > 0
-      ? settings.services
-      : DEFAULT_SETTINGS.services;
+    // Ensure local services are always of type Service
+    return Array.isArray(settings.services)
+      ? settings.services.map((s: any) => ({
+          id: s.id || s.name, // Fallback ID if not present
+          name: s.name, price: Number(s.price) || 0, durationMinutes: Number(s.durationMinutes) || 30, commissionRate: Number(s.commissionRate) || undefined
+        }))
+      : DEFAULT_SETTINGS.services; // Fallback to default if no services in local storage
   } catch {
     return DEFAULT_SETTINGS.services;
   }
 };
 
-export const listServices = async (): Promise<Service[]> => {
+export const listServices = async (barbershopId?: string): Promise<Service[]> => {
   if (!isSupabaseConfigured || !supabase) return listLocalServices();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('services')
     .select('id,name,price,duration_minutes,commission_rate,active')
-    .eq('active', true)
+    .eq('active', true);
+
+  if (barbershopId) {
+    query = query.eq('barbershop_id', barbershopId);
+  }
+
+  const { data, error } = await query
     .order('name', { ascending: true });
 
   if (error) throw error;
@@ -47,7 +57,7 @@ export const listServices = async (): Promise<Service[]> => {
 
 export const createService = async (service: Service): Promise<Service> => {
   if (!isSupabaseConfigured || !supabase) return service;
-
+  // TODO: When multi-tenancy is fully implemented, barbershopId should be passed here.
   const { data, error } = await supabase
     .from('services')
     .insert({

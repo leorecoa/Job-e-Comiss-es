@@ -5,13 +5,13 @@ import { APPOINTMENT_STORAGE_KEY, getAppointmentDateInput, hasAppointmentConflic
 
 export type DatabaseAppointmentRow = {
   id: string;
+  barbershop_id: string | null; // Added for multi-tenancy
   client_name: string;
   client_phone: string;
   barber_id: string | null;
   barber_name: string;
   service_id: string | null;
   service_type: string;
-  commission_rate: number | null;
   service_value: number | string;
   start_at: string;
   end_at: string;
@@ -30,6 +30,7 @@ type DatabaseAppointmentInsert = Omit<
 type DatabasePublicAppointmentSlotRow = {
   barber_id: string | null;
   barber_name: string;
+  barbershop_id: string | null; // Added for multi-tenancy
   start_at: string;
   end_at: string;
   status: Appointment['status'];
@@ -42,6 +43,7 @@ const nullableUuid = (value?: string | null): string | null => {
 
 export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment => ({
   id: row.id,
+  barbershopId: row.barbershop_id || undefined,
   barberId: row.barber_id || undefined,
   serviceId: row.service_id || undefined,
   financialRecordId: row.financial_record_id || undefined,
@@ -49,7 +51,6 @@ export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment =
   clientPhone: row.client_phone,
   barberName: row.barber_name,
   serviceType: row.service_type,
-  commissionRate: row.commission_rate === null ? undefined : Number(row.commission_rate),
   serviceValue: Number(row.service_value) || 0,
   startAt: row.start_at,
   endAt: row.end_at,
@@ -60,13 +61,13 @@ export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment =
 });
 
 export const mapAppointmentToDb = (appointment: Appointment): DatabaseAppointmentInsert => ({
+  barbershop_id: nullableUuid(appointment.barbershopId),
   client_name: appointment.clientName,
   client_phone: appointment.clientPhone || '',
   barber_id: nullableUuid(appointment.barberId),
   barber_name: appointment.barberName,
   service_id: nullableUuid(appointment.serviceId),
   service_type: appointment.serviceType,
-  commission_rate: appointment.commissionRate ?? null,
   service_value: appointment.serviceValue,
   start_at: appointment.startAt,
   end_at: appointment.endAt,
@@ -89,25 +90,43 @@ const writeLocalAppointments = (appointments: Appointment[]) => {
   localStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(appointments));
 };
 
-export const listInternalAppointments = async (): Promise<Appointment[]> => {
+export const listInternalAppointments = async (barbershopId?: string, barberId?: string): Promise<Appointment[]> => {
   if (!isSupabaseConfigured || !supabase) return readLocalAppointments();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('appointments')
-    .select('*')
+    .select('*');
+
+  if (barbershopId) {
+    query = query.eq('barbershop_id', barbershopId);
+  }
+
+  query = query
     .order('start_at', { ascending: true });
+
+  if (barberId) {
+    query = query.eq('barber_id', barberId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
   return ((data || []) as DatabaseAppointmentRow[]).map(mapAppointmentFromDb);
 };
 
-export const listPublicAppointmentSlots = async (): Promise<Appointment[]> => {
+export const listPublicAppointmentSlots = async (barbershopId?: string): Promise<Appointment[]> => {
   if (!isSupabaseConfigured || !supabase) return readLocalAppointments();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('public_appointment_slots')
-    .select('barber_id,barber_name,start_at,end_at,status')
+    .select('barbershop_id,barber_id,barber_name,start_at,end_at,status');
+
+  if (barbershopId) {
+    query = query.eq('barbershop_id', barbershopId);
+  }
+
+  const { data, error } = await query
     .order('start_at', { ascending: true });
 
   if (error) throw error;
@@ -115,6 +134,7 @@ export const listPublicAppointmentSlots = async (): Promise<Appointment[]> => {
   return ((data || []) as DatabasePublicAppointmentSlotRow[]).map((row, index) => ({
     id: `slot-${row.barber_id || row.barber_name}-${row.start_at}-${index}`,
     barberId: row.barber_id || undefined,
+    barbershopId: row.barbershop_id || undefined,
     clientName: 'Horario ocupado',
     clientPhone: '',
     barberName: row.barber_name,

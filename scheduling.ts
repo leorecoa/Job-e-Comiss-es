@@ -21,6 +21,7 @@ export type TimeSlot = {
 export type PublicBookingInput = {
   clientName: string;
   clientPhone: string;
+  barbershopId?: string;
   barberId?: string;
   barberName: string;
   service?: Service;
@@ -272,6 +273,7 @@ export const createPublicAppointment = (
 
   return {
     id,
+    barbershopId: input.barbershopId,
     barberId: input.barberId,
     serviceId: input.service.id,
     clientName: input.clientName.trim(),
