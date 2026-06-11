@@ -166,19 +166,23 @@ for each row execute function set_updated_at();
 -- Next step: add a database-level exclusion constraint using tstzrange + gist
 -- after confirming the desired cancelled/no-show behavior and required extensions.
 
-create or replace view public_appointment_slots 
--- TODO: Update view to filter by barbershop_id (e.g. where barbershop_id = (select current_setting('app.current_barbershop_id')::uuid))
+-- Public booking reads this view to calculate occupied slots by barbershop.
+-- Keep barbershop_id at the end of the select list. PostgreSQL does not allow
+-- create or replace view to reorder existing columns without dropping the view.
+create or replace view public.public_appointment_slots
 with (security_invoker = true)
 as
 select
-  barbershop_id,
-  barber_id,
-  barber_name,
-  start_at,
-  end_at,
-  status
-from appointments
-where status <> 'cancelled';
+  a.barber_id,
+  a.barber_name,
+  a.start_at,
+  a.end_at,
+  a.status,
+  a.barbershop_id
+from public.appointments a
+where a.status in ('scheduled', 'confirmed');
+
+grant select on public.public_appointment_slots to anon, authenticated;
 
 -- Initial RLS policies for the MVP.
 -- These policies are intentionally simple and should be hardened further
