@@ -59,6 +59,7 @@ describe('auth role helpers', () => {
       email: 'leo@example.com',
       displayName: 'Leo',
       role: 'barber',
+      barbershopId: undefined,
       barberId: undefined
     });
   });
@@ -79,6 +80,7 @@ describe('auth role helpers', () => {
         id: 'user-1',
         display_name: 'Leo Profile',
         role: 'barber',
+        barbershop_id: 'shop-1',
         barber_id: null
       }
     );
@@ -88,6 +90,7 @@ describe('auth role helpers', () => {
       email: 'leo@example.com',
       displayName: 'Leo Profile',
       role: 'barber',
+      barbershopId: 'shop-1',
       barberId: undefined
     });
   });
@@ -108,6 +111,7 @@ describe('auth role helpers', () => {
         id: 'user-2',
         display_name: 'Gabriel',
         role: 'barber',
+        barbershop_id: null,
         barber_id: 'barber-1'
       }
     );
@@ -117,6 +121,7 @@ describe('auth role helpers', () => {
       email: 'gabriel@example.com',
       displayName: 'Gabriel',
       role: 'barber',
+      barbershopId: undefined,
       barberId: 'barber-1'
     });
   });
