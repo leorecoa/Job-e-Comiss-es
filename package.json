@@ -9,6 +9,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "check": "npm run test && npm run typecheck && npm run build",
+    "validate": "powershell -ExecutionPolicy Bypass -File scripts/check.ps1",
     "preview": "vite preview"
   },
   "dependencies": {
