@@ -197,16 +197,21 @@ const emptySlotsMessage = selectedWorkday
 const handleSubmit = async (event: React.FormEvent) => {
   event.preventDefault();
 
+  if (!barbershop) {
+    setErrors(['Barbearia não encontrada ou indisponível.']);
+    return;
+  }
+
   const input: PublicBookingInput = {
-  clientName,
-  clientPhone,
-  barberId: selectedBarber?.id,
-  barbershopId: barbershop?.id, // Pass the resolved barbershopId
-  barberName: selectedBarber?.name || '',
-  service: selectedService,
-  selectedSlot,
-  notes
-};
+    clientName,
+    clientPhone,
+    barbershopId: barbershop.id,
+    barberId: selectedBarber?.id,
+    barberName: selectedBarber?.name || '',
+    service: selectedService,
+    selectedSlot,
+    notes
+  };
   const validation = validatePublicBookingInput(input, appointments);
 
   if (!validation.valid) {

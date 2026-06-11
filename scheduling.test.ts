@@ -404,6 +404,7 @@ describe('public booking helpers', () => {
       clientName: ' Maria ',
       clientPhone: '(85) 98888-7777',
       barberId: 'barber-1',
+      barbershopId: 'shop-1',
       barberName: 'Carlos',
       service: settings.services[0],
       selectedSlot: slot,
@@ -423,12 +424,14 @@ describe('public booking helpers', () => {
     const result = validatePublicBookingInput({
       clientName: '',
       clientPhone: '',
+      barbershopId: '',
       barberName: '',
       service: undefined,
       selectedSlot: null
     }, []);
 
     expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Barbearia não encontrada ou indisponível.');
     expect(result.errors).toContain('Escolha um barbeiro.');
     expect(result.errors).toContain('Escolha um servico.');
     expect(result.errors).toContain('Escolha um horario disponivel.');
