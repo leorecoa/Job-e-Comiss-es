@@ -86,6 +86,18 @@ const getCurrentMonthString = () => {
 const TRIAL_DAYS = 7;
 
 // Códigos
+const DEFAULT_PUBLIC_BARBERSHOP_SLUG = 'gestao-maxima';
+
+const getPublicBookingSlug = (): string => {
+  const lastSegment = window.location.pathname.split('/').filter(Boolean).pop();
+
+  if (!lastSegment || lastSegment === 'book' || lastSegment === 'agendar') {
+    return DEFAULT_PUBLIC_BARBERSHOP_SLUG;
+  }
+
+  return lastSegment;
+};
+
 const CODES_PRO = ["MENSAL", "PRO", "LIBERADO"];
 const CODES_VIP = ["VIP", "EQUIPE", "TIME", "VIP4"];
 const CODES_ADMIN: string[] = [];
@@ -279,9 +291,10 @@ const App: React.FC = () => {
         // Determine barbershopId for filtering remote data
         let currentBarbershopId: string | undefined;
         if (isPublicBookingRoute) {
-          const slug = window.location.pathname.split('/').pop();
-          const publicBarbershop = await getBarbershopBySlug(slug || 'gestao-maxima'); // Fallback to default slug
+          const publicBarbershop = await getBarbershopBySlug(getPublicBookingSlug());
           currentBarbershopId = publicBarbershop?.id;
+        } else if (authSession?.barbershopId) { // For internal dashboards
+          currentBarbershopId = authSession.barbershopId;
         }
 
         const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([ //
@@ -911,7 +924,7 @@ const App: React.FC = () => {
         <PublicBookingPage //
           settings={settings}
           appointments={appointments}
-          barbershopSlug={window.location.pathname.split('/').pop()} // Pass slug from URL
+          barbershopSlug={getPublicBookingSlug()}
           userProfile={userProfile}
           onCreateAppointment={handleCreatePublicAppointment}
         />

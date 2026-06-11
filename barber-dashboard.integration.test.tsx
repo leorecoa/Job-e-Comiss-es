@@ -204,6 +204,8 @@ describe('Public Booking Page Logic', () => {
       name: 'Gestão Máxima',
       slug: DEFAULT_BARBERSHOP_SLUG,
       active: true,
+      phone: null,
+      address: null
     });
     vi.mocked(barberRepository.listBarbers).mockResolvedValue([
       { id: 'barber-1', name: 'Gabriel', barbershopId: DEFAULT_BARBERSHOP_ID },
@@ -218,7 +220,7 @@ describe('Public Booking Page Logic', () => {
   it('should call getBarbershopBySlug with the default slug when no slug is provided', async () => {
     // Simulate App.tsx calling PublicBookingPage without a specific slug
     const mockPublicBookingPageProps = {
-      appSettings: {} as any,
+      settings: {} as any,
       appointments: [],
       userProfile: null,
       onCreateAppointment: vi.fn(),
@@ -241,7 +243,7 @@ describe('Public Booking Page Logic', () => {
     });
 
     const mockPublicBookingPageProps = {
-      appSettings: {} as any,
+      settings: {} as any,
       appointments: [],
       userProfile: null,
       onCreateAppointment: vi.fn(),
@@ -262,7 +264,7 @@ describe('Public Booking Page Logic', () => {
     });
 
     // Simulate the loadRemoteData logic from App.tsx
-    await barbershopRepository.getBarbershopBySlug('custom-shop'); // Resolve barbershop first
+    await barbershopRepository.getBarbershopBySlug('custom-shop');
     await barberRepository.listBarbers(customBarbershopId);
     await serviceRepository.listServices(customBarbershopId);
     await appointmentRepository.listPublicAppointmentSlots(customBarbershopId);

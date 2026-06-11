@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, CheckCircle, Clock, MessageCircle, Scissors } from 'lucide-react';
 import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfile } from '../types';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { getBarbershopBySlug } from '../services/barbershopRepository';
 import {
   buildWhatsAppLink,
@@ -16,7 +17,7 @@ import { formatCurrency, generateId } from '../utils';
 interface PublicBookingPageProps {
   settings: AppSettings;
   appointments: Appointment[];
-  barbershopSlug?: string; // New prop for the slug
+  barbershopSlug?: string;
   userProfile: UserProfile | null;
   onCreateAppointment: (appointment: Appointment) => Promise<void> | void;
 }
@@ -111,23 +112,18 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   const [isSubmitting, setSubmitting] = useState(false);
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
 
-  // Filter appSettings based on the resolved barbershop
-const settings = useMemo(() => {
-  if (!barbershop) {
-    return appSettings;
-  }
+  const settings = useMemo(() => {
+    if (!barbershop) {
+      return appSettings;
+    }
 
-  return {
-    ...appSettings,
-    shopName: barbershop.name,
-    barbers: appSettings.barbers.filter((barber) => {
-      return !barber.barbershopId || barber.barbershopId === barbershop.id;
-    }),
-    services: appSettings.services.filter((service) => {
-      return !service.barbershopId || service.barbershopId === barbershop.id;
-    })
-  };
-}, [appSettings, barbershop]);
+    return {
+      ...appSettings,
+      shopName: barbershop.name,
+      barbers: appSettings.barbers.filter((barber) => !barber.barbershopId || barber.barbershopId === barbershop.id),
+      services: appSettings.services.filter((service) => !service.barbershopId || service.barbershopId === barbershop.id)
+    };
+  }, [appSettings, barbershop]);
 
   const barberOptions = useMemo(
     () => normalizeBarberOptions(settings.barbers || [], userProfile?.ownerName),
@@ -135,6 +131,55 @@ const settings = useMemo(() => {
   );
 
   const services = settings.services || [];
+
+  useEffect(() => {
+    let active = true;
+    const slug = barbershopSlug?.trim() || 'gestao-maxima';
+
+    const loadBarbershop = async () => {
+      setLoadingBarbershop(true);
+      setBarbershopError(null);
+
+      try {
+        if (!isSupabaseConfigured) {
+          setBarbershop({
+            id: 'local-barbershop',
+            name: appSettings.shopName || 'Gestao Maxima',
+            slug,
+            phone: null,
+            address: null,
+            active: true
+          });
+          return;
+        }
+
+        const resolvedBarbershop = await getBarbershopBySlug(slug);
+
+        if (!active) return;
+
+        if (!resolvedBarbershop) {
+          setBarbershop(null);
+          setBarbershopError('Barbearia nao encontrada ou indisponivel.');
+          return;
+        }
+
+        setBarbershop(resolvedBarbershop);
+      } catch (error) {
+        if (!active) return;
+        console.error(error);
+        setBarbershop(null);
+        setBarbershopError('Nao foi possivel carregar esta barbearia.');
+      } finally {
+        if (active) setLoadingBarbershop(false);
+      }
+    };
+
+    loadBarbershop();
+
+    return () => {
+      active = false;
+    };
+  }, [appSettings.shopName, barbershopSlug]);
 
   useEffect(() => {
     if (!selectedBarberValue && barberOptions[0]) {
@@ -198,15 +243,15 @@ const handleSubmit = async (event: React.FormEvent) => {
   event.preventDefault();
 
   if (!barbershop) {
-    setErrors(['Barbearia não encontrada ou indisponível.']);
+    setErrors(['Barbearia nao encontrada ou indisponivel.']);
     return;
   }
 
   const input: PublicBookingInput = {
     clientName,
     clientPhone,
-    barbershopId: barbershop.id,
     barberId: selectedBarber?.id,
+    barbershopId: barbershop.id,
     barberName: selectedBarber?.name || '',
     service: selectedService,
     selectedSlot,

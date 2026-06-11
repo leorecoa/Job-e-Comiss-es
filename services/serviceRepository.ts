@@ -25,12 +25,15 @@ const listLocalServices = (): Service[] => {
     const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
     const settings = saved ? JSON.parse(saved) : {};
     // Ensure local services are always of type Service
-    return Array.isArray(settings.services)
+    // Filter by barbershopId if provided, otherwise return all local services
+    const allLocalServices = Array.isArray(settings.services)
       ? settings.services.map((s: any) => ({
           id: s.id || s.name, // Fallback ID if not present
           name: s.name, price: Number(s.price) || 0, durationMinutes: Number(s.durationMinutes) || 30, commissionRate: Number(s.commissionRate) || undefined
         }))
       : DEFAULT_SETTINGS.services; // Fallback to default if no services in local storage
+
+    return allLocalServices; // Local storage doesn't support barbershop filtering yet
   } catch {
     return DEFAULT_SETTINGS.services;
   }

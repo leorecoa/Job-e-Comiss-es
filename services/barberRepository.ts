@@ -15,7 +15,7 @@ const listLocalBarbers = (): BarberOption[] => {
     const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
     const settings = saved ? JSON.parse(saved) : {};
     // For local storage, barbers might just be strings. Convert to BarberOption.
-    return Array.isArray(settings.barbers) && settings.barbers.every((b: any) => typeof b === 'string' || (typeof b === 'object' && 'name' in b))
+    return Array.isArray(settings.barbers) && settings.barbers.every((b: any) => typeof b === 'string' || (typeof b === 'object' && 'name' in b && 'id' in b))
       ? settings.barbers.map((b: string | BarberOption) =>
           typeof b === 'string' ? { id: b, name: b } : b
         )
@@ -49,9 +49,8 @@ export const createBarber = async (name: string): Promise<BarberOption> => {
   if (!isSupabaseConfigured || !supabase) {
     return {
       id: name,
-      name,
-      active: true
-    } as any;
+      name
+    };
   }
   // TODO: When multi-tenancy is fully implemented, barbershopId should be passed here.
   const { data, error } = await supabase
