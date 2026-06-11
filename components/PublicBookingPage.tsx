@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, CheckCircle, Clock, MessageCircle, Scissors } from 'lucide-react';
 import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfile } from '../types';
-import { isSupabaseConfigured } from '../lib/supabase';
 import { getBarbershopBySlug } from '../services/barbershopRepository';
 import {
   buildWhatsAppLink,
@@ -134,32 +133,20 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
 
   useEffect(() => {
     let active = true;
-    const slug = barbershopSlug?.trim() || 'gestao-maxima';
+    const resolvedBarbershopSlug = barbershopSlug?.trim() || 'gestao-maxima';
 
     const loadBarbershop = async () => {
       setLoadingBarbershop(true);
       setBarbershopError(null);
 
       try {
-        if (!isSupabaseConfigured) {
-          setBarbershop({
-            id: 'local-barbershop',
-            name: appSettings.shopName || 'Gestao Maxima',
-            slug,
-            phone: null,
-            address: null,
-            active: true
-          });
-          return;
-        }
-
-        const resolvedBarbershop = await getBarbershopBySlug(slug);
+        const resolvedBarbershop = await getBarbershopBySlug(resolvedBarbershopSlug);
 
         if (!active) return;
 
         if (!resolvedBarbershop) {
           setBarbershop(null);
-          setBarbershopError('Barbearia nao encontrada ou indisponivel.');
+          setBarbershopError('Barbearia não encontrada ou indisponível.');
           return;
         }
 
@@ -179,7 +166,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     return () => {
       active = false;
     };
-  }, [appSettings.shopName, barbershopSlug]);
+  }, [barbershopSlug]);
 
   useEffect(() => {
     if (!selectedBarberValue && barberOptions[0]) {
@@ -243,7 +230,7 @@ const handleSubmit = async (event: React.FormEvent) => {
   event.preventDefault();
 
   if (!barbershop) {
-    setErrors(['Barbearia nao encontrada ou indisponivel.']);
+    setErrors(['Barbearia não encontrada ou indisponível.']);
     return;
   }
 
@@ -482,7 +469,7 @@ const handleSubmit = async (event: React.FormEvent) => {
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
             </div>
 
-            <button type="submit" disabled={!selectedBarber || !selectedService || !selectedSlot || isSubmitting} className="w-full bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg shadow-gold-500/20">
+            <button type="submit" disabled={!barbershop || !selectedBarber || !selectedService || !selectedSlot || isSubmitting} className="w-full bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg shadow-gold-500/20">
               {isSubmitting ? 'Confirmando...' : 'Agendar horario'}
             </button>
           </form>

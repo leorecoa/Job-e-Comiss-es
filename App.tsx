@@ -88,14 +88,15 @@ const TRIAL_DAYS = 7;
 // Códigos
 const DEFAULT_PUBLIC_BARBERSHOP_SLUG = 'gestao-maxima';
 
-const getPublicBookingSlug = (): string => {
-  const lastSegment = window.location.pathname.split('/').filter(Boolean).pop();
+export const getPublicBookingSlugFromPath = (pathname: string): string | undefined => {
+  if (pathname === '/book' || pathname === '/agendar') return undefined;
 
-  if (!lastSegment || lastSegment === 'book' || lastSegment === 'agendar') {
-    return DEFAULT_PUBLIC_BARBERSHOP_SLUG;
+  if (pathname.startsWith('/book/')) {
+    const slug = pathname.replace('/book/', '').split('/')[0]?.trim();
+    return slug || undefined;
   }
 
-  return lastSegment;
+  return undefined;
 };
 
 const CODES_PRO = ["MENSAL", "PRO", "LIBERADO"];
@@ -103,7 +104,8 @@ const CODES_VIP = ["VIP", "EQUIPE", "TIME", "VIP4"];
 const CODES_ADMIN: string[] = [];
 
 const App: React.FC = () => {
-  const isPublicBookingRoute = window.location.pathname === '/book' || window.location.pathname === '/agendar';
+  const publicBookingSlug = getPublicBookingSlugFromPath(window.location.pathname);
+  const isPublicBookingRoute = window.location.pathname === '/book' || window.location.pathname === '/agendar' || window.location.pathname.startsWith('/book/');
 
   // -- Handle Splash Screen --
   useEffect(() => {
@@ -291,7 +293,17 @@ const App: React.FC = () => {
         // Determine barbershopId for filtering remote data
         let currentBarbershopId: string | undefined;
         if (isPublicBookingRoute) {
-          const publicBarbershop = await getBarbershopBySlug(getPublicBookingSlug());
+          const publicBarbershop = await getBarbershopBySlug(publicBookingSlug ?? DEFAULT_PUBLIC_BARBERSHOP_SLUG);
+          if (!publicBarbershop) {
+            if (!active) return;
+            setAppointments([]);
+            setSettings(prev => normalizeSettings({
+              ...prev,
+              barbers: [],
+              services: []
+            }));
+            return;
+          }
           currentBarbershopId = publicBarbershop?.id;
         } else if (authSession?.barbershopId) { // For internal dashboards
           currentBarbershopId = authSession.barbershopId;
@@ -323,7 +335,7 @@ const App: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [authSession, isAuthLoading, isPublicBookingRoute]);
+  }, [authSession, isAuthLoading, isPublicBookingRoute, publicBookingSlug]);
 
   // Check for First Time Tour
   useEffect(() => {
@@ -924,7 +936,7 @@ const App: React.FC = () => {
         <PublicBookingPage //
           settings={settings}
           appointments={appointments}
-          barbershopSlug={getPublicBookingSlug()}
+          barbershopSlug={publicBookingSlug}
           userProfile={userProfile}
           onCreateAppointment={handleCreatePublicAppointment}
         />

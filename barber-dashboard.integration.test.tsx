@@ -6,6 +6,7 @@ import * as barbershopRepository from './services/barbershopRepository';
 import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
 import { Appointment } from './types';
+import { getPublicBookingSlugFromPath } from './App';
 import { 
   createPublicAppointment, 
   validatePublicBookingInput 
@@ -217,21 +218,35 @@ describe('Public Booking Page Logic', () => {
     vi.mocked(appointmentRepository.createAppointment).mockResolvedValue({} as Appointment);
   });
 
-  it('should call getBarbershopBySlug with the default slug when no slug is provided', async () => {
-    // Simulate App.tsx calling PublicBookingPage without a specific slug
-    const mockPublicBookingPageProps = {
-      settings: {} as any,
-      appointments: [],
-      userProfile: null,
-      onCreateAppointment: vi.fn(),
-      barbershopSlug: undefined,
-    };
+  it('/book uses the default gestao-maxima fallback slug', async () => {
+    const publicBookingSlug = getPublicBookingSlugFromPath('/book');
 
-    // Directly call the effect logic that would run in PublicBookingPage
-    // This is a simplified way to test the contract without full component rendering
-    await barbershopRepository.getBarbershopBySlug(mockPublicBookingPageProps.barbershopSlug || DEFAULT_BARBERSHOP_SLUG);
+    await barbershopRepository.getBarbershopBySlug(publicBookingSlug ?? DEFAULT_BARBERSHOP_SLUG);
 
+    expect(publicBookingSlug).toBeUndefined();
     expect(barbershopRepository.getBarbershopBySlug).toHaveBeenCalledWith(DEFAULT_BARBERSHOP_SLUG);
+  });
+
+  it('/book/gestao-maxima uses the explicit gestao-maxima slug', async () => {
+    const publicBookingSlug = getPublicBookingSlugFromPath('/book/gestao-maxima');
+
+    await barbershopRepository.getBarbershopBySlug(publicBookingSlug ?? DEFAULT_BARBERSHOP_SLUG);
+
+    expect(publicBookingSlug).toBe(DEFAULT_BARBERSHOP_SLUG);
+    expect(barbershopRepository.getBarbershopBySlug).toHaveBeenCalledWith(DEFAULT_BARBERSHOP_SLUG);
+  });
+
+  it('/book/barbearia-inexistente uses the invalid slug without fallback', async () => {
+    const invalidSlug = 'barbearia-inexistente';
+    vi.mocked(barbershopRepository.getBarbershopBySlug).mockResolvedValue(null);
+
+    const publicBookingSlug = getPublicBookingSlugFromPath(`/book/${invalidSlug}`);
+
+    await barbershopRepository.getBarbershopBySlug(publicBookingSlug ?? DEFAULT_BARBERSHOP_SLUG);
+
+    expect(publicBookingSlug).toBe(invalidSlug);
+    expect(barbershopRepository.getBarbershopBySlug).toHaveBeenCalledWith(invalidSlug);
+    expect(barbershopRepository.getBarbershopBySlug).not.toHaveBeenCalledWith(DEFAULT_BARBERSHOP_SLUG);
   });
 
   it('should call getBarbershopBySlug with the provided slug', async () => {
@@ -274,8 +289,28 @@ describe('Public Booking Page Logic', () => {
     expect(appointmentRepository.listPublicAppointmentSlots).toHaveBeenCalledWith(customBarbershopId);
   });
 
-  it('should include barbershopId in the created public appointment', async () => {
-    const mockCreateAppointment = vi.fn();
+  it('invalid slug does not create an appointment', async () => {
+    vi.mocked(barbershopRepository.getBarbershopBySlug).mockResolvedValue(null);
+    const createAppointment = vi.fn();
+
+    const barbershop = await barbershopRepository.getBarbershopBySlug('barbearia-inexistente');
+
+    if (barbershop) {
+      createAppointment(createPublicAppointment({
+        barbershopId: barbershop.id,
+        clientName: 'Test Client',
+        clientPhone: '1234567890',
+        barberName: 'Gabriel',
+        service: { id: 'service-1', name: 'Corte', price: 50, durationMinutes: 30 },
+        selectedSlot: { startAt: '2026-06-10T10:00:00Z', endAt: '2026-06-10T10:30:00Z', label: '10:00', available: true },
+      } as any, 'new-app-id'));
+    }
+
+    expect(barbershop).toBeNull();
+    expect(createAppointment).not.toHaveBeenCalled();
+  });
+
+  it('valid booking continues creating an appointment with barbershopId', async () => {
     const mockAppointmentInput = {
       barbershopId: DEFAULT_BARBERSHOP_ID,
       clientName: 'Test Client',

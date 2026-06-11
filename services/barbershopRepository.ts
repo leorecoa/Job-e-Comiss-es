@@ -1,6 +1,8 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Barbershop } from '../types';
 
+const DEFAULT_LOCAL_BARBERSHOP_SLUG = 'gestao-maxima';
+
 type DatabaseBarbershopRow = {
   id: string;
   name: string;
@@ -11,7 +13,18 @@ type DatabaseBarbershopRow = {
 };
 
 export const getBarbershopBySlug = async (slug: string): Promise<Barbershop | null> => {
-  if (!isSupabaseConfigured || !supabase) return null; // No local storage fallback for barbershops
+  if (!isSupabaseConfigured || !supabase) {
+    if (slug !== DEFAULT_LOCAL_BARBERSHOP_SLUG) return null;
+
+    return {
+      id: 'local-barbershop',
+      name: 'Gestao Maxima',
+      slug: DEFAULT_LOCAL_BARBERSHOP_SLUG,
+      phone: null,
+      address: null,
+      active: true
+    };
+  }
 
   const { data, error } = await supabase
     .from('barbershops')
