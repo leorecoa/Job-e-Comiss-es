@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Appointment, AppSettings, DEFAULT_SETTINGS } from './types';
 import {
   buildWhatsAppLink,
@@ -437,5 +437,21 @@ describe('public booking helpers', () => {
     expect(result.errors).toContain('Escolha um horario disponivel.');
     expect(result.errors).toContain('Informe seu nome.');
     expect(result.errors).toContain('Informe um WhatsApp valido com DDD.');
+  });
+});
+
+describe('barbershop repository local fallback', () => {
+  it("returns null for an invalid slug instead of falling back to gestao-maxima", async () => {
+    vi.resetModules();
+    vi.doMock('./lib/supabase', () => ({
+      isSupabaseConfigured: false,
+      supabase: null
+    }));
+
+    const { getBarbershopBySlug } = await import('./services/barbershopRepository');
+
+    await expect(getBarbershopBySlug('barbearia-inexistente')).resolves.toBeNull();
+
+    vi.doUnmock('./lib/supabase');
   });
 });
