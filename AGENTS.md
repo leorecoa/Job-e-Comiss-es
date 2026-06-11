@@ -1,32 +1,59 @@
-# AGENTS.md — Job e Comissões
+# AGENTS.md - Job e Comissoes
 
-## Project Context
+## Contexto
 
-This is a React 19 + TypeScript + Vite app for barbershop scheduling, commissions, financial records and public booking.
+Este repositorio e uma SPA React 19 + TypeScript + Vite para barbearias.
 
-The app includes:
+O app inclui:
 
-- Internal appointment schedule
-- Public booking flow
-- Commission and financial dashboard
-- PDF/CSV export
-- Supabase persistence with localStorage fallback
-- Supabase Auth and profile-based roles
-- Vitest tests
-- GitHub Actions CI
-- Vercel deployment
+- Agenda interna de appointments.
+- Booking publico em `/book` e `/agendar`.
+- Dashboard financeiro, comissoes, vales e relatorios PDF/CSV.
+- Supabase persistence com fallback em `localStorage`.
+- Supabase Auth com roles `owner` e `barber`.
+- Testes com Vitest, CI no GitHub Actions e deploy na Vercel.
 
-## Core Rule
+## Regra Principal
 
-Stability first.
+Estabilidade primeiro.
 
-Make small, focused, reviewable changes. Do not perform large refactors unless explicitly requested.
+Faca mudancas pequenas, focadas e revisaveis. Nao faca refatoracoes grandes sem pedido explicito.
 
-## Required Workflow
+## Antes de Alterar
 
-Before changing code, inspect the current state:
+1. Verifique a branch e o status:
+
+```bash
+git status --short --branch
+```
+
+2. Leia os arquivos relevantes antes de editar.
+3. Preserve alteracoes existentes do usuario.
+4. Nao toque em financeiro, comissao, PDF/CSV, dashboard ou schema Supabase sem relacao direta com a task.
+
+## Validacao Padrao
+
+Antes de finalizar, rode:
 
 ```bash
 npm run check
 npm run build
 npm audit --audit-level=moderate
+```
+
+Se algum comando nao puder ser executado, explique o motivo.
+
+## Supabase
+
+- Nunca commite `.env`.
+- Use `.env.example` para documentar variaveis.
+- Booking publico nao deve ler dados sensiveis de `appointments`.
+- Em fluxo publico, use `public_appointment_slots` para disponibilidade.
+- Leitura completa de `appointments` deve ser restrita ao painel interno autenticado.
+- Nao desative RLS para resolver bug de frontend.
+
+## Git
+
+- Commits devem ser pequenos e com escopo claro.
+- Use `gh` para abrir PR quando a branch estiver pronta.
+- Nao inclua `node_modules`, `dist`, `.env` ou arquivos temporarios.
