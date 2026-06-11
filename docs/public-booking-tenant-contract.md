@@ -80,8 +80,9 @@ The current public booking flow uses tenant-aware data where available:
 * barbers are associated with `barbershopId`
 * services are associated with `barbershopId`
 * appointments are created with `barbershopId`
+* public slots are filtered by `barbershopId`
 
-The full repository-level tenant isolation is not complete yet.
+Repository-level tenant filtering is in place. RLS hardening should be reviewed and applied separately using `docs/supabase-tenant-rls-plan.sql`.
 
 ## Public slots view contract
 
@@ -162,34 +163,33 @@ Do not remove the trigger yet.
 
 Do not apply `NOT NULL` to `barbershop_id` yet.
 
-Do not enforce full tenant RLS on all tables yet.
+Do not enforce full tenant RLS on all tables without first reviewing `docs/supabase-tenant-rls-plan.sql` and validating it in a controlled environment.
 
-These steps should happen only after repository-level tenant isolation is completed and validated.
+These steps should happen only after the tenant-aware RLS plan is reviewed and validated.
 
 ## Next technical step
 
 Recommended next PR:
 
 ```txt
-feat: enforce barbershop isolation in repositories
+docs: prepare tenant rls policies
 ```
 
 Expected goals:
 
-* filter barbers by `barbershop_id`
-* filter services by `barbershop_id`
-* filter appointments by `barbershop_id`
+* document tenant-aware policies for barbershops, profiles, barbers, services and appointments
 * keep owner and barber dashboards working
 * keep public booking working
-* preserve `/book` fallback temporarily
-* keep RLS unchanged until repository behavior is validated
+* preserve `/book` fallback and invalid slug blocking
+* keep the temporary public appointment fallback trigger
+* keep `barbershop_id` nullable until a separate validation step decides otherwise
 
 ## Later hardening steps
 
-After repository-level isolation is validated:
+After tenant-aware RLS is validated:
 
-1. enforce tenant-aware RLS policies
+1. apply tenant-aware RLS policies in production
 2. validate dashboards and public booking
-3. remove temporary appointment fallback trigger
-4. apply `barbershop_id NOT NULL`
+3. remove temporary appointment fallback trigger in a separate PR/window
+4. apply `barbershop_id NOT NULL` only in a later separate step
 5. document final multi-tenant production contract
