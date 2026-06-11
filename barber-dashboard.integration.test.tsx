@@ -6,7 +6,11 @@ import * as barbershopRepository from './services/barbershopRepository';
 import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
 import { Appointment } from './types';
-import { createPublicAppointment } from './scheduling';
+import { 
+  createPublicAppointment, 
+  validatePublicBookingInput 
+} from './scheduling';
+
 // Mock all external services
 vi.mock('./services/authRepository', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./services/authRepository')>();
@@ -281,5 +285,20 @@ describe('Public Booking Page Logic', () => {
 
     const createdAppointment = createPublicAppointment(mockAppointmentInput, 'new-app-id');
     expect(createdAppointment.barbershopId).toBe(DEFAULT_BARBERSHOP_ID);
+  });
+
+  it('should fail validation when barbershopId is missing', () => {
+    const input = {
+      clientName: 'Joao',
+      clientPhone: '11999990000',
+      barbershopId: '',
+      barberName: 'Gabriel',
+      service: { id: 'service-1', name: 'Corte', price: 50, durationMinutes: 30 },
+      selectedSlot: { startAt: '2026-06-10T10:00:00Z', endAt: '2026-06-10T10:30:00Z', label: '10:00', available: true },
+    } as any;
+
+    const result = validatePublicBookingInput(input, []);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Barbearia não encontrada ou indisponível.');
   });
 });

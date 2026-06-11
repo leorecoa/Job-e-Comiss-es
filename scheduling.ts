@@ -21,7 +21,7 @@ export type TimeSlot = {
 export type PublicBookingInput = {
   clientName: string;
   clientPhone: string;
-  barbershopId?: string;
+  barbershopId: string;
   barberId?: string;
   barberName: string;
   service?: Service;
@@ -235,6 +235,7 @@ export const validatePublicBookingInput = (
   const errors: string[] = [];
   const phoneDigits = normalizePhoneDigits(input.clientPhone);
 
+  if (!input.barbershopId) errors.push('Barbearia não encontrada ou indisponível.');
   if (!input.barberName) errors.push('Escolha um barbeiro.');
   if (!input.service) errors.push('Escolha um servico.');
   if (!input.selectedSlot) errors.push('Escolha um horario disponivel.');
