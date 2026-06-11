@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType, Appointment, AppointmentStatus, BarberOption, Service } from './types';
 import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById } from './utils';
+import { getBarbershopBySlug } from './services/barbershopRepository';
 import { APPOINTMENT_STORAGE_KEY, completeAppointmentFinancialRecord, getAppointmentDateInput, hasAppointmentConflict } from './scheduling';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
@@ -275,10 +276,18 @@ const App: React.FC = () => {
       setAppointmentsLoading(true);
       setAppointmentsError(null);
       try {
+        // Determine barbershopId for filtering remote data
+        let currentBarbershopId: string | undefined;
+        if (isPublicBookingRoute) {
+          const slug = window.location.pathname.split('/').pop();
+          const publicBarbershop = await getBarbershopBySlug(slug || 'gestao-maxima'); // Fallback to default slug
+          currentBarbershopId = publicBarbershop?.id;
+        }
+
         const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([ //
-          isPublicBookingRoute ? listPublicAppointmentSlots() : listInternalAppointments(),
-          listBarbers(),
-          listServices()
+          isPublicBookingRoute ? listPublicAppointmentSlots(currentBarbershopId) : listInternalAppointments(currentBarbershopId, authSession?.barberId),
+          listBarbers(currentBarbershopId),
+          listServices(currentBarbershopId)
         ]);
 
         if (!active) return;
@@ -894,13 +903,15 @@ const App: React.FC = () => {
     }
   ];
 
+  // Public Booking Route
   if (isPublicBookingRoute) {
     return (
       <>
         <ToastContainer toasts={toasts} removeToast={removeToast} />
-        <PublicBookingPage
+        <PublicBookingPage //
           settings={settings}
           appointments={appointments}
+          barbershopSlug={window.location.pathname.split('/').pop()} // Pass slug from URL
           userProfile={userProfile}
           onCreateAppointment={handleCreatePublicAppointment}
         />

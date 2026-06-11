@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, CheckCircle, Clock, MessageCircle, Scissors } from 'lucide-react';
-import { Appointment, AppSettings, BarberOption, Service, UserProfile } from '../types';
+import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfile } from '../types';
+import { getBarbershopBySlug } from '../services/barbershopRepository';
 import {
   buildWhatsAppLink,
   createPublicAppointment,
@@ -15,6 +16,7 @@ import { formatCurrency, generateId } from '../utils';
 interface PublicBookingPageProps {
   settings: AppSettings;
   appointments: Appointment[];
+  barbershopSlug?: string; // New prop for the slug
   userProfile: UserProfile | null;
   onCreateAppointment: (appointment: Appointment) => Promise<void> | void;
 }
@@ -89,11 +91,44 @@ const normalizeBarberOptions = (
 };
 
 export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
-  settings,
+  settings: appSettings,
   appointments,
+  barbershopSlug,
   userProfile,
   onCreateAppointment
 }) => {
+  const [selectedBarberValue, setSelectedBarberValue] = useState('');
+  const [serviceId, setServiceId] = useState(''); // This is the ID of the selected service
+  const [date, setDate] = useState(getTodayString());
+  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [notes, setNotes] = useState('');
+  const [barbershop, setBarbershop] = useState<Barbershop | null>(null);
+  const [loadingBarbershop, setLoadingBarbershop] = useState(false);
+  const [barbershopError, setBarbershopError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [isSubmitting, setSubmitting] = useState(false);
+  const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
+
+  // Filter appSettings based on the resolved barbershop
+const settings = useMemo(() => {
+  if (!barbershop) {
+    return appSettings;
+  }
+
+  return {
+    ...appSettings,
+    shopName: barbershop.name,
+    barbers: appSettings.barbers.filter((barber) => {
+      return !barber.barbershopId || barber.barbershopId === barbershop.id;
+    }),
+    services: appSettings.services.filter((service) => {
+      return !service.barbershopId || service.barbershopId === barbershop.id;
+    })
+  };
+}, [appSettings, barbershop]);
+
   const barberOptions = useMemo(
     () => normalizeBarberOptions(settings.barbers || [], userProfile?.ownerName),
     [settings.barbers, userProfile?.ownerName]
@@ -101,23 +136,11 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
 
   const services = settings.services || [];
 
-  const [selectedBarberValue, setSelectedBarberValue] = useState('');
-  const [serviceId, setServiceId] = useState('');
-  const [date, setDate] = useState(getTodayString());
-  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
-  const [clientName, setClientName] = useState('');
-  const [clientPhone, setClientPhone] = useState('');
-  const [notes, setNotes] = useState('');
-  const [errors, setErrors] = useState<string[]>([]);
-  const [isSubmitting, setSubmitting] = useState(false);
-  const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
-
   useEffect(() => {
     if (!selectedBarberValue && barberOptions[0]) {
       setSelectedBarberValue(barberOptions[0].value);
     }
   }, [barberOptions, selectedBarberValue]);
-
   useEffect(() => {
     if (!serviceId && services[0]) {
       setServiceId(services[0].id);
@@ -178,6 +201,7 @@ const handleSubmit = async (event: React.FormEvent) => {
   clientName,
   clientPhone,
   barberId: selectedBarber?.id,
+  barbershopId: barbershop?.id, // Pass the resolved barbershopId
   barberName: selectedBarber?.name || '',
   service: selectedService,
   selectedSlot,
@@ -214,6 +238,24 @@ const handleSubmit = async (event: React.FormEvent) => {
     setClientPhone('');
     setNotes('');
   };
+
+  if (loadingBarbershop) {
+    return (
+      <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
+        <div className="glass-card w-full max-w-lg rounded-2xl p-7 text-center">
+          <h1 className="font-display text-2xl font-bold text-white mb-3">Carregando barbearia...</h1>
+        </div>
+      </div>
+    );
+  }
+
+  if (barbershopError) {
+    return (
+      <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans text-red-400">
+        {barbershopError}
+      </div>
+    );
+  }
 
   if (createdAppointment) {
     const whatsappLink = buildWhatsAppLink(createdAppointment);
