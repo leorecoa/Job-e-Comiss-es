@@ -84,6 +84,8 @@ The current public booking flow uses tenant-aware data where available:
 
 Repository-level tenant filtering is in place. RLS hardening should be reviewed and applied separately using `docs/supabase-tenant-rls-plan.sql`.
 
+Tenant-aware RLS has since been applied manually in Supabase and validated in production. See `docs/supabase-tenant-rls-applied.md`.
+
 ## Public slots view contract
 
 Public booking availability is calculated from `public.public_appointment_slots`, not from full `appointments` rows.
@@ -163,33 +165,33 @@ Do not remove the trigger yet.
 
 Do not apply `NOT NULL` to `barbershop_id` yet.
 
-Do not enforce full tenant RLS on all tables without first reviewing `docs/supabase-tenant-rls-plan.sql` and validating it in a controlled environment.
+Tenant-aware RLS has been applied manually in Supabase after review and production validation.
 
-These steps should happen only after the tenant-aware RLS plan is reviewed and validated.
+Keep `docs/supabase-tenant-rls-plan.sql` as the reviewable reference for future environments or rollback analysis.
 
 ## Next technical step
 
-Recommended next PR:
+Current hardening record:
 
 ```txt
-docs: prepare tenant rls policies
+docs: record applied tenant rls
 ```
 
-Expected goals:
+Recorded state:
 
-* document tenant-aware policies for barbershops, profiles, barbers, services and appointments
+* tenant-aware policies applied for barbershops, profiles, barbers, services and appointments
 * keep owner and barber dashboards working
 * keep public booking working
 * preserve `/book` fallback and invalid slug blocking
-* keep the temporary public appointment fallback trigger
-* keep `barbershop_id` nullable until a separate validation step decides otherwise
+* keep the temporary public appointment fallback trigger for now
+* keep `barbershop_id` nullable until a later validation step decides otherwise
 
 ## Later hardening steps
 
-After tenant-aware RLS is validated:
+After the applied tenant-aware RLS state remains stable:
 
-1. apply tenant-aware RLS policies in production
-2. validate dashboards and public booking
-3. remove temporary appointment fallback trigger in a separate PR/window
-4. apply `barbershop_id NOT NULL` only in a later separate step
+1. test a fake second barbershop in a controlled environment
+2. harden public appointment `barber_id` and `service_id` checks if needed
+3. apply `barbershop_id NOT NULL` only in a later separate step
+4. remove temporary appointment fallback trigger in a separate PR/window
 5. document final multi-tenant production contract
