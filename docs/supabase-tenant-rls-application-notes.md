@@ -4,7 +4,13 @@
 
 `docs/supabase-tenant-rls-plan.sql` is a reviewable plan, not an automatic migration.
 
-Apply it first in a controlled Supabase environment with production-like data.
+The tenant-aware RLS plan was applied manually in Supabase and validated in production.
+
+See `docs/supabase-tenant-rls-applied.md` for the applied-state record.
+
+Keep these notes as a checklist for future re-application, rollback review, or second-barbershop validation.
+
+For new environments, apply the plan first in a controlled Supabase environment with production-like data.
 
 Do not apply `NOT NULL` as part of this step.
 

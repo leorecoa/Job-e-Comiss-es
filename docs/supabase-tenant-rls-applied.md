@@ -1,0 +1,145 @@
+# Supabase Tenant RLS Applied
+
+## Status
+
+Tenant-aware RLS was applied manually in Supabase and validated in production.
+
+This document records the production state. It is not an executable migration.
+
+## Applied Scope
+
+Tenant-aware RLS is now applied to:
+
+- `public.appointments`
+- `public.barbers`
+- `public.services`
+- `public.profiles`
+- `public.barbershops`
+
+The policies use `barbershop_id = private.current_user_barbershop_id()` for authenticated tenant isolation.
+
+Owner access is scoped to the owner profile's own barbershop. Owner access is not global.
+
+Barber access is scoped to the barber profile's own barbershop and, for appointments, to the profile's own `barber_id`.
+
+## Removed Broad Policies
+
+The manual Supabase application removed these broad policies:
+
+```txt
+appointments_authenticated_read
+appointments_authenticated_insert
+appointments_authenticated_update
+appointments_authenticated_delete
+barbers_owner_manage
+services_owner_manage
+profiles_owner_manage
+profiles_owner_read_all
+```
+
+The hardened plan also accounts for public and self-profile policies that may exist in older environments:
+
+```txt
+appointments_public_insert_scheduled
+barbers_public_read_active
+services_public_read_active
+profiles_insert_own_as_barber
+profiles_select_own
+barbershops_authenticated_read_own
+barbershops_public_read_active
+```
+
+## Final Expected Policy State
+
+### Barbershops
+
+- `anon` can read active barbershops for public booking slug resolution.
+- `authenticated` users can read only their own barbershop.
+
+### Profiles
+
+- Users can read their own profile.
+- Owners can read and manage profiles only inside their own barbershop.
+- Self-created profiles must be `role = 'barber'` and tied to a valid barbershop.
+- Barbers cannot read or manage profiles from another barbershop.
+
+### Barbers
+
+- `anon` can read active barbers needed for public booking.
+- `authenticated` users can read barbers only from their own barbershop.
+- Owners can manage barbers only inside their own barbershop.
+- Barbers cannot manage other barbers.
+
+### Services
+
+- `anon` can read active services needed for public booking.
+- `authenticated` users can read services only from their own barbershop.
+- Owners can manage services only inside their own barbershop.
+- Barbers cannot manage services.
+
+### Appointments
+
+- `anon` can insert public appointments only with `status = 'scheduled'`.
+- Public inserts require a non-null `barbershop_id`, required client/service/time fields, valid time range, and an active matching barbershop.
+- Owners can read, insert, update, and delete appointments only inside their own barbershop.
+- Barbers can read, insert, and update appointments only inside their own barbershop and own `barber_id`.
+- Barbers cannot delete appointments.
+
+## Public Slots View
+
+`public.public_appointment_slots` remains the public read surface for booking availability.
+
+The view exposes:
+
+```txt
+barbershop_id
+barber_id
+barber_name
+start_at
+end_at
+status
+```
+
+It allows only `SELECT` for `anon` and `authenticated`.
+
+It does not expose sensitive client data such as:
+
+```txt
+client_name
+client_phone
+notes
+financial_record_id
+```
+
+Public booking must continue to use this view for availability instead of reading full `appointments` rows.
+
+## Validated Production Flows
+
+Validated successfully after manual RLS application:
+
+- `/book`
+- `/book/gestao-maxima`
+- `/book/barbearia-inexistente` remains blocked
+- owner login
+- barber login
+- owner dashboard
+- barber dashboard
+- public appointment creation
+- public booking availability through `public.public_appointment_slots`
+
+## Not Applied Yet
+
+These hardening steps remain intentionally pending:
+
+- `barbershop_id NOT NULL` was not applied in this step.
+- The temporary trigger `set_default_appointment_barbershop_id` was not removed.
+- A real second barbershop was not created for production use.
+
+## Recommended Next Steps
+
+1. Test with a fake second barbershop in a controlled environment.
+2. Verify owner isolation across two barbershops.
+3. Verify barber isolation across two barbershops and multiple barbers.
+4. Harden public appointment `barber_id` and `service_id` checks further if production data requires stricter public booking constraints.
+5. After multi-tenant validation, evaluate applying `barbershop_id NOT NULL`.
+6. After `barbershop_id NOT NULL` is safe, evaluate removing the temporary `set_default_appointment_barbershop_id` trigger.
