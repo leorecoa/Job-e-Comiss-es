@@ -103,6 +103,8 @@ These steps were intentionally not included:
 - The temporary trigger `set_default_appointment_barbershop_id` has not been removed.
 - A real second production barbershop has not been created.
 
+The removal plan for the temporary trigger is documented in `docs/supabase-remove-appointment-barbershop-trigger-plan.md`.
+
 ## Recommended Next Steps
 
 1. Plan safe removal of the temporary trigger `set_default_appointment_barbershop_id`.
