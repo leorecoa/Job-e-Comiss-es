@@ -42,6 +42,34 @@ public.public_appointment_slots
 
 Confirm the public slots view still returns occupied slots for anonymous public booking after RLS is applied. If the view uses `security_invoker`, validate the underlying permissions/RLS behavior carefully in the controlled environment before production.
 
+## Existing Broad Policies
+
+The current production Supabase state previously included broad role-based policies that did not consistently enforce `barbershop_id`.
+
+The hardened plan removes those policies explicitly by name before recreating tenant-aware policies:
+
+```txt
+appointments_authenticated_delete
+appointments_authenticated_insert
+appointments_authenticated_read
+appointments_authenticated_update
+appointments_public_insert_scheduled
+barbers_owner_manage
+barbers_public_read_active
+services_owner_manage
+services_public_read_active
+profiles_insert_own_as_barber
+profiles_owner_manage
+profiles_owner_read_all
+profiles_select_own
+barbershops_authenticated_read_own
+barbershops_public_read_active
+```
+
+During review, confirm there are no additional production policies with broad `owner` access that bypass `barbershop_id = private.current_user_barbershop_id()`.
+
+Owner access in the hardened plan is tenant-scoped, not global.
+
 ## Suggested Application Flow
 
 1. Apply the policy plan in a Supabase staging or controlled project.

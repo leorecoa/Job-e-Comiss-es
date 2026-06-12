@@ -34,11 +34,26 @@ alter table public.appointments enable row level security;
 -- tenant-aware checks.
 
 drop policy if exists "barbers_owner_all" on public.barbers;
+drop policy if exists "barbers_owner_manage" on public.barbers;
+drop policy if exists "barbers_public_read_active" on public.barbers;
+
 drop policy if exists "services_owner_all" on public.services;
+drop policy if exists "services_owner_manage" on public.services;
+drop policy if exists "services_public_read_active" on public.services;
+
 drop policy if exists "appointments_authenticated_read" on public.appointments;
 drop policy if exists "appointments_authenticated_update" on public.appointments;
 drop policy if exists "appointments_authenticated_insert" on public.appointments;
 drop policy if exists "appointments_authenticated_delete" on public.appointments;
+drop policy if exists "appointments_public_insert_scheduled" on public.appointments;
+
+drop policy if exists "profiles_insert_own_as_barber" on public.profiles;
+drop policy if exists "profiles_owner_manage" on public.profiles;
+drop policy if exists "profiles_owner_read_all" on public.profiles;
+drop policy if exists "profiles_select_own" on public.profiles;
+
+drop policy if exists "barbershops_authenticated_read_own" on public.barbershops;
+drop policy if exists "barbershops_public_read_active" on public.barbershops;
 
 -- ---------------------------------------------------------------------------
 -- Barbershops
@@ -93,6 +108,24 @@ for insert
 to authenticated
 with check (
   id = auth.uid()
+  and role = 'barber'
+  and barbershop_id is not null
+  and exists (
+    select 1
+    from public.barbershops b
+    where b.id = profiles.barbershop_id
+      and b.active = true
+  )
+  and (
+    barber_id is null
+    or exists (
+      select 1
+      from public.barbers br
+      where br.id = profiles.barber_id
+        and br.barbershop_id = profiles.barbershop_id
+        and br.active = true
+    )
+  )
 );
 
 drop policy if exists "profiles_update_own" on public.profiles;
@@ -101,7 +134,27 @@ on public.profiles
 for update
 to authenticated
 using (id = auth.uid())
-with check (id = auth.uid());
+with check (
+  id = auth.uid()
+  and role = 'barber'
+  and barbershop_id = private.current_user_barbershop_id()
+  and exists (
+    select 1
+    from public.barbershops b
+    where b.id = profiles.barbershop_id
+      and b.active = true
+  )
+  and (
+    barber_id is null
+    or exists (
+      select 1
+      from public.barbers br
+      where br.id = profiles.barber_id
+        and br.barbershop_id = profiles.barbershop_id
+        and br.active = true
+    )
+  )
+);
 
 drop policy if exists "profiles_owner_insert_own_barbershop" on public.profiles;
 create policy "profiles_owner_insert_own_barbershop"
@@ -111,6 +164,16 @@ to authenticated
 with check (
   private.current_user_role() = 'owner'
   and barbershop_id = private.current_user_barbershop_id()
+  and (
+    barber_id is null
+    or exists (
+      select 1
+      from public.barbers br
+      where br.id = profiles.barber_id
+        and br.barbershop_id = profiles.barbershop_id
+        and br.active = true
+    )
+  )
 );
 
 drop policy if exists "profiles_owner_update_own_barbershop" on public.profiles;
@@ -125,6 +188,16 @@ using (
 with check (
   private.current_user_role() = 'owner'
   and barbershop_id = private.current_user_barbershop_id()
+  and (
+    barber_id is null
+    or exists (
+      select 1
+      from public.barbers br
+      where br.id = profiles.barber_id
+        and br.barbershop_id = profiles.barbershop_id
+        and br.active = true
+    )
+  )
 );
 
 drop policy if exists "profiles_owner_delete_own_barbershop" on public.profiles;
@@ -350,6 +423,26 @@ to authenticated
 with check (
   private.current_user_role() = 'owner'
   and barbershop_id = private.current_user_barbershop_id()
+  and (
+    barber_id is null
+    or exists (
+      select 1
+      from public.barbers br
+      where br.id = appointments.barber_id
+        and br.barbershop_id = appointments.barbershop_id
+        and br.active = true
+    )
+  )
+  and (
+    service_id is null
+    or exists (
+      select 1
+      from public.services s
+      where s.id = appointments.service_id
+        and s.barbershop_id = appointments.barbershop_id
+        and s.active = true
+    )
+  )
 );
 
 drop policy if exists "appointments_barber_insert_own" on public.appointments;
@@ -361,6 +454,16 @@ with check (
   private.current_user_role() = 'barber'
   and barbershop_id = private.current_user_barbershop_id()
   and barber_id = private.current_user_barber_id()
+  and (
+    service_id is null
+    or exists (
+      select 1
+      from public.services s
+      where s.id = appointments.service_id
+        and s.barbershop_id = appointments.barbershop_id
+        and s.active = true
+    )
+  )
 );
 
 drop policy if exists "appointments_owner_update_own_barbershop" on public.appointments;
@@ -375,6 +478,26 @@ using (
 with check (
   private.current_user_role() = 'owner'
   and barbershop_id = private.current_user_barbershop_id()
+  and (
+    barber_id is null
+    or exists (
+      select 1
+      from public.barbers br
+      where br.id = appointments.barber_id
+        and br.barbershop_id = appointments.barbershop_id
+        and br.active = true
+    )
+  )
+  and (
+    service_id is null
+    or exists (
+      select 1
+      from public.services s
+      where s.id = appointments.service_id
+        and s.barbershop_id = appointments.barbershop_id
+        and s.active = true
+    )
+  )
 );
 
 drop policy if exists "appointments_barber_update_own" on public.appointments;
@@ -391,6 +514,16 @@ with check (
   private.current_user_role() = 'barber'
   and barbershop_id = private.current_user_barbershop_id()
   and barber_id = private.current_user_barber_id()
+  and (
+    service_id is null
+    or exists (
+      select 1
+      from public.services s
+      where s.id = appointments.service_id
+        and s.barbershop_id = appointments.barbershop_id
+        and s.active = true
+    )
+  )
 );
 
 drop policy if exists "appointments_owner_delete_own_barbershop" on public.appointments;
