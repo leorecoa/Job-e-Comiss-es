@@ -159,6 +159,8 @@ These steps remain intentionally pending:
 
 `barbershop_id NOT NULL` was later applied and validated in production. See `docs/supabase-barbershop-id-not-null-applied.md`.
 
+The temporary trigger removal plan is documented in `docs/supabase-remove-appointment-barbershop-trigger-plan.md`.
+
 ## Recommended Next Steps
 
 1. Keep the second fake barbershop available for isolation validation.

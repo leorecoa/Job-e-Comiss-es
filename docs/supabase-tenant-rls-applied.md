@@ -160,6 +160,8 @@ These hardening steps remain intentionally pending:
 - The temporary trigger `set_default_appointment_barbershop_id` was not removed.
 - A real second production barbershop was not created for business use.
 
+The temporary trigger removal plan is documented in `docs/supabase-remove-appointment-barbershop-trigger-plan.md`.
+
 ## Recommended Next Steps
 
 1. Keep the fake second-barbershop validation scenario available before critical RLS changes.
