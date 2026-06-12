@@ -147,11 +147,16 @@ The public appointment insert policy was later hardened to require `barbershop_i
 
 See `docs/public-appointment-entity-id-hardening.md` for the applied-state record and production validation.
 
+## Barbershop ID NOT NULL
+
+`barbershop_id` was later set to `NOT NULL` on `profiles`, `barbers`, `services`, and `appointments`.
+
+See `docs/supabase-barbershop-id-not-null-applied.md` for the applied-state record and production validation.
+
 ## Not Applied Yet
 
 These hardening steps remain intentionally pending:
 
-- `barbershop_id NOT NULL` was not applied in this step.
 - The temporary trigger `set_default_appointment_barbershop_id` was not removed.
 - A real second production barbershop was not created for business use.
 
@@ -160,5 +165,5 @@ These hardening steps remain intentionally pending:
 1. Keep the fake second-barbershop validation scenario available before critical RLS changes.
 2. Verify barber isolation across multiple barbers whenever barber policies change.
 3. Harden public appointment `barber_id` and `service_id` checks further if production data requires stricter public booking constraints.
-4. After continued multi-tenant validation, evaluate applying `barbershop_id NOT NULL`.
-5. After `barbershop_id NOT NULL` is safe, evaluate removing the temporary `set_default_appointment_barbershop_id` trigger.
+4. Validate that no flow depends on automatic fallback assignment of `barbershop_id`.
+5. Plan safe removal of the temporary `set_default_appointment_barbershop_id` trigger.

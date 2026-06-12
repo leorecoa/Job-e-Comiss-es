@@ -167,7 +167,7 @@ The application should not depend on this trigger in the normal public booking f
 
 Do not remove the trigger yet.
 
-Do not apply `NOT NULL` to `barbershop_id` yet.
+`barbershop_id NOT NULL` has since been applied and validated in production. See `docs/supabase-barbershop-id-not-null-applied.md`.
 
 Tenant-aware RLS has been applied manually in Supabase after review and production validation.
 
@@ -188,7 +188,7 @@ Recorded state:
 * keep public booking working
 * preserve `/book` fallback and invalid slug blocking
 * keep the temporary public appointment fallback trigger for now
-* keep `barbershop_id` nullable until a later validation step decides otherwise
+* keep `barbershop_id NOT NULL` enforced in the main tenant tables
 
 ## Later hardening steps
 
@@ -196,6 +196,6 @@ After the applied tenant-aware RLS state remains stable:
 
 1. keep or repeat the fake second-barbershop validation before critical RLS changes
 2. keep the hardened public appointment `barber_id` and `service_id` checks validated before critical RLS changes
-3. apply `barbershop_id NOT NULL` only in a later separate step
+3. validate that no flow depends on automatic fallback assignment of `barbershop_id`
 4. remove temporary appointment fallback trigger in a separate PR/window
 5. document final multi-tenant production contract

@@ -6,6 +6,8 @@ This document is a plan for applying `NOT NULL` to `barbershop_id` in the main S
 
 It is documentation only. Do not execute this file as a migration without a separate manual review and controlled application window.
 
+This plan has since been applied manually in Supabase and validated in production. See `docs/supabase-barbershop-id-not-null-applied.md`.
+
 ## Objective
 
 Make tenant ownership mandatory at the database schema level for the core tenant-scoped tables.

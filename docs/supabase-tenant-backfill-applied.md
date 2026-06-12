@@ -38,7 +38,7 @@ Initial tenant backfill was applied successfully in Supabase.
 * Public booking availability reads `public.public_appointment_slots`.
 * `public.public_appointment_slots` exposes `barber_id`, `barber_name`, `start_at`, `end_at`, `status`, and `barbershop_id` in that order.
 
-## Current decision
+## Decision At Backfill Time
 
 `barbershop_id` remains nullable for now.
 
@@ -49,6 +49,16 @@ Do not enforce tenant RLS on all tables yet.
 The temporary appointment trigger remains only as a safety fallback. The normal public booking flow should resolve a barbershop and send `barbershop_id` explicitly.
 
 The public slots view hotfix should remain documented as reference state, not as a new executable migration. Keep `barbershop_id` at the end of the view definition to avoid PostgreSQL renaming/reordering errors during `create or replace view`.
+
+## Later Applied State
+
+Tenant-aware RLS, public appointment entity ID hardening, and `barbershop_id NOT NULL` were later applied and validated.
+
+See:
+
+* `docs/supabase-tenant-rls-applied.md`
+* `docs/public-appointment-entity-id-hardening.md`
+* `docs/supabase-barbershop-id-not-null-applied.md`
 
 ## Manual validation
 
@@ -67,4 +77,4 @@ Validated successfully:
 * Introduce public booking by barbershop slug.
 * Replace the temporary default trigger with explicit tenant resolution.
 * Enforce tenant isolation with RLS across `profiles`, `barbers`, `services`, and `appointments`.
-* Only after full validation, consider making `barbershop_id` `NOT NULL`.
+* Keep the temporary trigger until a separate removal plan validates that no flow depends on automatic fallback assignment.
