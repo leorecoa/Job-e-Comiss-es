@@ -141,6 +141,12 @@ The validation confirmed:
 - `/book/barbearia-inexistente` remained blocked.
 - Appointment counts remained isolated: Gestão Máxima with 24 appointments and Barbearia Fake RLS with 1 appointment.
 
+## Public Appointment Entity IDs
+
+The public appointment insert policy was later hardened to require `barbershop_id`, `barber_id`, and `service_id` for new public appointments.
+
+See `docs/public-appointment-entity-id-hardening.md` for the applied-state record and production validation.
+
 ## Not Applied Yet
 
 These hardening steps remain intentionally pending:

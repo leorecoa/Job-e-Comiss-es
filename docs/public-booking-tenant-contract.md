@@ -88,6 +88,8 @@ Tenant-aware RLS has since been applied manually in Supabase and validated in pr
 
 Isolation with a second fake barbershop was validated in Supabase. See `docs/supabase-tenant-isolation-validation.md`.
 
+Public appointment inserts were later hardened to require `barbershop_id`, `barber_id`, and `service_id`. See `docs/public-appointment-entity-id-hardening.md`.
+
 ## Public slots view contract
 
 Public booking availability is calculated from `public.public_appointment_slots`, not from full `appointments` rows.
@@ -193,7 +195,7 @@ Recorded state:
 After the applied tenant-aware RLS state remains stable:
 
 1. keep or repeat the fake second-barbershop validation before critical RLS changes
-2. harden public appointment `barber_id` and `service_id` checks if needed
+2. keep the hardened public appointment `barber_id` and `service_id` checks validated before critical RLS changes
 3. apply `barbershop_id NOT NULL` only in a later separate step
 4. remove temporary appointment fallback trigger in a separate PR/window
 5. document final multi-tenant production contract
