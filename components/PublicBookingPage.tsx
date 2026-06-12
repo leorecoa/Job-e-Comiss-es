@@ -234,12 +234,27 @@ const handleSubmit = async (event: React.FormEvent) => {
     return;
   }
 
+  if (!selectedBarber?.id) {
+    setErrors(['Selecione um barbeiro.']);
+    return;
+  }
+
+  if (!selectedService?.id) {
+    setErrors(['Selecione um serviço.']);
+    return;
+  }
+
+  if (!selectedSlot) {
+    setErrors(['Selecione um horário.']);
+    return;
+  }
+
   const input: PublicBookingInput = {
     clientName,
     clientPhone,
-    barberId: selectedBarber?.id,
+    barberId: selectedBarber.id,
     barbershopId: barbershop.id,
-    barberName: selectedBarber?.name || '',
+    barberName: selectedBarber.name,
     service: selectedService,
     selectedSlot,
     notes
@@ -469,7 +484,7 @@ const handleSubmit = async (event: React.FormEvent) => {
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
             </div>
 
-            <button type="submit" disabled={!barbershop || !selectedBarber || !selectedService || !selectedSlot || isSubmitting} className="w-full bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg shadow-gold-500/20">
+            <button type="submit" disabled={!barbershop?.id || !selectedBarber?.id || !selectedService?.id || !selectedSlot || isSubmitting} className="w-full bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg shadow-gold-500/20">
               {isSubmitting ? 'Confirmando...' : 'Agendar horario'}
             </button>
           </form>
