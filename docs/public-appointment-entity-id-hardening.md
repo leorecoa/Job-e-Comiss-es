@@ -154,14 +154,15 @@ This keeps public booking tenant-aware without exposing full appointment reads o
 
 These steps remain intentionally pending:
 
-- `barbershop_id NOT NULL` has not been applied.
 - The temporary trigger `set_default_appointment_barbershop_id` has not been removed.
 - A real second production barbershop has not been created.
+
+`barbershop_id NOT NULL` was later applied and validated in production. See `docs/supabase-barbershop-id-not-null-applied.md`.
 
 ## Recommended Next Steps
 
 1. Keep the second fake barbershop available for isolation validation.
 2. Repeat validation before any critical RLS change.
-3. Evaluate `barbershop_id NOT NULL` after the hardened public insert policy remains stable.
-4. Remove the temporary `set_default_appointment_barbershop_id` trigger only after stabilization.
+3. Plan safe removal of the temporary `set_default_appointment_barbershop_id` trigger.
+4. Validate that no flow depends on automatic fallback assignment of `barbershop_id`.
 5. Keep documenting manual Supabase changes that affect RLS, public booking, or tenant isolation.
