@@ -6,7 +6,7 @@ This is a documentation-only plan for safely removing the temporary appointment 
 
 Do not execute this document as a migration. Do not apply the SQL without a separate manual review and controlled production window.
 
-The trigger has not been removed yet.
+This plan has since been applied manually in Supabase and validated in production. See `docs/supabase-appointment-barbershop-trigger-removal-applied.md`.
 
 ## Temporary Trigger
 
