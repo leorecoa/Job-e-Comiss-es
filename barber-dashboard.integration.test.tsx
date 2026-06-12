@@ -249,6 +249,24 @@ describe('Public Booking Page Logic', () => {
     expect(barbershopRepository.getBarbershopBySlug).not.toHaveBeenCalledWith(DEFAULT_BARBERSHOP_SLUG);
   });
 
+  it('/book/barbearia-fake-rls uses the fake barbershop slug without fallback', async () => {
+    const fakeSlug = 'barbearia-fake-rls';
+    vi.mocked(barbershopRepository.getBarbershopBySlug).mockResolvedValue({
+      id: 'fc9bb084-eb2c-4fd4-a287-83dbe6bb6ea3',
+      name: 'Barbearia Fake RLS',
+      slug: fakeSlug,
+      active: true
+    });
+
+    const publicBookingSlug = getPublicBookingSlugFromPath(`/book/${fakeSlug}`);
+
+    await barbershopRepository.getBarbershopBySlug(publicBookingSlug ?? DEFAULT_BARBERSHOP_SLUG);
+
+    expect(publicBookingSlug).toBe(fakeSlug);
+    expect(barbershopRepository.getBarbershopBySlug).toHaveBeenCalledWith(fakeSlug);
+    expect(barbershopRepository.getBarbershopBySlug).not.toHaveBeenCalledWith(DEFAULT_BARBERSHOP_SLUG);
+  });
+
   it('should call getBarbershopBySlug with the provided slug', async () => {
     const customSlug = 'minha-barbearia';
     vi.mocked(barbershopRepository.getBarbershopBySlug).mockResolvedValue({
@@ -315,6 +333,7 @@ describe('Public Booking Page Logic', () => {
       barbershopId: DEFAULT_BARBERSHOP_ID,
       clientName: 'Test Client',
       clientPhone: '1234567890',
+      barberId: 'barber-1',
       barberName: 'Gabriel',
       service: { id: 'service-1', name: 'Corte', price: 50, durationMinutes: 30, barbershopId: DEFAULT_BARBERSHOP_ID },
       selectedSlot: { startAt: '2026-06-10T10:00:00Z', endAt: '2026-06-10T10:30:00Z', label: '10:00', available: true },
@@ -322,6 +341,53 @@ describe('Public Booking Page Logic', () => {
 
     const createdAppointment = createPublicAppointment(mockAppointmentInput, 'new-app-id');
     expect(createdAppointment.barbershopId).toBe(DEFAULT_BARBERSHOP_ID);
+    expect(createdAppointment.barberId).toBe('barber-1');
+    expect(createdAppointment.serviceId).toBe('service-1');
+  });
+
+  it('public booking without barberId does not create an appointment', () => {
+    const createAppointment = vi.fn();
+    const input = {
+      barbershopId: DEFAULT_BARBERSHOP_ID,
+      clientName: 'Test Client',
+      clientPhone: '1234567890',
+      barberName: 'Gabriel',
+      service: { id: 'service-1', name: 'Corte', price: 50, durationMinutes: 30, barbershopId: DEFAULT_BARBERSHOP_ID },
+      selectedSlot: { startAt: '2026-06-10T10:00:00Z', endAt: '2026-06-10T10:30:00Z', label: '10:00', available: true },
+    } as any;
+
+    const result = validatePublicBookingInput(input, []);
+
+    if (result.valid) {
+      createAppointment(createPublicAppointment(input, 'new-app-id'));
+    }
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Selecione um barbeiro.');
+    expect(createAppointment).not.toHaveBeenCalled();
+  });
+
+  it('public booking without serviceId does not create an appointment', () => {
+    const createAppointment = vi.fn();
+    const input = {
+      barbershopId: DEFAULT_BARBERSHOP_ID,
+      clientName: 'Test Client',
+      clientPhone: '1234567890',
+      barberId: 'barber-1',
+      barberName: 'Gabriel',
+      service: { id: '', name: 'Corte', price: 50, durationMinutes: 30, barbershopId: DEFAULT_BARBERSHOP_ID },
+      selectedSlot: { startAt: '2026-06-10T10:00:00Z', endAt: '2026-06-10T10:30:00Z', label: '10:00', available: true },
+    } as any;
+
+    const result = validatePublicBookingInput(input, []);
+
+    if (result.valid) {
+      createAppointment(createPublicAppointment(input, 'new-app-id'));
+    }
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Selecione um serviço.');
+    expect(createAppointment).not.toHaveBeenCalled();
   });
 
   it('should fail validation when barbershopId is missing', () => {

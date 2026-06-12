@@ -418,6 +418,45 @@ describe('public booking helpers', () => {
     expect(appointment.clientName).toBe('Maria');
     expect(appointment.clientPhone).toBe('85988887777');
     expect(appointment.serviceType).toBe(settings.services[0].name);
+    expect(appointment.serviceValue).toBe(settings.services[0].price);
+    expect(appointment.commissionRate).toBe(settings.services[0].commissionRate);
+    expect(appointment.startAt).toBe(slot.startAt);
+    expect(appointment.endAt).toBe(slot.endAt);
+  });
+
+  it('rejects public appointment creation without barbershopId', () => {
+    expect(() => createPublicAppointment({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barberId: 'barber-1',
+      barbershopId: '',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, 'public-1')).toThrow('Barbearia');
+  });
+
+  it('rejects public appointment creation without barberId', () => {
+    expect(() => createPublicAppointment({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, 'public-1')).toThrow('Selecione um barbeiro.');
+  });
+
+  it('rejects public appointment creation without serviceId', () => {
+    expect(() => createPublicAppointment({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barberId: 'barber-1',
+      barbershopId: 'shop-1',
+      barberName: 'Carlos',
+      service: { ...settings.services[0], id: '' },
+      selectedSlot: slot
+    }, 'public-1')).toThrow('Selecione um serviço.');
   });
 
   it('validates required public booking fields', () => {
@@ -432,6 +471,8 @@ describe('public booking helpers', () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Barbearia não encontrada ou indisponível.');
+    expect(result.errors).toContain('Selecione um barbeiro.');
+    expect(result.errors).toContain('Selecione um serviço.');
     expect(result.errors).toContain('Escolha um barbeiro.');
     expect(result.errors).toContain('Escolha um servico.');
     expect(result.errors).toContain('Escolha um horario disponivel.');

@@ -234,6 +234,8 @@ export const validatePublicBookingInput = (
 ): PublicBookingValidationResult => {
   const errors: string[] = [];
   const phoneDigits = normalizePhoneDigits(input.clientPhone);
+  if (!input.barberId) errors.push('Selecione um barbeiro.');
+  if (!input.service?.id) errors.push('Selecione um serviço.');
 
   if (!input.barbershopId) errors.push('Barbearia não encontrada ou indisponível.');
   if (!input.barberName) errors.push('Escolha um barbeiro.');
@@ -266,9 +268,10 @@ export const createPublicAppointment = (
   id: string,
   now: Date = new Date()
 ): Appointment => {
-  if (!input.service || !input.selectedSlot) {
-    throw new Error('Cannot create appointment without service and slot.');
-  }
+  if (!input.barbershopId) throw new Error('Barbearia não encontrada ou indisponível.');
+  if (!input.barberId) throw new Error('Selecione um barbeiro.');
+  if (!input.service?.id) throw new Error('Selecione um serviço.');
+  if (!input.selectedSlot) throw new Error('Selecione um horário.');
 
   const timestamp = now.toISOString();
 
