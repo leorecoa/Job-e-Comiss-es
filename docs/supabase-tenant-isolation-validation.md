@@ -142,6 +142,12 @@ Gestão Máxima and Barbearia Fake RLS did not mix appointments, barbers, or ser
 
 The fake barbershop should remain test-only data and should not be treated as a production business tenant.
 
+## Related Public Insert Hardening
+
+After this isolation validation, public appointment inserts were hardened to require `barbershop_id`, `barber_id`, and `service_id`.
+
+See `docs/public-appointment-entity-id-hardening.md` for the applied-state record and production validation.
+
 ## Still Pending
 
 - `barbershop_id NOT NULL` has not been applied.

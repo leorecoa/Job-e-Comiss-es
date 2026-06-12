@@ -10,6 +10,8 @@ See `docs/supabase-tenant-rls-applied.md` for the applied-state record.
 
 See `docs/supabase-tenant-isolation-validation.md` for the second fake barbershop validation record.
 
+See `docs/public-appointment-entity-id-hardening.md` for the applied public insert hardening that requires `barbershop_id`, `barber_id`, and `service_id`.
+
 Keep these notes as a checklist for future re-application, rollback review, or second-barbershop validation.
 
 For new environments, apply the plan first in a controlled Supabase environment with production-like data.
@@ -104,6 +106,10 @@ notify pgrst, 'reload schema';
 - Anonymous reads from `public.public_appointment_slots` still work after RLS hardening.
 - Public booking creates an appointment with `status = 'scheduled'`.
 - Public booking creates an appointment with a non-null `barbershop_id`.
+- Public booking creates an appointment with a non-null `barber_id`.
+- Public booking creates an appointment with a non-null `service_id`.
+- Public appointment insert rejects a `barber_id` from another barbershop.
+- Public appointment insert rejects a `service_id` from another barbershop.
 
 ### Owner Login
 
