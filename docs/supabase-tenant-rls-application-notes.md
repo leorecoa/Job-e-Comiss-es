@@ -8,6 +8,8 @@ The tenant-aware RLS plan was applied manually in Supabase and validated in prod
 
 See `docs/supabase-tenant-rls-applied.md` for the applied-state record.
 
+See `docs/supabase-tenant-isolation-validation.md` for the second fake barbershop validation record.
+
 Keep these notes as a checklist for future re-application, rollback review, or second-barbershop validation.
 
 For new environments, apply the plan first in a controlled Supabase environment with production-like data.
@@ -151,6 +153,8 @@ When a second barbershop exists:
 - Owner from barbershop A cannot manage barbershop B services.
 - Barber from barbershop A cannot read barbershop B data.
 - Barber from barbershop A cannot read another barber's appointments in barbershop A.
+
+The first practical second-barbershop validation was recorded in `docs/supabase-tenant-isolation-validation.md` using `Barbearia Fake RLS`.
 
 ## Rollback Notes
 

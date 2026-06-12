@@ -127,19 +127,32 @@ Validated successfully after manual RLS application:
 - public appointment creation
 - public booking availability through `public.public_appointment_slots`
 
+## Second Barbershop Validation
+
+Tenant isolation was validated with a fake second barbershop in Supabase.
+
+See `docs/supabase-tenant-isolation-validation.md` for the validation record, including test IDs and observed results.
+
+The validation confirmed:
+
+- Gestão Máxima owner dashboard did not show fake barbershop data.
+- `/book/gestao-maxima` did not list fake barbers or services.
+- `/book/barbearia-fake-rls` opened the fake barbershop and showed only fake barbershop data.
+- `/book/barbearia-inexistente` remained blocked.
+- Appointment counts remained isolated: Gestão Máxima with 24 appointments and Barbearia Fake RLS with 1 appointment.
+
 ## Not Applied Yet
 
 These hardening steps remain intentionally pending:
 
 - `barbershop_id NOT NULL` was not applied in this step.
 - The temporary trigger `set_default_appointment_barbershop_id` was not removed.
-- A real second barbershop was not created for production use.
+- A real second production barbershop was not created for business use.
 
 ## Recommended Next Steps
 
-1. Test with a fake second barbershop in a controlled environment.
-2. Verify owner isolation across two barbershops.
-3. Verify barber isolation across two barbershops and multiple barbers.
-4. Harden public appointment `barber_id` and `service_id` checks further if production data requires stricter public booking constraints.
-5. After multi-tenant validation, evaluate applying `barbershop_id NOT NULL`.
-6. After `barbershop_id NOT NULL` is safe, evaluate removing the temporary `set_default_appointment_barbershop_id` trigger.
+1. Keep the fake second-barbershop validation scenario available before critical RLS changes.
+2. Verify barber isolation across multiple barbers whenever barber policies change.
+3. Harden public appointment `barber_id` and `service_id` checks further if production data requires stricter public booking constraints.
+4. After continued multi-tenant validation, evaluate applying `barbershop_id NOT NULL`.
+5. After `barbershop_id NOT NULL` is safe, evaluate removing the temporary `set_default_appointment_barbershop_id` trigger.
