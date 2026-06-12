@@ -52,13 +52,14 @@ The public slots view hotfix should remain documented as reference state, not as
 
 ## Later Applied State
 
-Tenant-aware RLS, public appointment entity ID hardening, and `barbershop_id NOT NULL` were later applied and validated.
+Tenant-aware RLS, public appointment entity ID hardening, `barbershop_id NOT NULL`, and temporary trigger removal were later applied and validated.
 
 See:
 
 * `docs/supabase-tenant-rls-applied.md`
 * `docs/public-appointment-entity-id-hardening.md`
 * `docs/supabase-barbershop-id-not-null-applied.md`
+* `docs/supabase-appointment-barbershop-trigger-removal-applied.md`
 
 ## Manual validation
 
@@ -75,6 +76,6 @@ Validated successfully:
 
 * Add tenant-aware frontend flow.
 * Introduce public booking by barbershop slug.
-* Replace the temporary default trigger with explicit tenant resolution.
+* Temporary default trigger was replaced by explicit tenant resolution.
 * Enforce tenant isolation with RLS across `profiles`, `barbers`, `services`, and `appointments`.
-* Keep the temporary trigger until a separate removal plan validates that no flow depends on automatic fallback assignment.
+* Keep validating that no flow depends on automatic fallback assignment.

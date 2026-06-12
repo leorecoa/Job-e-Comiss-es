@@ -12,18 +12,15 @@ See `docs/supabase-tenant-isolation-validation.md` for the second fake barbersho
 
 See `docs/public-appointment-entity-id-hardening.md` for the applied public insert hardening that requires `barbershop_id`, `barber_id`, and `service_id`.
 
+See `docs/supabase-barbershop-id-not-null-applied.md` for the applied `barbershop_id NOT NULL` record.
+
+See `docs/supabase-appointment-barbershop-trigger-removal-applied.md` for the applied temporary trigger removal record.
+
 Keep these notes as a checklist for future re-application, rollback review, or second-barbershop validation.
 
 For new environments, apply the plan first in a controlled Supabase environment with production-like data.
 
-Do not apply `NOT NULL` as part of this step.
-
-Do not remove the temporary public appointment fallback trigger:
-
-```txt
-public.set_default_appointment_barbershop_id()
-set_default_appointment_barbershop_id
-```
+For this historical RLS step, `NOT NULL` and trigger removal were intentionally separate follow-up actions. Both have since been applied and validated.
 
 ## Preconditions
 

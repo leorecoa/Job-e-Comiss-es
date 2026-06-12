@@ -157,15 +157,14 @@ See `docs/supabase-barbershop-id-not-null-applied.md` for the applied-state reco
 
 These hardening steps remain intentionally pending:
 
-- The temporary trigger `set_default_appointment_barbershop_id` was not removed.
 - A real second production barbershop was not created for business use.
 
-The temporary trigger removal plan is documented in `docs/supabase-remove-appointment-barbershop-trigger-plan.md`.
+The temporary trigger `set_default_appointment_barbershop_id` was later removed and validated in production. See `docs/supabase-appointment-barbershop-trigger-removal-applied.md`.
 
 ## Recommended Next Steps
 
 1. Keep the fake second-barbershop validation scenario available before critical RLS changes.
 2. Verify barber isolation across multiple barbers whenever barber policies change.
 3. Harden public appointment `barber_id` and `service_id` checks further if production data requires stricter public booking constraints.
-4. Validate that no flow depends on automatic fallback assignment of `barbershop_id`.
-5. Plan safe removal of the temporary `set_default_appointment_barbershop_id` trigger.
+4. Clean fake validation data when it is no longer needed.
+5. Evaluate multi-barbershop dashboards separately if needed.

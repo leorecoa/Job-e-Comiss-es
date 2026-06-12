@@ -100,14 +100,13 @@ Observed result:
 
 These steps were intentionally not included:
 
-- The temporary trigger `set_default_appointment_barbershop_id` has not been removed.
 - A real second production barbershop has not been created.
 
-The removal plan for the temporary trigger is documented in `docs/supabase-remove-appointment-barbershop-trigger-plan.md`.
+The temporary trigger `set_default_appointment_barbershop_id` was later removed and validated in production. See `docs/supabase-appointment-barbershop-trigger-removal-applied.md`.
 
 ## Recommended Next Steps
 
-1. Plan safe removal of the temporary trigger `set_default_appointment_barbershop_id`.
-2. Validate that no flow depends on automatic fallback assignment of `barbershop_id`.
-3. Keep the fake second barbershop available for isolation regression checks.
-4. After trigger removal is applied and validated, document that removal in a separate record.
+1. Keep the fake second barbershop available for isolation regression checks.
+2. Clean fake validation data when it is no longer needed.
+3. Create a real second production barbershop only when there is a business flow for it.
+4. Evaluate multi-barbershop dashboards separately if needed.

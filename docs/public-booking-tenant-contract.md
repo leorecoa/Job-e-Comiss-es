@@ -150,22 +150,22 @@ Without this column, PostgREST returns:
 column public_appointment_slots.barbershop_id does not exist
 ```
 
-## Temporary database fallback
+## Removed temporary database fallback
 
-Supabase still has a temporary fallback trigger for public appointments:
+Supabase previously had a temporary fallback trigger for public appointments:
 
 ```txt
 function: public.set_default_appointment_barbershop_id()
 trigger: set_default_appointment_barbershop_id
 ```
 
-This trigger exists only as a safety fallback.
+This trigger was removed after tenant hardening was completed and validated.
 
-The application should not depend on this trigger in the normal public booking flow.
+The application must not depend on fallback assignment in the normal public booking flow.
+
+See `docs/supabase-appointment-barbershop-trigger-removal-applied.md`.
 
 ## Current decision
-
-Do not remove the trigger yet.
 
 `barbershop_id NOT NULL` has since been applied and validated in production. See `docs/supabase-barbershop-id-not-null-applied.md`.
 
@@ -187,8 +187,8 @@ Recorded state:
 * keep owner and barber dashboards working
 * keep public booking working
 * preserve `/book` fallback and invalid slug blocking
-* keep the temporary public appointment fallback trigger for now
 * keep `barbershop_id NOT NULL` enforced in the main tenant tables
+* keep temporary fallback trigger removed
 
 ## Later hardening steps
 
@@ -196,6 +196,6 @@ After the applied tenant-aware RLS state remains stable:
 
 1. keep or repeat the fake second-barbershop validation before critical RLS changes
 2. keep the hardened public appointment `barber_id` and `service_id` checks validated before critical RLS changes
-3. validate that no flow depends on automatic fallback assignment of `barbershop_id`
-4. remove temporary appointment fallback trigger in a separate PR/window
-5. document final multi-tenant production contract
+3. clean fake validation data when it is no longer needed
+4. create a real second production barbershop only when there is a business flow for it
+5. evaluate multi-barbershop dashboards separately if needed
