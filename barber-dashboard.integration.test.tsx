@@ -5,8 +5,9 @@ import { calculateEstimatedCommission } from './utils';
 import * as barbershopRepository from './services/barbershopRepository';
 import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
-import { Appointment } from './types';
+import { Appointment, DEFAULT_SETTINGS } from './types';
 import { getPublicBookingSlugFromPath } from './App';
+import { getPublicBookingBranding } from './components/PublicBookingPage';
 import { 
   createPublicAppointment, 
   validatePublicBookingInput 
@@ -234,6 +235,52 @@ describe('Public Booking Page Logic', () => {
 
     expect(publicBookingSlug).toBe(DEFAULT_BARBERSHOP_SLUG);
     expect(barbershopRepository.getBarbershopBySlug).toHaveBeenCalledWith(DEFAULT_BARBERSHOP_SLUG);
+  });
+
+  it('/book/gestao-maxima keeps a clean fallback header without image fields', () => {
+    const branding = getPublicBookingBranding({
+      id: DEFAULT_BARBERSHOP_ID,
+      name: 'Gestao Maxima',
+      slug: DEFAULT_BARBERSHOP_SLUG,
+      active: true,
+      phone: null,
+      address: null,
+      logoUrl: null,
+      coverImageUrl: null,
+      description: null,
+      instagramUrl: null,
+      whatsapp: null
+    }, DEFAULT_SETTINGS);
+
+    expect(branding.shopName).toBe('Gestao Maxima');
+    expect(branding.logoUrl).toBeNull();
+    expect(branding.coverImageUrl).toBeNull();
+    expect(branding.hasVisualBranding).toBe(false);
+  });
+
+  it('/book/:slug exposes public branding when fields exist', () => {
+    const branding = getPublicBookingBranding({
+      id: 'barbershop-brand',
+      name: 'Barbearia Premium',
+      slug: 'barbearia-premium',
+      active: true,
+      phone: null,
+      address: 'Rua Central, 100',
+      logoUrl: 'https://cdn.example.com/logo.png',
+      coverImageUrl: 'https://cdn.example.com/cover.jpg',
+      description: 'Cortes classicos com agenda online.',
+      instagramUrl: 'https://instagram.com/barbearia_premium',
+      whatsapp: '5585999999999'
+    }, DEFAULT_SETTINGS);
+
+    expect(branding.shopName).toBe('Barbearia Premium');
+    expect(branding.description).toBe('Cortes classicos com agenda online.');
+    expect(branding.logoUrl).toBe('https://cdn.example.com/logo.png');
+    expect(branding.coverImageUrl).toBe('https://cdn.example.com/cover.jpg');
+    expect(branding.address).toBe('Rua Central, 100');
+    expect(branding.whatsapp).toBe('5585999999999');
+    expect(branding.instagramUrl).toBe('https://instagram.com/barbearia_premium');
+    expect(branding.hasVisualBranding).toBe(true);
   });
 
   it('/book/barbearia-inexistente uses the invalid slug without fallback', async () => {

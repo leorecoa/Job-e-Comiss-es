@@ -24,6 +24,11 @@ export type Barbershop = {
   slug: string;
   phone?: string | null;
   address?: string | null;
+  logoUrl?: string | null;
+  coverImageUrl?: string | null;
+  description?: string | null;
+  instagramUrl?: string | null;
+  whatsapp?: string | null;
   active: boolean;
 };
 
