@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AtSign, CalendarCheck, CheckCircle, Clock, MapPin, MessageCircle, Phone, Scissors } from 'lucide-react';
+import { CalendarCheck, CheckCircle, Clock, MapPin, MessageCircle, Phone, Scissors } from 'lucide-react';
 import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfile } from '../types';
 import { getBarbershopBySlug } from '../services/barbershopRepository';
 import {
@@ -444,7 +444,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                   )}
                   {branding.instagramUrl && (
                     <a href={getExternalHref(branding.instagramUrl)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-pink-400/20 bg-pink-500/10 px-3 py-2 text-pink-100">
-                      <AtSign size={14} />
+                      <MessageCircle size={14} />
                       Instagram
                     </a>
                   )}
