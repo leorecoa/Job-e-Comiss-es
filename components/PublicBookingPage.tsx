@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarCheck, CheckCircle, Clock, MessageCircle, Scissors } from 'lucide-react';
+import { AtSign, CalendarCheck, CheckCircle, Clock, MapPin, MessageCircle, Phone, Scissors } from 'lucide-react';
 import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfile } from '../types';
 import { getBarbershopBySlug } from '../services/barbershopRepository';
 import {
@@ -90,6 +90,38 @@ const normalizeBarberOptions = (
   return Array.from(byValue.values());
 };
 
+export const getPublicBookingBranding = (barbershop: Barbershop | null, settings: AppSettings) => {
+  const shopName = barbershop?.name?.trim() || settings.shopName || 'Gestao Maxima';
+  const logoUrl = barbershop?.logoUrl?.trim() || null;
+  const coverImageUrl = barbershop?.coverImageUrl?.trim() || null;
+  const description = barbershop?.description?.trim() || null;
+  const address = barbershop?.address?.trim() || null;
+  const whatsapp = barbershop?.whatsapp?.trim() || barbershop?.phone?.trim() || null;
+  const instagramUrl = barbershop?.instagramUrl?.trim() || null;
+
+  return {
+    shopName,
+    logoUrl,
+    coverImageUrl,
+    description,
+    address,
+    whatsapp,
+    instagramUrl,
+    hasVisualBranding: Boolean(logoUrl || coverImageUrl || description || address || whatsapp || instagramUrl)
+  };
+};
+
+const getExternalHref = (value: string): string => {
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+};
+
+const getWhatsAppHref = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length >= 10) return `https://wa.me/${digits}`;
+  return getExternalHref(value);
+};
+
 export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   settings: appSettings,
   appointments,
@@ -123,6 +155,10 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
       services: appSettings.services.filter((service) => !service.barbershopId || service.barbershopId === barbershop.id)
     };
   }, [appSettings, barbershop]);
+  const branding = useMemo(
+    () => getPublicBookingBranding(barbershop, settings),
+    [barbershop, settings]
+  );
 
   const barberOptions = useMemo(
     () => normalizeBarberOptions(settings.barbers || [], userProfile?.ownerName),
@@ -355,7 +391,7 @@ const handleSubmit = async (event: React.FormEvent) => {
           <div className="flex items-center gap-3">
             <img src="/brand-mark.svg" alt="Gestao Maxima" className="w-12 h-12" />
             <div>
-              <h1 className="text-white font-display font-bold text-xl">{settings.shopName || 'Gestao Maxima'}</h1>
+              <h1 className="text-white font-display font-bold text-xl">{branding.shopName}</h1>
               <p className="text-gold-400 text-[10px] uppercase tracking-widest font-bold">Agendamento online</p>
             </div>
           </div>
@@ -363,6 +399,60 @@ const handleSubmit = async (event: React.FormEvent) => {
             Painel
           </a>
         </header>
+
+        <section className="glass-card overflow-hidden rounded-2xl mb-5">
+          <div className="relative min-h-[180px] bg-[linear-gradient(135deg,rgba(250,204,21,0.18),rgba(15,23,42,0.86)_45%,rgba(14,165,233,0.16))]">
+            {branding.coverImageUrl && (
+              <img
+                src={branding.coverImageUrl}
+                alt={`Capa da ${branding.shopName}`}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
+            <div className="absolute inset-0 bg-black/55" />
+            <div className="relative flex min-h-[180px] flex-col justify-end p-5 md:p-7">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div className="flex items-end gap-4">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-gray-950/75 text-gold-300 shadow-xl shadow-black/30">
+                    {branding.logoUrl ? (
+                      <img src={branding.logoUrl} alt={`Logo da ${branding.shopName}`} className="h-full w-full object-cover" />
+                    ) : (
+                      <Scissors size={34} />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gold-300">Reserva publica</p>
+                    <h2 className="font-display text-3xl font-bold text-white md:text-4xl">{branding.shopName}</h2>
+                    {branding.description && (
+                      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-200">{branding.description}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 text-xs font-semibold text-gray-200 md:justify-end">
+                  {branding.address && (
+                    <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                      <MapPin size={14} />
+                      {branding.address}
+                    </span>
+                  )}
+                  {branding.whatsapp && (
+                    <a href={getWhatsAppHref(branding.whatsapp)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-green-400/20 bg-green-500/10 px-3 py-2 text-green-200">
+                      <Phone size={14} />
+                      WhatsApp
+                    </a>
+                  )}
+                  {branding.instagramUrl && (
+                    <a href={getExternalHref(branding.instagramUrl)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-pink-400/20 bg-pink-500/10 px-3 py-2 text-pink-100">
+                      <AtSign size={14} />
+                      Instagram
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <main className="grid lg:grid-cols-[0.9fr_1.1fr] gap-5">
           <section className="glass-card rounded-2xl p-6 md:p-7">

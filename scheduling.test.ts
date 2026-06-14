@@ -482,6 +482,27 @@ describe('public booking helpers', () => {
 });
 
 describe('barbershop repository local fallback', () => {
+  it('returns the local gestao-maxima fallback without image fields', async () => {
+    vi.resetModules();
+    vi.doMock('./lib/supabase', () => ({
+      isSupabaseConfigured: false,
+      supabase: null
+    }));
+
+    const { getBarbershopBySlug } = await import('./services/barbershopRepository');
+
+    await expect(getBarbershopBySlug('gestao-maxima')).resolves.toMatchObject({
+      slug: 'gestao-maxima',
+      logoUrl: null,
+      coverImageUrl: null,
+      description: null,
+      instagramUrl: null,
+      whatsapp: null
+    });
+
+    vi.doUnmock('./lib/supabase');
+  });
+
   it("returns null for an invalid slug instead of falling back to gestao-maxima", async () => {
     vi.resetModules();
     vi.doMock('./lib/supabase', () => ({
@@ -492,6 +513,53 @@ describe('barbershop repository local fallback', () => {
     const { getBarbershopBySlug } = await import('./services/barbershopRepository');
 
     await expect(getBarbershopBySlug('barbearia-inexistente')).resolves.toBeNull();
+
+    vi.doUnmock('./lib/supabase');
+  });
+
+  it('maps Supabase branding fields to camelCase', async () => {
+    vi.resetModules();
+
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        id: 'barbershop-brand',
+        name: 'Barbearia Premium',
+        slug: 'barbearia-premium',
+        phone: null,
+        address: 'Rua Central, 100',
+        logo_url: 'https://cdn.example.com/logo.png',
+        cover_image_url: 'https://cdn.example.com/cover.jpg',
+        description: 'Cortes classicos com agenda online.',
+        instagram_url: 'https://instagram.com/barbearia_premium',
+        whatsapp: '5585999999999',
+        active: true
+      },
+      error: null
+    });
+    const eqActive = vi.fn(() => ({ maybeSingle }));
+    const eqSlug = vi.fn(() => ({ eq: eqActive }));
+    const select = vi.fn(() => ({ eq: eqSlug }));
+    const from = vi.fn(() => ({ select }));
+
+    vi.doMock('./lib/supabase', () => ({
+      isSupabaseConfigured: true,
+      supabase: { from }
+    }));
+
+    const { getBarbershopBySlug } = await import('./services/barbershopRepository');
+
+    await expect(getBarbershopBySlug('barbearia-premium')).resolves.toMatchObject({
+      id: 'barbershop-brand',
+      slug: 'barbearia-premium',
+      logoUrl: 'https://cdn.example.com/logo.png',
+      coverImageUrl: 'https://cdn.example.com/cover.jpg',
+      description: 'Cortes classicos com agenda online.',
+      instagramUrl: 'https://instagram.com/barbearia_premium',
+      whatsapp: '5585999999999'
+    });
+
+    expect(from).toHaveBeenCalledWith('barbershops');
+    expect(select).toHaveBeenCalledWith('id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,active');
 
     vi.doUnmock('./lib/supabase');
   });
