@@ -29,6 +29,8 @@ export type Barbershop = {
   description?: string | null;
   instagramUrl?: string | null;
   whatsapp?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
   active: boolean;
 };
 

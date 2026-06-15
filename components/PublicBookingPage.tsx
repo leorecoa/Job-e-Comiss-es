@@ -98,6 +98,8 @@ export const getPublicBookingBranding = (barbershop: Barbershop | null, settings
   const address = barbershop?.address?.trim() || null;
   const whatsapp = barbershop?.whatsapp?.trim() || barbershop?.phone?.trim() || null;
   const instagramUrl = barbershop?.instagramUrl?.trim() || null;
+  const primaryColor = barbershop?.primaryColor?.trim() || null;
+  const secondaryColor = barbershop?.secondaryColor?.trim() || null;
 
   return {
     shopName,
@@ -107,7 +109,9 @@ export const getPublicBookingBranding = (barbershop: Barbershop | null, settings
     address,
     whatsapp,
     instagramUrl,
-    hasVisualBranding: Boolean(logoUrl || coverImageUrl || description || address || whatsapp || instagramUrl)
+    primaryColor,
+    secondaryColor,
+    hasVisualBranding: Boolean(logoUrl || coverImageUrl || description || address || whatsapp || instagramUrl || primaryColor || secondaryColor)
   };
 };
 
@@ -120,6 +124,10 @@ const getWhatsAppHref = (value: string): string => {
   const digits = value.replace(/\D/g, '');
   if (digits.length >= 10) return `https://wa.me/${digits}`;
   return getExternalHref(value);
+};
+
+const isSafeHexColor = (value: string | null): value is string => {
+  return Boolean(value && /^#[0-9a-f]{6}$/i.test(value));
 };
 
 export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
@@ -159,6 +167,15 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     () => getPublicBookingBranding(barbershop, settings),
     [barbershop, settings]
   );
+  const primaryColor = isSafeHexColor(branding.primaryColor) ? branding.primaryColor : '#f59e0b';
+  const secondaryColor = isSafeHexColor(branding.secondaryColor) ? branding.secondaryColor : '#0ea5e9';
+  const brandingHeaderStyle = {
+    background: `linear-gradient(135deg, ${primaryColor}33, rgba(15,23,42,0.86) 45%, ${secondaryColor}26)`
+  };
+  const primaryActionStyle = {
+    backgroundColor: primaryColor,
+    boxShadow: `0 18px 36px ${primaryColor}24`
+  };
 
   const barberOptions = useMemo(
     () => normalizeBarberOptions(settings.barbers || [], userProfile?.ownerName),
@@ -401,7 +418,7 @@ const handleSubmit = async (event: React.FormEvent) => {
         </header>
 
         <section className="glass-card overflow-hidden rounded-2xl mb-5">
-          <div className="relative min-h-[180px] bg-[linear-gradient(135deg,rgba(250,204,21,0.18),rgba(15,23,42,0.86)_45%,rgba(14,165,233,0.16))]">
+          <div className="relative min-h-[180px]" style={brandingHeaderStyle}>
             {branding.coverImageUrl && (
               <img
                 src={branding.coverImageUrl}
@@ -574,7 +591,7 @@ const handleSubmit = async (event: React.FormEvent) => {
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
             </div>
 
-            <button type="submit" disabled={!barbershop?.id || !selectedBarber?.id || !selectedService?.id || !selectedSlot || isSubmitting} className="w-full bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg shadow-gold-500/20">
+            <button type="submit" disabled={!barbershop?.id || !selectedBarber?.id || !selectedService?.id || !selectedSlot || isSubmitting} style={primaryActionStyle} className="w-full disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg">
               {isSubmitting ? 'Confirmando...' : 'Agendar horario'}
             </button>
           </form>

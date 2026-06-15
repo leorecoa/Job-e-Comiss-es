@@ -497,7 +497,9 @@ describe('barbershop repository local fallback', () => {
       coverImageUrl: null,
       description: null,
       instagramUrl: null,
-      whatsapp: null
+      whatsapp: null,
+      primaryColor: null,
+      secondaryColor: null
     });
 
     vi.doUnmock('./lib/supabase');
@@ -532,6 +534,8 @@ describe('barbershop repository local fallback', () => {
         description: 'Cortes classicos com agenda online.',
         instagram_url: 'https://instagram.com/barbearia_premium',
         whatsapp: '5585999999999',
+        primary_color: '#111111',
+        secondary_color: '#eeeeee',
         active: true
       },
       error: null
@@ -555,11 +559,117 @@ describe('barbershop repository local fallback', () => {
       coverImageUrl: 'https://cdn.example.com/cover.jpg',
       description: 'Cortes classicos com agenda online.',
       instagramUrl: 'https://instagram.com/barbearia_premium',
-      whatsapp: '5585999999999'
+      whatsapp: '5585999999999',
+      primaryColor: '#111111',
+      secondaryColor: '#eeeeee'
     });
 
     expect(from).toHaveBeenCalledWith('barbershops');
-    expect(select).toHaveBeenCalledWith('id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,active');
+    expect(select).toHaveBeenCalledWith('id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,primary_color,secondary_color,active');
+
+    vi.doUnmock('./lib/supabase');
+  });
+
+  it('builds a safe barbershop branding update payload', async () => {
+    vi.resetModules();
+    vi.doMock('./lib/supabase', () => ({
+      isSupabaseConfigured: false,
+      supabase: null
+    }));
+
+    const { toBarbershopBrandingPayload } = await import('./services/barbershopRepository');
+
+    expect(toBarbershopBrandingPayload({
+      name: ' Gestao Maxima ',
+      phone: ' ',
+      address: 'Rua Principal',
+      description: 'Agenda premium',
+      whatsapp: '5585999999999',
+      instagramUrl: 'https://instagram.com/gestao',
+      logoUrl: 'https://cdn.example.com/logo.png',
+      coverImageUrl: 'https://cdn.example.com/cover.jpg',
+      primaryColor: '#f59e0b',
+      secondaryColor: '#0ea5e9'
+    })).toEqual({
+      name: 'Gestao Maxima',
+      phone: null,
+      address: 'Rua Principal',
+      description: 'Agenda premium',
+      whatsapp: '5585999999999',
+      instagram_url: 'https://instagram.com/gestao',
+      logo_url: 'https://cdn.example.com/logo.png',
+      cover_image_url: 'https://cdn.example.com/cover.jpg',
+      primary_color: '#f59e0b',
+      secondary_color: '#0ea5e9'
+    });
+
+    vi.doUnmock('./lib/supabase');
+  });
+
+  it('updates current barbershop branding using only allowed fields', async () => {
+    vi.resetModules();
+
+    const single = vi.fn().mockResolvedValue({
+      data: {
+        id: 'barbershop-1',
+        name: 'Gestao Maxima',
+        slug: 'gestao-maxima',
+        phone: null,
+        address: 'Rua Principal',
+        logo_url: 'https://cdn.example.com/logo.png',
+        cover_image_url: 'https://cdn.example.com/cover.jpg',
+        description: 'Agenda premium',
+        instagram_url: 'https://instagram.com/gestao',
+        whatsapp: '5585999999999',
+        primary_color: '#f59e0b',
+        secondary_color: '#0ea5e9',
+        active: true
+      },
+      error: null
+    });
+    const select = vi.fn(() => ({ single }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ update }));
+
+    vi.doMock('./lib/supabase', () => ({
+      isSupabaseConfigured: true,
+      supabase: { from }
+    }));
+
+    const { updateCurrentBarbershopBranding } = await import('./services/barbershopRepository');
+
+    await expect(updateCurrentBarbershopBranding('barbershop-1', {
+      name: 'Gestao Maxima',
+      phone: '',
+      address: 'Rua Principal',
+      description: 'Agenda premium',
+      whatsapp: '5585999999999',
+      instagramUrl: 'https://instagram.com/gestao',
+      logoUrl: 'https://cdn.example.com/logo.png',
+      coverImageUrl: 'https://cdn.example.com/cover.jpg',
+      primaryColor: '#f59e0b',
+      secondaryColor: '#0ea5e9'
+    })).resolves.toMatchObject({
+      id: 'barbershop-1',
+      primaryColor: '#f59e0b',
+      secondaryColor: '#0ea5e9'
+    });
+
+    expect(from).toHaveBeenCalledWith('barbershops');
+    expect(update).toHaveBeenCalledWith({
+      name: 'Gestao Maxima',
+      phone: null,
+      address: 'Rua Principal',
+      description: 'Agenda premium',
+      whatsapp: '5585999999999',
+      instagram_url: 'https://instagram.com/gestao',
+      logo_url: 'https://cdn.example.com/logo.png',
+      cover_image_url: 'https://cdn.example.com/cover.jpg',
+      primary_color: '#f59e0b',
+      secondary_color: '#0ea5e9'
+    });
+    expect(eq).toHaveBeenCalledWith('id', 'barbershop-1');
 
     vi.doUnmock('./lib/supabase');
   });
