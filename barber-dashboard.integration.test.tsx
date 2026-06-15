@@ -8,7 +8,7 @@ import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
 import { Appointment, DEFAULT_SETTINGS } from './types';
 import { getPublicBookingSlugFromPath } from './App';
-import { getPublicBookingBranding } from './components/PublicBookingPage';
+import { getPublicBookingBranding, getPublicBookingSteps, getPublicBookingSummary } from './components/PublicBookingPage';
 import {
   BarbershopBrandingSettings,
   canManageBarbershopBranding,
@@ -295,6 +295,50 @@ describe('Public Booking Page Logic', () => {
     expect(branding.primaryColor).toBe('#111111');
     expect(branding.secondaryColor).toBe('#eeeeee');
     expect(branding.hasVisualBranding).toBe(true);
+  });
+
+  it('public booking step state highlights the current incomplete step', () => {
+    const steps = getPublicBookingSteps({
+      hasBarber: true,
+      hasService: true,
+      hasSlot: false,
+      hasClient: false
+    });
+
+    expect(steps.map((step) => step.label)).toEqual(['Barbeiro', 'Servico', 'Horario', 'Dados']);
+    expect(steps.find((step) => step.key === 'slot')?.active).toBe(true);
+    expect(steps.find((step) => step.key === 'barber')?.complete).toBe(true);
+  });
+
+  it('public booking summary appears when barber service and slot are selected', () => {
+    const summary = getPublicBookingSummary(
+      { value: 'id:barber-1', id: 'barber-1', name: 'Gabriel' },
+      { id: 'service-1', name: 'Corte', price: 50, durationMinutes: 30 },
+      {
+        startAt: new Date(2026, 5, 10, 9, 0).toISOString(),
+        endAt: new Date(2026, 5, 10, 9, 30).toISOString(),
+        label: '09:00',
+        available: true
+      }
+    );
+
+    expect(summary).toMatchObject({
+      barberName: 'Gabriel',
+      serviceName: 'Corte',
+      duration: '30 min',
+      slotLabel: '09:00',
+      ready: true
+    });
+    expect(summary.serviceValue).toContain('50,00');
+  });
+
+  it('public booking summary handles empty states without breaking', () => {
+    const summary = getPublicBookingSummary(null, undefined, null);
+
+    expect(summary.ready).toBe(false);
+    expect(summary.barberName).toBe('Selecione um barbeiro');
+    expect(summary.serviceName).toBe('Selecione um servico');
+    expect(summary.slotLabel).toBe('Selecione um horario');
   });
 
   it('owner can see white label barbershop settings', () => {
