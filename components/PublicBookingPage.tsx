@@ -45,6 +45,47 @@ const isBarberOption = (barber: unknown): barber is BarberOption => {
   );
 };
 
+type SectionTitleProps = {
+  step: string;
+  title: string;
+  description: string;
+};
+
+const SectionTitle: React.FC<SectionTitleProps> = ({ step, title, description }) => (
+  <div className="flex items-start gap-3">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gold-400/20 bg-gold-500/10 text-xs font-black text-gold-300">
+      {step}
+    </span>
+    <span>
+      <span className="block font-display text-xl font-bold text-white">{title}</span>
+      <span className="mt-1 block text-sm text-gray-500">{description}</span>
+    </span>
+  </div>
+);
+
+type EmptyStateProps = {
+  message: string;
+};
+
+const EmptyState: React.FC<EmptyStateProps> = ({ message }) => (
+  <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-4 text-sm text-gray-400">
+    {message}
+  </div>
+);
+
+type SummaryRowProps = {
+  label: string;
+  value: string;
+  highlight?: boolean;
+};
+
+const SummaryRow: React.FC<SummaryRowProps> = ({ label, value, highlight = false }) => (
+  <div className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-black/20 px-3 py-2">
+    <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{label}</span>
+    <span className={`text-right text-sm font-bold ${highlight ? 'text-gold-300' : 'text-gray-200'}`}>{value}</span>
+  </div>
+);
+
 const normalizeBarberOptions = (
   barbers: Array<BarberOption | string> = [],
   ownerName?: string
@@ -130,6 +171,53 @@ const isSafeHexColor = (value: string | null): value is string => {
   return Boolean(value && /^#[0-9a-f]{6}$/i.test(value));
 };
 
+export type PublicBookingStepKey = 'barber' | 'service' | 'slot' | 'client';
+
+export type PublicBookingStep = {
+  key: PublicBookingStepKey;
+  label: string;
+  complete: boolean;
+  active: boolean;
+};
+
+export const getPublicBookingSteps = ({
+  hasBarber,
+  hasService,
+  hasSlot,
+  hasClient
+}: {
+  hasBarber: boolean;
+  hasService: boolean;
+  hasSlot: boolean;
+  hasClient: boolean;
+}): PublicBookingStep[] => {
+  const steps: Array<Omit<PublicBookingStep, 'active'>> = [
+    { key: 'barber', label: 'Barbeiro', complete: hasBarber },
+    { key: 'service', label: 'Servico', complete: hasService },
+    { key: 'slot', label: 'Horario', complete: hasSlot },
+    { key: 'client', label: 'Dados', complete: hasClient }
+  ];
+  const activeIndex = Math.max(0, steps.findIndex((step) => !step.complete));
+
+  return steps.map((step, index) => ({
+    ...step,
+    active: index === (activeIndex === -1 ? steps.length - 1 : activeIndex)
+  }));
+};
+
+export const getPublicBookingSummary = (
+  barber: PublicBarberOption | null,
+  service: Service | undefined,
+  slot: TimeSlot | null
+) => ({
+  barberName: barber?.name || 'Selecione um barbeiro',
+  serviceName: service?.name || 'Selecione um servico',
+  serviceValue: service ? formatCurrency(service.price) : '--',
+  duration: service ? `${service.durationMinutes} min` : '--',
+  slotLabel: slot?.label || 'Selecione um horario',
+  ready: Boolean(barber?.id && service?.id && slot)
+});
+
 export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   settings: appSettings,
   appointments,
@@ -175,6 +263,14 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   const primaryActionStyle = {
     backgroundColor: primaryColor,
     boxShadow: `0 18px 36px ${primaryColor}24`
+  };
+  const selectedCardStyle = {
+    borderColor: primaryColor,
+    boxShadow: `0 18px 35px ${primaryColor}1f`
+  };
+  const subtleAccentStyle = {
+    borderColor: `${secondaryColor}66`,
+    background: `linear-gradient(135deg, ${secondaryColor}18, rgba(17,24,39,0.82))`
   };
 
   const barberOptions = useMemo(
@@ -240,6 +336,16 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   const selectedService = useMemo(
     () => services.find((service) => service.id === serviceId),
     [services, serviceId]
+  );
+  const bookingSteps = useMemo(() => getPublicBookingSteps({
+    hasBarber: Boolean(selectedBarber?.id),
+    hasService: Boolean(selectedService?.id),
+    hasSlot: Boolean(selectedSlot),
+    hasClient: Boolean(clientName.trim() && clientPhone.trim())
+  }), [clientName, clientPhone, selectedBarber, selectedService, selectedSlot]);
+  const bookingSummary = useMemo(
+    () => getPublicBookingSummary(selectedBarber, selectedService, selectedSlot),
+    [selectedBarber, selectedService, selectedSlot]
   );
   const selectedWorkday = useMemo(
   () => getPublicBookingWorkdayForDate(date),
@@ -347,8 +453,11 @@ const handleSubmit = async (event: React.FormEvent) => {
   if (loadingBarbershop) {
     return (
       <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
-        <div className="glass-card w-full max-w-lg rounded-2xl p-7 text-center">
+        <div className="glass-card w-full max-w-lg rounded-3xl p-7 text-center">
+          <div className="mx-auto mb-5 h-16 w-16 animate-pulse rounded-2xl border border-gold-400/20 bg-gold-500/10" />
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-gold-300">Agendamento online</p>
           <h1 className="font-display text-2xl font-bold text-white mb-3">Carregando barbearia...</h1>
+          <p className="text-sm text-gray-400">Estamos preparando os horarios disponiveis para voce.</p>
         </div>
       </div>
     );
@@ -356,8 +465,15 @@ const handleSubmit = async (event: React.FormEvent) => {
 
   if (barbershopError) {
     return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans text-red-400">
-        {barbershopError}
+      <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
+        <div className="glass-card w-full max-w-lg rounded-3xl p-7 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-red-400/20 bg-red-500/10 text-red-300">
+            <Scissors size={30} />
+          </div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-red-300">Link indisponivel</p>
+          <h1 className="font-display text-2xl font-bold text-white mb-3">{barbershopError}</h1>
+          <p className="text-sm text-gray-400">Confira o link recebido ou fale diretamente com a barbearia.</p>
+        </div>
       </div>
     );
   }
@@ -368,20 +484,22 @@ const handleSubmit = async (event: React.FormEvent) => {
 
     return (
       <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
-        <div className="glass-card w-full max-w-lg rounded-2xl p-7 text-center animate-slide-in">
+        <div className="glass-card w-full max-w-lg rounded-3xl p-7 text-center animate-slide-in">
           <div className="w-20 h-20 mx-auto rounded-2xl bg-green-500/10 border border-green-400/20 flex items-center justify-center text-green-300 mb-5">
             <CheckCircle size={42} />
           </div>
-          <h1 className="font-display text-2xl font-bold text-white mb-2">Horario solicitado</h1>
-          <p className="text-gray-400 text-sm mb-6">Seu agendamento foi enviado para a agenda da barbearia.</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-green-300">Solicitacao enviada</p>
+          <h1 className="font-display text-2xl font-bold text-white mb-2">Horario solicitado com sucesso</h1>
+          <p className="text-gray-400 text-sm mb-6">A barbearia recebeu seu agendamento na agenda interna.</p>
 
-          <div className="bg-gray-900/50 border border-gray-700 rounded-xl p-4 text-left space-y-2 mb-6">
+          <div className="bg-gray-900/60 border border-gray-700 rounded-2xl p-4 text-left space-y-3 mb-6">
             <p className="text-white font-bold">{createdAppointment.clientName}</p>
             <p className="text-sm text-gray-300">{createdAppointment.serviceType} · {formatCurrency(createdAppointment.serviceValue)}</p>
-            <p className="text-sm text-gray-300">{createdAppointment.barberName}</p>
+            <p className="text-sm text-gray-300">Com {createdAppointment.barberName}</p>
             <p className="text-sm text-gold-400 font-mono">
               {when.toLocaleDateString('pt-BR')} as {when.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </p>
+            <p className="inline-flex rounded-full border border-green-400/20 bg-green-500/10 px-3 py-1 text-xs font-bold text-green-200">Status: solicitado</p>
           </div>
 
           <div className="flex flex-col xs:flex-row gap-3">
@@ -404,7 +522,7 @@ const handleSubmit = async (event: React.FormEvent) => {
   return (
     <div className="min-h-screen bg-transparent p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto">
-        <header className="flex items-center justify-between gap-4 mb-8">
+        <header className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <img src="/brand-mark.svg" alt="Gestao Maxima" className="w-12 h-12" />
             <div>
@@ -417,8 +535,8 @@ const handleSubmit = async (event: React.FormEvent) => {
           </a>
         </header>
 
-        <section className="glass-card overflow-hidden rounded-2xl mb-5">
-          <div className="relative min-h-[180px]" style={brandingHeaderStyle}>
+        <section className="glass-card overflow-hidden rounded-3xl mb-5">
+          <div className="relative min-h-[240px]" style={brandingHeaderStyle}>
             {branding.coverImageUrl && (
               <img
                 src={branding.coverImageUrl}
@@ -427,10 +545,10 @@ const handleSubmit = async (event: React.FormEvent) => {
               />
             )}
             <div className="absolute inset-0 bg-black/55" />
-            <div className="relative flex min-h-[180px] flex-col justify-end p-5 md:p-7">
+            <div className="relative flex min-h-[240px] flex-col justify-end p-5 md:p-8">
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div className="flex items-end gap-4">
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-gray-950/75 text-gold-300 shadow-xl shadow-black/30">
+                  <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/15 bg-gray-950/75 text-gold-300 shadow-xl shadow-black/30">
                     {branding.logoUrl ? (
                       <img src={branding.logoUrl} alt={`Logo da ${branding.shopName}`} className="h-full w-full object-cover" />
                     ) : (
@@ -439,7 +557,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gold-300">Reserva publica</p>
-                    <h2 className="font-display text-3xl font-bold text-white md:text-4xl">{branding.shopName}</h2>
+                    <h2 className="font-display text-4xl font-bold text-white md:text-5xl">{branding.shopName}</h2>
                     {branding.description && (
                       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-200">{branding.description}</p>
                     )}
@@ -471,8 +589,25 @@ const handleSubmit = async (event: React.FormEvent) => {
           </div>
         </section>
 
-        <main className="grid lg:grid-cols-[0.9fr_1.1fr] gap-5">
-          <section className="glass-card rounded-2xl p-6 md:p-7">
+        <section className="glass-card rounded-2xl p-3 mb-5">
+          <div className="grid grid-cols-4 gap-2">
+            {bookingSteps.map((step, index) => (
+              <div
+                key={step.key}
+                className={`rounded-xl border px-2 py-3 text-center transition-all ${
+                  step.active ? 'bg-white/10 text-white' : step.complete ? 'bg-green-500/10 text-green-200 border-green-400/20' : 'bg-gray-900/50 text-gray-500 border-gray-700'
+                }`}
+                style={step.active ? selectedCardStyle : undefined}
+              >
+                <p className="mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/30 text-xs font-bold">{index + 1}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide">{step.label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <main className="grid lg:grid-cols-[0.85fr_1.15fr] gap-5 items-start">
+          <section className="glass-card rounded-3xl p-6 md:p-7 lg:sticky lg:top-6">
             <div className="flex items-center gap-2 text-gold-400 mb-3">
               <CalendarCheck size={22} />
               <span className="text-xs font-bold uppercase tracking-widest">Escolha seu horario</span>
@@ -494,9 +629,31 @@ const handleSubmit = async (event: React.FormEvent) => {
                 <p className="text-gray-500 text-xs">Duracao por servico</p>
               </div>
             </div>
+
+            <div className="mt-5 rounded-2xl border border-gray-700 bg-gray-950/70 p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Resumo</p>
+                  <h3 className="font-display text-xl font-bold text-white">Seu agendamento</h3>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-bold ${bookingSummary.ready ? 'bg-green-500/10 text-green-200 border border-green-400/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>
+                  {bookingSummary.ready ? 'Pronto' : 'Em andamento'}
+                </span>
+              </div>
+              <div className="space-y-3 text-sm">
+                <SummaryRow label="Barbeiro" value={bookingSummary.barberName} />
+                <SummaryRow label="Servico" value={bookingSummary.serviceName} />
+                <SummaryRow label="Valor" value={bookingSummary.serviceValue} />
+                <SummaryRow label="Duracao" value={bookingSummary.duration} />
+                <SummaryRow label="Horario" value={bookingSummary.slotLabel} highlight={Boolean(selectedSlot)} />
+              </div>
+              <p className="mt-4 rounded-xl border border-blue-400/20 bg-blue-500/10 p-3 text-xs leading-relaxed text-blue-100">
+                Status antes de confirmar: o horario sera enviado como solicitado para a agenda da barbearia.
+              </p>
+            </div>
           </section>
 
-          <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 md:p-7 space-y-5">
+          <form onSubmit={handleSubmit} className="glass-card rounded-3xl p-5 md:p-7 space-y-6">
             {barberOptions.length === 0 && (
               <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-sm rounded-xl p-3">
                 A barbearia ainda precisa cadastrar pelo menos um barbeiro no painel interno.
@@ -509,7 +666,67 @@ const handleSubmit = async (event: React.FormEvent) => {
               </div>
             )}
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <SectionTitle step="01" title="Escolha o barbeiro" description="Selecione quem vai te atender." />
+              {barberOptions.length === 0 ? (
+                <EmptyState message="Nenhum barbeiro disponivel para esta barbearia." />
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {barberOptions.map((barber) => {
+                    const selected = selectedBarber?.value === barber.value;
+                    return (
+                      <button
+                        key={barber.value}
+                        type="button"
+                        onClick={() => handleBarberChange(barber.value)}
+                        className={`rounded-2xl border p-4 text-left transition-all ${selected ? 'bg-white/10 text-white' : 'bg-gray-900/60 text-gray-300 border-gray-700 hover:border-gray-500'}`}
+                        style={selected ? selectedCardStyle : undefined}
+                      >
+                        <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-black/30 text-gold-300">
+                          <Scissors size={20} />
+                        </span>
+                        <span className="block font-bold">{barber.name}</span>
+                        <span className="mt-1 block text-xs text-gray-500">{selected ? 'Selecionado' : 'Toque para escolher'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <SectionTitle step="02" title="Escolha o servico" description="Veja valor e duracao antes de continuar." />
+              {services.length === 0 ? (
+                <EmptyState message="Nenhum servico disponivel para esta barbearia." />
+              ) : (
+                <div className="grid gap-3">
+                  {services.map((service: Service) => {
+                    const selected = selectedService?.id === service.id;
+                    return (
+                      <button
+                        key={service.id}
+                        type="button"
+                        onClick={() => handleServiceChange(service.id)}
+                        className={`rounded-2xl border p-4 text-left transition-all ${selected ? 'bg-white/10 text-white' : 'bg-gray-900/60 text-gray-300 border-gray-700 hover:border-gray-500'}`}
+                        style={selected ? selectedCardStyle : undefined}
+                      >
+                        <span className="flex items-start justify-between gap-4">
+                          <span>
+                            <span className="block font-bold">{service.name}</span>
+                            <span className="mt-1 block text-xs text-gray-500">{service.durationMinutes} min</span>
+                          </span>
+                          <span className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm font-bold text-white">
+                            {formatCurrency(service.price)}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="sr-only">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1.5">Barbeiro</label>
                 <select
@@ -544,27 +761,31 @@ const handleSubmit = async (event: React.FormEvent) => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1.5">Data</label>
-              <input type="date" required min={getTodayString()} value={date} onChange={(e) => { setDate(e.target.value); setSelectedSlot(null); }} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
+            <div className="space-y-3">
+              <SectionTitle step="03" title="Escolha data e horario" description="Mostramos apenas horarios livres para o servico escolhido." />
+              <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-4" style={subtleAccentStyle}>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Data</label>
+                <input type="date" required min={getTodayString()} value={date} onChange={(e) => { setDate(e.target.value); setSelectedSlot(null); }} className="w-full bg-gray-950/80 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-2">Horarios disponiveis</label>
               {availableSlots.length === 0 ? (
-                <p className="text-sm text-gray-500 bg-gray-900/50 border border-gray-700 rounded-xl p-4">
+                <p className="text-sm text-gray-400 bg-gray-900/50 border border-gray-700 rounded-2xl p-4">
   {emptySlotsMessage}
 </p>
               ) : (
-                <div className="grid grid-cols-3 xs:grid-cols-4 md:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 xs:grid-cols-3 md:grid-cols-4 gap-2">
                   {availableSlots.map(slot => (
                     <button
                       key={slot.startAt}
                       type="button"
                       onClick={() => setSelectedSlot(slot)}
-                      className={`py-2.5 rounded-xl border text-sm font-bold transition-all ${
+                      style={selectedSlot?.startAt === slot.startAt ? selectedCardStyle : undefined}
+                      className={`py-3.5 rounded-2xl border text-sm font-bold transition-all ${
                         selectedSlot?.startAt === slot.startAt
-                          ? 'bg-gold-500 text-black border-gold-400'
+                          ? 'bg-white/10 text-white'
                           : 'bg-gray-900/70 text-gray-300 border-gray-700 hover:border-gold-500/40'
                       }`}
                     >
@@ -575,7 +796,9 @@ const handleSubmit = async (event: React.FormEvent) => {
               )}
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <SectionTitle step="04" title="Seus dados" description="Usamos essas informacoes para identificar seu horario." />
+              <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1.5">Seu nome</label>
                 <input required value={clientName} onChange={(e) => setClientName(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
@@ -584,6 +807,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                 <label className="block text-sm font-medium text-gray-400 mb-1.5">WhatsApp</label>
                 <input required value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="DDD + numero" className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
               </div>
+              </div>
             </div>
 
             <div>
@@ -591,8 +815,18 @@ const handleSubmit = async (event: React.FormEvent) => {
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
             </div>
 
-            <button type="submit" disabled={!barbershop?.id || !selectedBarber?.id || !selectedService?.id || !selectedSlot || isSubmitting} style={primaryActionStyle} className="w-full disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-lg">
-              {isSubmitting ? 'Confirmando...' : 'Agendar horario'}
+            <div className="rounded-2xl border border-gray-700 bg-gray-950/70 p-4">
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-gray-500">Antes de confirmar</p>
+              <div className="grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
+                <SummaryRow label="Barbeiro" value={bookingSummary.barberName} />
+                <SummaryRow label="Servico" value={bookingSummary.serviceName} />
+                <SummaryRow label="Horario" value={bookingSummary.slotLabel} highlight={Boolean(selectedSlot)} />
+                <SummaryRow label="Status" value="Sera solicitado" />
+              </div>
+            </div>
+
+            <button type="submit" disabled={!barbershop?.id || !selectedBarber?.id || !selectedService?.id || !selectedSlot || isSubmitting} style={primaryActionStyle} className="w-full disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-4 rounded-2xl shadow-lg">
+              {isSubmitting ? 'Confirmando...' : 'Confirmar agendamento'}
             </button>
           </form>
         </main>
