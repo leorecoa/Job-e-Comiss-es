@@ -53,12 +53,12 @@ type SectionTitleProps = {
 
 const SectionTitle: React.FC<SectionTitleProps> = ({ step, title, description }) => (
   <div className="flex items-start gap-3">
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gold-400/20 bg-gold-500/10 text-xs font-black text-gold-300">
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-gold-400/20 bg-gold-500/10 text-[11px] font-black text-gold-300">
       {step}
     </span>
     <span>
-      <span className="block font-display text-xl font-bold text-white">{title}</span>
-      <span className="mt-1 block text-sm text-gray-500">{description}</span>
+      <span className="block font-display text-lg font-bold text-white">{title}</span>
+      <span className="mt-0.5 block text-sm text-gray-500">{description}</span>
     </span>
   </div>
 );
@@ -156,17 +156,18 @@ export const getPublicBookingBranding = (barbershop: Barbershop | null, settings
   };
 };
 
-const DEFAULT_PUBLIC_BOOKING_DESCRIPTION = 'Corte, barba e acabamento com horario marcado. Escolha o melhor horario e confirme seu atendimento online.';
+const DEFAULT_PUBLIC_BOOKING_DESCRIPTION = 'Corte, barba e acabamento com horario marcado.';
 
 export const getPublicBookingLandingContent = (branding: ReturnType<typeof getPublicBookingBranding>) => {
   const description = branding.description || DEFAULT_PUBLIC_BOOKING_DESCRIPTION;
 
   return {
-    eyebrow: 'Agenda oficial da barbearia',
-    headline: `Agende seu horario na ${branding.shopName}`,
+    eyebrow: 'Agenda premium',
+    headline: 'Agende seu horario',
+    subheadline: branding.shopName,
     description,
     ctaLabel: 'Agendar agora',
-    trustItems: ['Confirmacao rapida', 'Horario reservado', 'Atendimento por barbeiro']
+    trustItems: ['Horario reservado', 'Atendimento por barbeiro']
   };
 };
 
@@ -294,7 +295,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   };
   const heroCtaStyle = {
     backgroundColor: primaryColor,
-    boxShadow: `0 24px 50px ${primaryColor}30`
+    boxShadow: `0 18px 36px ${primaryColor}24`
   };
   const selectedCardStyle = {
     borderColor: primaryColor,
@@ -520,7 +521,7 @@ const handleSubmit = async (event: React.FormEvent) => {
           <div className="w-20 h-20 mx-auto rounded-2xl bg-green-500/10 border border-green-400/20 flex items-center justify-center text-green-300 mb-5">
             <CheckCircle size={42} />
           </div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-green-300">Solicitacao enviada</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-green-300">Reserva confirmada</p>
           <h1 className="font-display text-2xl font-bold text-white mb-2">Horario reservado com sucesso</h1>
           <p className="text-gray-400 text-sm mb-6">A barbearia ja recebeu seu agendamento.</p>
 
@@ -542,7 +543,7 @@ const handleSubmit = async (event: React.FormEvent) => {
               </a>
             )}
             <button onClick={handleNewBooking} className="flex-1 bg-gold-500 hover:bg-gold-600 text-black font-bold py-3 rounded-xl">
-              Agendar outro
+              Nova reserva
             </button>
           </div>
           <a href="/" className="inline-block text-xs text-gray-500 hover:text-white mt-5">Ir para o painel interno</a>
@@ -554,21 +555,24 @@ const handleSubmit = async (event: React.FormEvent) => {
   return (
     <div className="min-h-screen bg-transparent p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto">
-        <header className="flex items-center justify-between gap-4 mb-6">
+        <header className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <img src="/brand-mark.svg" alt="Gestao Maxima" className="w-12 h-12" />
             <div>
-              <h1 className="text-white font-display font-bold text-xl">{branding.shopName}</h1>
-              <p className="text-gold-400 text-[10px] uppercase tracking-widest font-bold">Agenda oficial</p>
+              <h1 className="text-white font-display font-bold text-lg">{branding.shopName}</h1>
+              <p className="text-gold-400 text-[10px] uppercase tracking-widest font-bold">Reserva oficial</p>
             </div>
           </div>
-          <a href="/" className="hidden xs:inline-flex bg-gray-800 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl text-sm font-bold">
-            Painel
-          </a>
+          {contactLinks.whatsapp && (
+            <a href={contactLinks.whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-green-400/20 bg-green-500/10 px-3 py-2 text-sm font-bold text-green-200">
+              <Phone size={16} />
+              WhatsApp
+            </a>
+          )}
         </header>
 
         <section className="glass-card overflow-hidden rounded-3xl mb-5">
-          <div className="relative min-h-[520px] md:min-h-[560px]" style={brandingHeaderStyle}>
+          <div className="relative min-h-[300px] md:min-h-[340px]" style={brandingHeaderStyle}>
             {branding.coverImageUrl && (
               <img
                 src={branding.coverImageUrl}
@@ -577,65 +581,52 @@ const handleSubmit = async (event: React.FormEvent) => {
               />
             )}
             <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/62 to-gray-950/95" />
-            <div className="relative flex min-h-[520px] flex-col justify-between p-5 md:min-h-[560px] md:p-8">
+            <div className="relative flex min-h-[300px] flex-col justify-between p-5 md:min-h-[340px] md:p-7">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 text-xs font-bold uppercase tracking-widest text-gray-100">
                   <CalendarCheck size={14} />
                   {landingContent.eyebrow}
                 </span>
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-gray-200 md:justify-end">
-                  {contactLinks.address && (
-                    <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/35 px-3 py-2">
-                      <MapPin size={14} />
-                      {contactLinks.address}
-                    </span>
-                  )}
-                  {contactLinks.whatsapp && (
-                    <a href={contactLinks.whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-green-400/20 bg-green-500/10 px-3 py-2 text-green-200">
-                      <Phone size={14} />
-                      WhatsApp
-                    </a>
-                  )}
                   {contactLinks.instagram && (
                     <a href={contactLinks.instagram} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-pink-400/20 bg-pink-500/10 px-3 py-2 text-pink-100">
                       <MessageCircle size={14} />
                       Instagram
                     </a>
                   )}
+                  {contactLinks.address && (
+                    <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                      <MapPin size={14} />
+                      Localizacao
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div className="max-w-3xl">
-                <div className="mb-5 flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/15 bg-gray-950/75 text-gold-300 shadow-xl shadow-black/30 md:h-28 md:w-28">
+              <div className="max-w-2xl">
+                <div className="mb-4 flex h-18 w-18 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-gray-950/75 text-gold-300 shadow-xl shadow-black/30 md:h-20 md:w-20">
                   {branding.logoUrl ? (
                     <img src={branding.logoUrl} alt={`Logo da ${branding.shopName}`} className="h-full w-full object-cover" />
                   ) : (
-                    <Scissors size={38} />
+                    <Scissors size={28} />
                   )}
                 </div>
-                <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.24em] text-gold-300">{branding.shopName}</p>
-                <h2 className="font-display text-4xl font-black leading-tight text-white md:text-6xl">{landingContent.headline}</h2>
-                <p className="mt-4 max-w-2xl text-base leading-relaxed text-gray-200 md:text-lg">{landingContent.description}</p>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.24em] text-gold-300">{landingContent.subheadline}</p>
+                <h2 className="font-display text-3xl font-black leading-tight text-white md:text-5xl">{landingContent.headline}</h2>
+                <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray-200 md:text-base">{landingContent.description}</p>
 
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <a href="#booking-flow" className="inline-flex items-center justify-center rounded-2xl px-5 py-4 text-sm font-black text-black" style={heroCtaStyle}>
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <a href="#booking-flow" className="inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-black text-black" style={heroCtaStyle}>
                     {landingContent.ctaLabel}
                   </a>
-                  {contactLinks.whatsapp && (
-                    <a href={contactLinks.whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-sm font-bold text-white">
-                      <MessageCircle size={18} />
-                      Falar no WhatsApp
-                    </a>
-                  )}
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {landingContent.trustItems.map((item) => (
-                  <div key={item} className="rounded-2xl border border-white/10 bg-black/35 p-4 backdrop-blur">
-                    <CheckCircle size={18} className="mb-2 text-green-300" />
+                  <div key={item} className="rounded-2xl border border-white/10 bg-black/35 p-3 backdrop-blur">
+                    <CheckCircle size={16} className="mb-1.5 text-green-300" />
                     <p className="text-sm font-bold text-white">{item}</p>
-                    <p className="mt-1 text-xs text-gray-400">Fluxo simples e direto pelo link oficial.</p>
                   </div>
                 ))}
               </div>
@@ -643,7 +634,7 @@ const handleSubmit = async (event: React.FormEvent) => {
           </div>
         </section>
 
-        <section className="glass-card rounded-2xl p-3 mb-5">
+        <section className="glass-card rounded-2xl p-2.5 mb-4">
           <div className="grid grid-cols-4 gap-2">
             {bookingSteps.map((step, index) => (
               <div
@@ -660,54 +651,48 @@ const handleSubmit = async (event: React.FormEvent) => {
           </div>
         </section>
 
-        <main id="booking-flow" className="grid scroll-mt-6 lg:grid-cols-[0.85fr_1.15fr] gap-5 items-start">
-          <section className="glass-card rounded-3xl p-6 md:p-7 lg:sticky lg:top-6">
+        <main id="booking-flow" className="grid scroll-mt-6 lg:grid-cols-[0.82fr_1.18fr] gap-4 items-start">
+          <section className="glass-card rounded-3xl p-5 md:p-6 lg:sticky lg:top-5">
             <div className="flex items-center gap-2 text-gold-400 mb-3">
               <CalendarCheck size={22} />
               <span className="text-xs font-bold uppercase tracking-widest">Reserva em poucos passos</span>
             </div>
-            <h2 className="font-display text-3xl font-bold text-white mb-3">Monte seu atendimento</h2>
-            <p className="text-gray-400 text-sm leading-relaxed mb-6">
-              Escolha seu barbeiro, reserve o servico e confirme em poucos segundos.
-            </p>
+            <h2 className="font-display text-2xl font-bold text-white mb-2">Reserve em poucos segundos</h2>
+            <p className="text-gray-400 text-sm leading-relaxed mb-5">Escolha profissional, servico e horario.</p>
 
             <div className="grid xs:grid-cols-2 gap-3">
               <div className="bg-gray-900/50 border border-gray-700 rounded-xl p-4">
                 <Clock className="text-blue-300 mb-2" size={20} />
                 <p className="text-white font-bold text-sm">{workdayLabel}</p>
-<p className="text-gray-500 text-xs">{workdayDescription}</p>
+                <p className="text-gray-500 text-xs">{workdayDescription}</p>
               </div>
               <div className="bg-gray-900/50 border border-gray-700 rounded-xl p-4">
                 <Scissors className="text-gold-400 mb-2" size={20} />
                 <p className="text-white font-bold text-sm">{services.length} servicos</p>
-                <p className="text-gray-500 text-xs">Duracao por servico</p>
+                <p className="text-gray-500 text-xs">Agenda por servico</p>
               </div>
             </div>
 
-            <div className="mt-5 rounded-2xl border border-gray-700 bg-gray-950/70 p-4">
-              <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="mt-4 rounded-2xl border border-gray-700 bg-gray-950/70 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Sua reserva</p>
-                  <h3 className="font-display text-xl font-bold text-white">Detalhes do atendimento</h3>
+                  <h3 className="font-display text-lg font-bold text-white">Resumo rapido</h3>
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs font-bold ${bookingSummary.ready ? 'bg-green-500/10 text-green-200 border border-green-400/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>
                   {bookingSummary.ready ? 'Pronto' : 'Em andamento'}
                 </span>
               </div>
-              <div className="space-y-3 text-sm">
+              <div className="space-y-2 text-sm">
                 <SummaryRow label="Barbeiro" value={bookingSummary.barberName} />
                 <SummaryRow label="Servico" value={bookingSummary.serviceName} />
                 <SummaryRow label="Valor" value={bookingSummary.serviceValue} />
-                <SummaryRow label="Duracao" value={bookingSummary.duration} />
                 <SummaryRow label="Horario" value={bookingSummary.slotLabel} highlight={Boolean(selectedSlot)} />
               </div>
-              <p className="mt-4 rounded-xl border border-blue-400/20 bg-blue-500/10 p-3 text-xs leading-relaxed text-blue-100">
-                Ao confirmar, a barbearia recebe sua reserva com os detalhes escolhidos.
-              </p>
             </div>
           </section>
 
-          <form onSubmit={handleSubmit} className="glass-card rounded-3xl p-5 md:p-7 space-y-6">
+          <form onSubmit={handleSubmit} className="glass-card rounded-3xl p-5 md:p-6 space-y-5">
             {barberOptions.length === 0 && (
               <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-sm rounded-xl p-3">
                 A barbearia ainda precisa cadastrar pelo menos um barbeiro no painel interno.
@@ -721,7 +706,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             )}
 
             <div className="space-y-3">
-              <SectionTitle step="01" title="Quem vai te atender?" description="Escolha o profissional para o seu horario." />
+              <SectionTitle step="01" title="Profissional" description="Escolha quem vai te atender." />
               {barberOptions.length === 0 ? (
                 <EmptyState message="Nenhum barbeiro disponivel para esta barbearia." />
               ) : (
@@ -733,7 +718,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                         key={barber.value}
                         type="button"
                         onClick={() => handleBarberChange(barber.value)}
-                        className={`rounded-2xl border p-4 text-left transition-all ${selected ? 'bg-white/10 text-white' : 'bg-gray-900/60 text-gray-300 border-gray-700 hover:border-gray-500'}`}
+                        className={`rounded-2xl border p-3.5 text-left transition-all ${selected ? 'bg-white/10 text-white' : 'bg-gray-900/60 text-gray-300 border-gray-700 hover:border-gray-500'}`}
                         style={selected ? selectedCardStyle : undefined}
                       >
                         <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-black/30 text-gold-300">
@@ -749,7 +734,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              <SectionTitle step="02" title="Qual atendimento voce quer?" description="Confira valor e duracao antes de reservar." />
+              <SectionTitle step="02" title="Servico" description="Confira valor e duracao." />
               {services.length === 0 ? (
                 <EmptyState message="Nenhum servico disponivel para esta barbearia." />
               ) : (
@@ -761,7 +746,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                         key={service.id}
                         type="button"
                         onClick={() => handleServiceChange(service.id)}
-                        className={`rounded-2xl border p-4 text-left transition-all ${selected ? 'bg-white/10 text-white' : 'bg-gray-900/60 text-gray-300 border-gray-700 hover:border-gray-500'}`}
+                        className={`rounded-2xl border p-3.5 text-left transition-all ${selected ? 'bg-white/10 text-white' : 'bg-gray-900/60 text-gray-300 border-gray-700 hover:border-gray-500'}`}
                         style={selected ? selectedCardStyle : undefined}
                       >
                         <span className="flex items-start justify-between gap-4">
@@ -816,7 +801,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              <SectionTitle step="03" title="Quando voce quer vir?" description="Escolha uma data e um horario livre." />
+              <SectionTitle step="03" title="Horario" description="Escolha data e horario livre." />
               <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-4" style={subtleAccentStyle}>
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">Data</label>
                 <input type="date" required min={getTodayString()} value={date} onChange={(e) => { setDate(e.target.value); setSelectedSlot(null); }} className="w-full bg-gray-950/80 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
@@ -851,7 +836,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              <SectionTitle step="04" title="Como a barbearia te identifica?" description="Informe seus dados para concluir a reserva." />
+              <SectionTitle step="04" title="Seus dados" description="Informe nome e WhatsApp." />
               <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1.5">Seu nome</label>

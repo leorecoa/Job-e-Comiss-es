@@ -306,9 +306,10 @@ describe('Public Booking Page Logic', () => {
     }, DEFAULT_SETTINGS);
     const content = getPublicBookingLandingContent(branding);
 
-    expect(content.headline).toBe('Agende seu horario na Barbearia Premium');
+    expect(content.headline).toBe('Agende seu horario');
+    expect(content.subheadline).toBe('Barbearia Premium');
     expect(content.ctaLabel).toBe('Agendar agora');
-    expect(content.trustItems).toContain('Confirmacao rapida');
+    expect(content.trustItems).toContain('Horario reservado');
   });
 
   it('public booking landing content uses barbershop description when it exists', () => {
@@ -331,7 +332,7 @@ describe('Public Booking Page Logic', () => {
       active: true
     }, DEFAULT_SETTINGS);
 
-    expect(getPublicBookingLandingContent(branding).description).toContain('Corte, barba e acabamento');
+    expect(getPublicBookingLandingContent(branding).description).toBe('Corte, barba e acabamento com horario marcado.');
   });
 
   it('public booking contact links render only when branding fields exist', () => {
