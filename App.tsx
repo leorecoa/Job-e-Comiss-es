@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
 import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById } from './utils';
-import { BarbershopBrandingInput, getBarbershopById, getBarbershopBySlug, updateCurrentBarbershopBranding } from './services/barbershopRepository';
+import { BarbershopBrandingImageType, BarbershopBrandingInput, getBarbershopById, getBarbershopBySlug, updateCurrentBarbershopBranding, uploadBarbershopBrandingImage } from './services/barbershopRepository';
 import { APPOINTMENT_STORAGE_KEY, completeAppointmentFinancialRecord, getAppointmentDateInput, hasAppointmentConflict } from './scheduling';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
@@ -645,6 +645,20 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUploadOwnerBarbershopBrandingImage = async (file: File, type: BarbershopBrandingImageType): Promise<string> => {
+    if (authSession?.role === 'barber') {
+      throw new Error('Barbeiro nao pode alterar a identidade da barbearia.');
+    }
+
+    const barbershopId = authSession?.barbershopId || ownerBarbershop?.id || (!isSupabaseConfigured ? 'local-barbershop' : undefined);
+
+    if (!barbershopId) {
+      throw new Error('Barbearia nao encontrada para upload.');
+    }
+
+    return uploadBarbershopBrandingImage({ barbershopId, file, type });
+  };
+
   const handleSaveClient = (data: ClientFormData) => {
     const { timeStr, ...clientInfo } = data;
     const [year, month, day] = selectedDate.split('-').map(Number);
@@ -1168,6 +1182,7 @@ const App: React.FC = () => {
                 error={ownerBarbershopError}
                 success={ownerBarbershopSuccess}
                 onSave={handleSaveOwnerBarbershopBranding}
+                onUploadImage={handleUploadOwnerBarbershopBrandingImage}
              />
 
              {/* New Dashboard Charts */}

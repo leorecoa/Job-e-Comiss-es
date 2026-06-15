@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
 import * as authRepository from './services/authRepository';
 import * as appointmentRepository from './services/appointmentRepository';
 import { calculateEstimatedCommission } from './utils';
@@ -9,7 +10,9 @@ import { Appointment, DEFAULT_SETTINGS } from './types';
 import { getPublicBookingSlugFromPath } from './App';
 import { getPublicBookingBranding } from './components/PublicBookingPage';
 import {
+  BarbershopBrandingSettings,
   canManageBarbershopBranding,
+  getBarbershopBrandingImageField,
   getBarbershopBrandingFormData,
   getBarbershopBrandingSaveInput
 } from './components/BarbershopBrandingSettings';
@@ -303,6 +306,48 @@ describe('Public Booking Page Logic', () => {
     expect(canManageBarbershopBranding('barber')).toBe(false);
   });
 
+  it('owner sees logo and cover upload controls', () => {
+    const html = renderToStaticMarkup(
+      <BarbershopBrandingSettings
+        barbershop={{
+          id: DEFAULT_BARBERSHOP_ID,
+          name: 'Gestao Maxima',
+          slug: DEFAULT_BARBERSHOP_SLUG,
+          active: true,
+          logoUrl: 'https://cdn.example.com/logo.png',
+          coverImageUrl: 'https://cdn.example.com/cover.jpg'
+        }}
+        role="owner"
+        onSave={vi.fn()}
+        onUploadImage={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('Upload da logo');
+    expect(html).toContain('Upload da capa');
+    expect(html).toContain('type="file"');
+    expect(html).toContain('https://cdn.example.com/logo.png');
+    expect(html).toContain('https://cdn.example.com/cover.jpg');
+  });
+
+  it('barber does not render branding settings or upload controls', () => {
+    const html = renderToStaticMarkup(
+      <BarbershopBrandingSettings
+        barbershop={{
+          id: DEFAULT_BARBERSHOP_ID,
+          name: 'Gestao Maxima',
+          slug: DEFAULT_BARBERSHOP_SLUG,
+          active: true
+        }}
+        role="barber"
+        onSave={vi.fn()}
+        onUploadImage={vi.fn()}
+      />
+    );
+
+    expect(html).toBe('');
+  });
+
   it('barbershop branding form loads current data and keeps slug read-only', () => {
     const formData = getBarbershopBrandingFormData({
       id: DEFAULT_BARBERSHOP_ID,
@@ -324,6 +369,11 @@ describe('Public Booking Page Logic', () => {
     expect(formData.description).toBe('Agenda premium');
     expect(formData.logoUrl).toBe('https://cdn.example.com/logo.png');
     expect('slug' in formData).toBe(false);
+  });
+
+  it('maps successful branding image uploads to the matching form URL field', () => {
+    expect(getBarbershopBrandingImageField('logo')).toBe('logoUrl');
+    expect(getBarbershopBrandingImageField('cover')).toBe('coverImageUrl');
   });
 
   it('saving white label settings sends only allowed fields', () => {
@@ -354,6 +404,35 @@ describe('Public Booking Page Logic', () => {
     });
     expect('id' in payload).toBe(false);
     expect('slug' in payload).toBe(false);
+  });
+
+  it('branding preview renders logo and cover when available', () => {
+    const html = renderToStaticMarkup(
+      <BarbershopBrandingSettings
+        barbershop={{
+          id: DEFAULT_BARBERSHOP_ID,
+          name: 'Gestao Maxima',
+          slug: DEFAULT_BARBERSHOP_SLUG,
+          active: true,
+          description: 'Agenda premium',
+          whatsapp: '5585999999999',
+          instagramUrl: 'https://instagram.com/gestao',
+          logoUrl: 'https://cdn.example.com/logo.png',
+          coverImageUrl: 'https://cdn.example.com/cover.jpg',
+          primaryColor: '#111111',
+          secondaryColor: '#eeeeee'
+        }}
+        role="owner"
+        onSave={vi.fn()}
+        onUploadImage={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('https://cdn.example.com/logo.png');
+    expect(html).toContain('https://cdn.example.com/cover.jpg');
+    expect(html).toContain('Agendar agora');
+    expect(html).toContain('WhatsApp');
+    expect(html).toContain('Instagram');
   });
 
   it('/book/barbearia-inexistente uses the invalid slug without fallback', async () => {

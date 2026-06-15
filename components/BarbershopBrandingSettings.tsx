@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Eye, Globe2, Save } from 'lucide-react';
+import { Eye, Globe2, Save, Upload } from 'lucide-react';
 import { Barbershop } from '../types';
 import { AppRole } from '../services/authRepository';
-import { BarbershopBrandingInput } from '../services/barbershopRepository';
+import { BarbershopBrandingImageType, BarbershopBrandingInput } from '../services/barbershopRepository';
 
 export type BarbershopBrandingFormData = {
   name: string;
@@ -25,6 +25,7 @@ type BarbershopBrandingSettingsProps = {
   error?: string | null;
   success?: string | null;
   onSave: (input: BarbershopBrandingInput) => Promise<void> | void;
+  onUploadImage?: (file: File, type: BarbershopBrandingImageType) => Promise<string>;
 };
 
 export const canManageBarbershopBranding = (role?: AppRole | null): boolean => role !== 'barber';
@@ -55,6 +56,12 @@ export const getBarbershopBrandingSaveInput = (formData: BarbershopBrandingFormD
   secondaryColor: formData.secondaryColor
 });
 
+export const getBarbershopBrandingImageField = (type: BarbershopBrandingImageType): 'logoUrl' | 'coverImageUrl' => (
+  type === 'logo' ? 'logoUrl' : 'coverImageUrl'
+);
+
+const isSafeHexColor = (color: string): boolean => /^#[0-9a-fA-F]{6}$/.test(color);
+
 export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProps> = ({
   barbershop,
   role,
@@ -62,24 +69,69 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
   saving = false,
   error,
   success,
-  onSave
+  onSave,
+  onUploadImage
 }) => {
   const [formData, setFormData] = useState<BarbershopBrandingFormData>(() => getBarbershopBrandingFormData(barbershop));
+  const [uploadingType, setUploadingType] = useState<BarbershopBrandingImageType | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     setFormData(getBarbershopBrandingFormData(barbershop));
   }, [barbershop]);
 
   const canManage = canManageBarbershopBranding(role);
+  const primaryColor = isSafeHexColor(formData.primaryColor) ? formData.primaryColor : '#f59e0b';
+  const secondaryColor = isSafeHexColor(formData.secondaryColor) ? formData.secondaryColor : '#0ea5e9';
   const previewStyle = useMemo(() => ({
-    borderColor: formData.primaryColor || '#f59e0b',
-    background: `linear-gradient(135deg, ${formData.primaryColor || '#f59e0b'}33, rgba(17,24,39,0.92) 45%, ${formData.secondaryColor || '#0ea5e9'}26)`
-  }), [formData.primaryColor, formData.secondaryColor]);
+    borderColor: primaryColor,
+    background: `linear-gradient(135deg, ${primaryColor}33, rgba(17,24,39,0.92) 45%, ${secondaryColor}26)`
+  }), [primaryColor, secondaryColor]);
+
+  const primaryButtonStyle = useMemo(() => ({
+    backgroundColor: primaryColor,
+    borderColor: primaryColor
+  }), [primaryColor]);
+
+  const secondaryButtonStyle = useMemo(() => ({
+    backgroundColor: `${secondaryColor}26`,
+    borderColor: `${secondaryColor}80`,
+    color: '#f8fafc'
+  }), [secondaryColor]);
 
   if (!canManage) return null;
 
   const handleChange = (field: keyof BarbershopBrandingFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleImageUpload = async (type: BarbershopBrandingImageType, event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    setUploadError(null);
+    setUploadSuccess(null);
+
+    if (!onUploadImage) {
+      setUploadError('Upload de imagens nao esta disponivel neste ambiente.');
+      input.value = '';
+      return;
+    }
+
+    setUploadingType(type);
+
+    try {
+      const publicUrl = await onUploadImage(file, type);
+      handleChange(getBarbershopBrandingImageField(type), publicUrl);
+      setUploadSuccess(type === 'logo' ? 'Logo enviada. Salve a aparencia para publicar.' : 'Capa enviada. Salve a aparencia para publicar.');
+    } catch (uploadFailure) {
+      setUploadError(uploadFailure instanceof Error ? uploadFailure.message : 'Nao foi possivel enviar a imagem.');
+    } finally {
+      setUploadingType(null);
+      input.value = '';
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -108,9 +160,28 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
       {loading && <p className="mb-4 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-sm text-blue-200">Carregando dados da barbearia...</p>}
       {error && <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
       {success && <p className="mb-4 rounded-xl border border-green-500/20 bg-green-500/10 p-3 text-sm text-green-200">{success}</p>}
+      {uploadError && <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{uploadError}</p>}
+      {uploadSuccess && <p className="mb-4 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-sm text-blue-200">{uploadSuccess}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <ImageUploadField
+              label="Upload da logo"
+              helpText="PNG, JPG ou WEBP ate 2MB"
+              previewUrl={formData.logoUrl}
+              uploading={uploadingType === 'logo'}
+              onChange={(event) => handleImageUpload('logo', event)}
+            />
+            <ImageUploadField
+              label="Upload da capa"
+              helpText="PNG, JPG ou WEBP ate 5MB"
+              previewUrl={formData.coverImageUrl}
+              uploading={uploadingType === 'cover'}
+              onChange={(event) => handleImageUpload('cover', event)}
+            />
+          </div>
+
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="Nome da barbearia" value={formData.name} onChange={(value) => handleChange('name', value)} required />
             <Field label="Telefone" value={formData.phone} onChange={(value) => handleChange('phone', value)} />
@@ -156,8 +227,11 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
               <p className="text-sm text-gray-300 mt-2">{formData.description || 'Descricao curta da experiencia publica.'}</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-200">
                 {formData.address && <span className="rounded-lg bg-white/10 px-2 py-1">{formData.address}</span>}
-                {formData.whatsapp && <span className="rounded-lg bg-green-500/20 px-2 py-1">WhatsApp</span>}
-                {formData.instagramUrl && <span className="rounded-lg bg-pink-500/20 px-2 py-1">Instagram</span>}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="rounded-xl border px-3 py-2 text-xs font-bold text-black" style={primaryButtonStyle}>Agendar agora</span>
+                {formData.whatsapp && <span className="rounded-xl border px-3 py-2 text-xs font-bold" style={secondaryButtonStyle}>WhatsApp</span>}
+                {formData.instagramUrl && <span className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-white">Instagram</span>}
               </div>
             </div>
           </div>
@@ -166,6 +240,39 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
     </section>
   );
 };
+
+type ImageUploadFieldProps = {
+  label: string;
+  helpText: string;
+  previewUrl: string;
+  uploading: boolean;
+  onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+};
+
+const ImageUploadField: React.FC<ImageUploadFieldProps> = ({ label, helpText, previewUrl, uploading, onChange }) => (
+  <label className="block rounded-2xl border border-gray-700 bg-gray-900/70 p-4">
+    <span className="mb-3 flex items-center justify-between gap-3">
+      <span>
+        <span className="block text-sm font-bold text-gray-200">{label}</span>
+        <span className="block text-xs text-gray-500">{helpText}</span>
+      </span>
+      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-gold-300">
+        <Upload size={17} />
+      </span>
+    </span>
+    <span className="mb-3 flex h-28 items-center justify-center overflow-hidden rounded-xl border border-dashed border-gray-700 bg-black/30 text-xs text-gray-500">
+      {previewUrl ? <img src={previewUrl} alt="" className="h-full w-full object-cover" /> : 'Sem imagem'}
+    </span>
+    <input
+      type="file"
+      accept="image/png,image/jpeg,image/webp"
+      disabled={uploading}
+      onChange={onChange}
+      className="block w-full text-sm text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-gold-500 file:px-3 file:py-2 file:text-sm file:font-bold file:text-black disabled:cursor-not-allowed disabled:opacity-60"
+    />
+    {uploading && <span className="mt-2 block text-xs text-blue-200">Enviando imagem...</span>}
+  </label>
+);
 
 type FieldProps = {
   label: string;

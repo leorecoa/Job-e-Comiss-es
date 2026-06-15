@@ -78,7 +78,7 @@ Not included:
 
 ## Limitations
 
-Image URLs must be hosted elsewhere and pasted manually.
+Image URLs can still be pasted manually as fallback, but the next phase adds Supabase Storage upload.
 
 Colors should be valid hex values such as:
 
@@ -91,7 +91,13 @@ If colors are missing or invalid, the public page falls back to the app's defaul
 
 ## Next Phase
 
-The next white-label phase can add Supabase Storage upload support:
+The next white-label phase is documented in:
+
+```txt
+docs/white-label-storage-upload.md
+```
+
+It adds Supabase Storage upload support:
 
 1. Create a controlled storage bucket for barbershop brand assets.
 2. Add upload UI for logo and cover image.

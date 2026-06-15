@@ -36,6 +36,22 @@ export type BarbershopBrandingInput = {
   secondaryColor?: string | null;
 };
 
+export type BarbershopBrandingImageType = 'logo' | 'cover';
+
+export type BarbershopBrandingImageUploadInput = {
+  barbershopId: string;
+  file: File;
+  type: BarbershopBrandingImageType;
+};
+
+const BRANDING_STORAGE_BUCKET = 'barbershop-branding';
+const BRANDING_ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp'] as const;
+const BRANDING_ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const BRANDING_MAX_BYTES: Record<BarbershopBrandingImageType, number> = {
+  logo: 2 * 1024 * 1024,
+  cover: 5 * 1024 * 1024
+};
+
 const mapBarbershopRow = (row: DatabaseBarbershopRow | DatabaseBarbershopBrandingRow): Barbershop => ({
   id: row.id,
   name: row.name,
@@ -151,6 +167,34 @@ const cleanOptional = (value: string | null | undefined): string | null => {
   return trimmed || null;
 };
 
+export const getBarbershopBrandingImageExtension = (fileName: string): string => {
+  const extension = fileName.split('.').pop()?.toLowerCase() || '';
+  return extension === 'jpg' ? 'jpg' : extension;
+};
+
+export const validateBarbershopBrandingImageFile = (
+  file: Pick<File, 'name' | 'size' | 'type'>,
+  type: BarbershopBrandingImageType
+): string => {
+  const extension = getBarbershopBrandingImageExtension(file.name);
+
+  if (!BRANDING_ALLOWED_EXTENSIONS.includes(extension as typeof BRANDING_ALLOWED_EXTENSIONS[number]) || !BRANDING_ALLOWED_MIME_TYPES.includes(file.type)) {
+    throw new Error('Use uma imagem PNG, JPG, JPEG ou WEBP.');
+  }
+
+  if (file.size > BRANDING_MAX_BYTES[type]) {
+    throw new Error(type === 'logo' ? 'A logo deve ter no maximo 2MB.' : 'A imagem de capa deve ter no maximo 5MB.');
+  }
+
+  return extension;
+};
+
+export const getBarbershopBrandingImagePath = (
+  barbershopId: string,
+  type: BarbershopBrandingImageType,
+  extension: string
+): string => `${barbershopId}/${type}.${extension}`;
+
 export const toBarbershopBrandingPayload = (input: BarbershopBrandingInput) => ({
   name: input.name.trim(),
   phone: cleanOptional(input.phone),
@@ -206,4 +250,35 @@ export const updateCurrentBarbershopBranding = async (
   if (error) throw error;
 
   return mapBarbershopRow(data);
+};
+
+export const uploadBarbershopBrandingImage = async ({
+  barbershopId,
+  file,
+  type
+}: BarbershopBrandingImageUploadInput): Promise<string> => {
+  if (!barbershopId?.trim()) {
+    throw new Error('Barbearia nao encontrada para upload.');
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase Storage nao esta configurado para upload de imagens.');
+  }
+
+  const extension = validateBarbershopBrandingImageFile(file, type);
+  const path = getBarbershopBrandingImagePath(barbershopId, type, extension);
+  const bucket = supabase.storage.from(BRANDING_STORAGE_BUCKET);
+  const { error } = await bucket.upload(path, file, {
+    cacheControl: '3600',
+    upsert: true
+  });
+
+  if (error) throw error;
+
+  const { data } = bucket.getPublicUrl(path);
+  if (!data.publicUrl) {
+    throw new Error('Nao foi possivel gerar a URL publica da imagem.');
+  }
+
+  return data.publicUrl;
 };
