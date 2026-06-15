@@ -606,6 +606,109 @@ describe('barbershop repository local fallback', () => {
     vi.doUnmock('./lib/supabase');
   });
 
+  it('rejects invalid branding image files', async () => {
+    vi.resetModules();
+    vi.doMock('./lib/supabase', () => ({
+      isSupabaseConfigured: false,
+      supabase: null
+    }));
+
+    const { validateBarbershopBrandingImageFile } = await import('./services/barbershopRepository');
+
+    expect(() => validateBarbershopBrandingImageFile({
+      name: 'logo.gif',
+      size: 1024,
+      type: 'image/gif'
+    } as File, 'logo')).toThrow('PNG, JPG, JPEG ou WEBP');
+
+    vi.doUnmock('./lib/supabase');
+  });
+
+  it('rejects oversized branding image files', async () => {
+    vi.resetModules();
+    vi.doMock('./lib/supabase', () => ({
+      isSupabaseConfigured: false,
+      supabase: null
+    }));
+
+    const { validateBarbershopBrandingImageFile } = await import('./services/barbershopRepository');
+
+    expect(() => validateBarbershopBrandingImageFile({
+      name: 'logo.png',
+      size: 2 * 1024 * 1024 + 1,
+      type: 'image/png'
+    } as File, 'logo')).toThrow('2MB');
+
+    expect(() => validateBarbershopBrandingImageFile({
+      name: 'cover.webp',
+      size: 5 * 1024 * 1024 + 1,
+      type: 'image/webp'
+    } as File, 'cover')).toThrow('5MB');
+
+    vi.doUnmock('./lib/supabase');
+  });
+
+  it('uploads a branding image to a stable Supabase Storage path', async () => {
+    vi.resetModules();
+
+    const upload = vi.fn().mockResolvedValue({ error: null });
+    const getPublicUrl = vi.fn(() => ({ data: { publicUrl: 'https://cdn.example.com/barbershop-1/logo.png' } }));
+    const storageFrom = vi.fn(() => ({ upload, getPublicUrl }));
+
+    vi.doMock('./lib/supabase', () => ({
+      isSupabaseConfigured: true,
+      supabase: {
+        storage: {
+          from: storageFrom
+        }
+      }
+    }));
+
+    const { uploadBarbershopBrandingImage } = await import('./services/barbershopRepository');
+    const file = {
+      name: 'brand.png',
+      size: 1024,
+      type: 'image/png'
+    } as File;
+
+    await expect(uploadBarbershopBrandingImage({
+      barbershopId: 'barbershop-1',
+      file,
+      type: 'logo'
+    })).resolves.toBe('https://cdn.example.com/barbershop-1/logo.png');
+
+    expect(storageFrom).toHaveBeenCalledWith('barbershop-branding');
+    expect(upload).toHaveBeenCalledWith('barbershop-1/logo.png', file, {
+      cacheControl: '3600',
+      upsert: true
+    });
+    expect(getPublicUrl).toHaveBeenCalledWith('barbershop-1/logo.png');
+
+    vi.doUnmock('./lib/supabase');
+  });
+
+  it('rejects branding upload when Supabase Storage is not configured', async () => {
+    vi.resetModules();
+    vi.doMock('./lib/supabase', () => ({
+      isSupabaseConfigured: false,
+      supabase: null
+    }));
+
+    const { uploadBarbershopBrandingImage } = await import('./services/barbershopRepository');
+
+    await expect(uploadBarbershopBrandingImage({
+      barbershopId: 'barbershop-1',
+      file: {
+        name: 'brand.png',
+        size: 1024,
+        type: 'image/png'
+      } as File,
+      type: 'logo'
+    })).rejects.toThrow('Supabase Storage');
+
+    vi.doUnmock('./lib/supabase');
+  });
+
   it('updates current barbershop branding using only allowed fields', async () => {
     vi.resetModules();
 
