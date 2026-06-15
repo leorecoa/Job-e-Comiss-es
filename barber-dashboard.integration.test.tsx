@@ -8,7 +8,7 @@ import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
 import { Appointment, DEFAULT_SETTINGS } from './types';
 import { getPublicBookingSlugFromPath } from './App';
-import { getPublicBookingBranding, getPublicBookingSteps, getPublicBookingSummary } from './components/PublicBookingPage';
+import { getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingSteps, getPublicBookingSummary } from './components/PublicBookingPage';
 import {
   BarbershopBrandingSettings,
   canManageBarbershopBranding,
@@ -295,6 +295,72 @@ describe('Public Booking Page Logic', () => {
     expect(branding.primaryColor).toBe('#111111');
     expect(branding.secondaryColor).toBe('#eeeeee');
     expect(branding.hasVisualBranding).toBe(true);
+  });
+
+  it('public booking landing content renders a headline with barbershop name', () => {
+    const branding = getPublicBookingBranding({
+      id: 'barbershop-brand',
+      name: 'Barbearia Premium',
+      slug: 'barbearia-premium',
+      active: true
+    }, DEFAULT_SETTINGS);
+    const content = getPublicBookingLandingContent(branding);
+
+    expect(content.headline).toBe('Agende seu horario na Barbearia Premium');
+    expect(content.ctaLabel).toBe('Agendar agora');
+    expect(content.trustItems).toContain('Confirmacao rapida');
+  });
+
+  it('public booking landing content uses barbershop description when it exists', () => {
+    const branding = getPublicBookingBranding({
+      id: 'barbershop-brand',
+      name: 'Barbearia Premium',
+      slug: 'barbearia-premium',
+      description: 'Cortes classicos com acabamento premium.',
+      active: true
+    }, DEFAULT_SETTINGS);
+
+    expect(getPublicBookingLandingContent(branding).description).toBe('Cortes classicos com acabamento premium.');
+  });
+
+  it('public booking landing content uses a better fallback description', () => {
+    const branding = getPublicBookingBranding({
+      id: DEFAULT_BARBERSHOP_ID,
+      name: 'Gestao Maxima',
+      slug: DEFAULT_BARBERSHOP_SLUG,
+      active: true
+    }, DEFAULT_SETTINGS);
+
+    expect(getPublicBookingLandingContent(branding).description).toContain('Corte, barba e acabamento');
+  });
+
+  it('public booking contact links render only when branding fields exist', () => {
+    const withLinks = getPublicBookingContactLinks(getPublicBookingBranding({
+      id: 'barbershop-brand',
+      name: 'Barbearia Premium',
+      slug: 'barbearia-premium',
+      whatsapp: '5585999999999',
+      instagramUrl: 'instagram.com/barbearia',
+      address: 'Rua Central, 100',
+      active: true
+    }, DEFAULT_SETTINGS));
+
+    expect(withLinks.whatsapp).toBe('https://wa.me/5585999999999');
+    expect(withLinks.instagram).toBe('https://instagram.com/barbearia');
+    expect(withLinks.address).toBe('Rua Central, 100');
+
+    const withoutLinks = getPublicBookingContactLinks(getPublicBookingBranding({
+      id: DEFAULT_BARBERSHOP_ID,
+      name: 'Gestao Maxima',
+      slug: DEFAULT_BARBERSHOP_SLUG,
+      active: true
+    }, DEFAULT_SETTINGS));
+
+    expect(withoutLinks).toEqual({
+      whatsapp: null,
+      instagram: null,
+      address: null
+    });
   });
 
   it('public booking step state highlights the current incomplete step', () => {
