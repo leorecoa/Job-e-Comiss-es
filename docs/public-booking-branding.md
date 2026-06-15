@@ -29,7 +29,9 @@ add column if not exists logo_url text,
 add column if not exists cover_image_url text,
 add column if not exists description text,
 add column if not exists instagram_url text,
-add column if not exists whatsapp text;
+add column if not exists whatsapp text,
+add column if not exists primary_color text,
+add column if not exists secondary_color text;
 
 notify pgrst, 'reload schema';
 ```
@@ -45,7 +47,9 @@ set
   cover_image_url = 'https://example.com/gestao-maxima-cover.jpg',
   description = 'Agenda online da Gestao Maxima.',
   instagram_url = 'https://instagram.com/gestao_maxima',
-  whatsapp = '5585999999999'
+  whatsapp = '5585999999999',
+  primary_color = '#f59e0b',
+  secondary_color = '#0ea5e9'
 where slug = 'gestao-maxima';
 
 notify pgrst, 'reload schema';
@@ -63,6 +67,8 @@ cover_image_url -> coverImageUrl
 description -> description
 instagram_url -> instagramUrl
 whatsapp -> whatsapp
+primary_color -> primaryColor
+secondary_color -> secondaryColor
 ```
 
 Public booking should continue to work if these fields are null.

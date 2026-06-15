@@ -8,6 +8,11 @@ import * as serviceRepository from './services/serviceRepository';
 import { Appointment, DEFAULT_SETTINGS } from './types';
 import { getPublicBookingSlugFromPath } from './App';
 import { getPublicBookingBranding } from './components/PublicBookingPage';
+import {
+  canManageBarbershopBranding,
+  getBarbershopBrandingFormData,
+  getBarbershopBrandingSaveInput
+} from './components/BarbershopBrandingSettings';
 import { 
   createPublicAppointment, 
   validatePublicBookingInput 
@@ -249,7 +254,9 @@ describe('Public Booking Page Logic', () => {
       coverImageUrl: null,
       description: null,
       instagramUrl: null,
-      whatsapp: null
+      whatsapp: null,
+      primaryColor: null,
+      secondaryColor: null
     }, DEFAULT_SETTINGS);
 
     expect(branding.shopName).toBe('Gestao Maxima');
@@ -270,7 +277,9 @@ describe('Public Booking Page Logic', () => {
       coverImageUrl: 'https://cdn.example.com/cover.jpg',
       description: 'Cortes classicos com agenda online.',
       instagramUrl: 'https://instagram.com/barbearia_premium',
-      whatsapp: '5585999999999'
+      whatsapp: '5585999999999',
+      primaryColor: '#111111',
+      secondaryColor: '#eeeeee'
     }, DEFAULT_SETTINGS);
 
     expect(branding.shopName).toBe('Barbearia Premium');
@@ -280,7 +289,71 @@ describe('Public Booking Page Logic', () => {
     expect(branding.address).toBe('Rua Central, 100');
     expect(branding.whatsapp).toBe('5585999999999');
     expect(branding.instagramUrl).toBe('https://instagram.com/barbearia_premium');
+    expect(branding.primaryColor).toBe('#111111');
+    expect(branding.secondaryColor).toBe('#eeeeee');
     expect(branding.hasVisualBranding).toBe(true);
+  });
+
+  it('owner can see white label barbershop settings', () => {
+    expect(canManageBarbershopBranding('owner')).toBe(true);
+    expect(canManageBarbershopBranding(null)).toBe(true);
+  });
+
+  it('barber cannot see white label barbershop settings', () => {
+    expect(canManageBarbershopBranding('barber')).toBe(false);
+  });
+
+  it('barbershop branding form loads current data and keeps slug read-only', () => {
+    const formData = getBarbershopBrandingFormData({
+      id: DEFAULT_BARBERSHOP_ID,
+      name: 'Gestao Maxima',
+      slug: DEFAULT_BARBERSHOP_SLUG,
+      active: true,
+      phone: '558500000000',
+      address: 'Rua Principal',
+      description: 'Agenda premium',
+      whatsapp: '5585999999999',
+      instagramUrl: 'https://instagram.com/gestao',
+      logoUrl: 'https://cdn.example.com/logo.png',
+      coverImageUrl: 'https://cdn.example.com/cover.jpg',
+      primaryColor: '#f59e0b',
+      secondaryColor: '#0ea5e9'
+    });
+
+    expect(formData.name).toBe('Gestao Maxima');
+    expect(formData.description).toBe('Agenda premium');
+    expect(formData.logoUrl).toBe('https://cdn.example.com/logo.png');
+    expect('slug' in formData).toBe(false);
+  });
+
+  it('saving white label settings sends only allowed fields', () => {
+    const payload = getBarbershopBrandingSaveInput({
+      name: 'Gestao Maxima',
+      phone: '558500000000',
+      address: 'Rua Principal',
+      whatsapp: '5585999999999',
+      instagramUrl: 'https://instagram.com/gestao',
+      description: 'Agenda premium',
+      logoUrl: 'https://cdn.example.com/logo.png',
+      coverImageUrl: 'https://cdn.example.com/cover.jpg',
+      primaryColor: '#f59e0b',
+      secondaryColor: '#0ea5e9'
+    });
+
+    expect(payload).toEqual({
+      name: 'Gestao Maxima',
+      phone: '558500000000',
+      address: 'Rua Principal',
+      whatsapp: '5585999999999',
+      instagramUrl: 'https://instagram.com/gestao',
+      description: 'Agenda premium',
+      logoUrl: 'https://cdn.example.com/logo.png',
+      coverImageUrl: 'https://cdn.example.com/cover.jpg',
+      primaryColor: '#f59e0b',
+      secondaryColor: '#0ea5e9'
+    });
+    expect('id' in payload).toBe(false);
+    expect('slug' in payload).toBe(false);
   });
 
   it('/book/barbearia-inexistente uses the invalid slug without fallback', async () => {

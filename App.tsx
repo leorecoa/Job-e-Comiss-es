@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType, Appointment, AppointmentStatus, BarberOption, Service } from './types';
+import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
 import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById } from './utils';
-import { getBarbershopBySlug } from './services/barbershopRepository';
+import { BarbershopBrandingInput, getBarbershopById, getBarbershopBySlug, updateCurrentBarbershopBranding } from './services/barbershopRepository';
 import { APPOINTMENT_STORAGE_KEY, completeAppointmentFinancialRecord, getAppointmentDateInput, hasAppointmentConflict } from './scheduling';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
@@ -22,6 +22,7 @@ import { ReportModal } from './components/ReportModal';
 import { DashboardCharts } from './components/DashboardCharts';
 import { isSupabaseConfigured } from './lib/supabase';
 import { BarberDashboard } from './components/BarberDashboard';
+import { BarbershopBrandingSettings } from './components/BarbershopBrandingSettings';
 import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { listBarbers } from './services/barberRepository';
 import { listServices } from './services/serviceRepository';
@@ -202,6 +203,11 @@ const App: React.FC = () => {
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [isAuthLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [ownerBarbershop, setOwnerBarbershop] = useState<Barbershop | null>(null);
+  const [isOwnerBarbershopLoading, setOwnerBarbershopLoading] = useState(false);
+  const [ownerBarbershopError, setOwnerBarbershopError] = useState<string | null>(null);
+  const [ownerBarbershopSuccess, setOwnerBarbershopSuccess] = useState<string | null>(null);
+  const [isSavingOwnerBarbershop, setSavingOwnerBarbershop] = useState(false);
 
   // Tour State
   const [isTourOpen, setTourOpen] = useState(false);
@@ -279,6 +285,42 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('barbearia_settings', JSON.stringify(settings));
   }, [settings]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadOwnerBarbershop = async () => {
+      if (authSession?.role === 'barber') {
+        setOwnerBarbershop(null);
+        return;
+      }
+
+      const barbershopId = authSession?.barbershopId || (!isSupabaseConfigured ? 'local-barbershop' : undefined);
+
+      if (!barbershopId) return;
+
+      setOwnerBarbershopLoading(true);
+      setOwnerBarbershopError(null);
+
+      try {
+        const currentBarbershop = await getBarbershopById(barbershopId);
+        if (!active) return;
+        setOwnerBarbershop(currentBarbershop);
+      } catch (error) {
+        if (!active) return;
+        console.error(error);
+        setOwnerBarbershopError('Nao foi possivel carregar a identidade da barbearia.');
+      } finally {
+        if (active) setOwnerBarbershopLoading(false);
+      }
+    };
+
+    loadOwnerBarbershop();
+
+    return () => {
+      active = false;
+    };
+  }, [authSession]);
 
   useEffect(() => {
     let active = true;
@@ -570,6 +612,37 @@ const App: React.FC = () => {
         return true;
     }
     return false;
+  };
+
+  const handleSaveOwnerBarbershopBranding = async (input: BarbershopBrandingInput) => {
+    if (authSession?.role === 'barber') return;
+
+    const barbershopId = authSession?.barbershopId || ownerBarbershop?.id || (!isSupabaseConfigured ? 'local-barbershop' : undefined);
+
+    if (!barbershopId) {
+      setOwnerBarbershopError('Barbearia nao encontrada para atualizar.');
+      return;
+    }
+
+    setSavingOwnerBarbershop(true);
+    setOwnerBarbershopError(null);
+    setOwnerBarbershopSuccess(null);
+
+    try {
+      const updatedBarbershop = await updateCurrentBarbershopBranding(barbershopId, input);
+      setOwnerBarbershop(updatedBarbershop);
+      setSettings(prev => normalizeSettings({
+        ...prev,
+        shopName: updatedBarbershop.name
+      }));
+      setOwnerBarbershopSuccess('Aparencia publica salva com sucesso.');
+      addToast('Aparencia publica salva.', 'success');
+    } catch (error) {
+      console.error(error);
+      setOwnerBarbershopError('Nao foi possivel salvar a identidade da barbearia.');
+    } finally {
+      setSavingOwnerBarbershop(false);
+    }
   };
 
   const handleSaveClient = (data: ClientFormData) => {
@@ -1087,6 +1160,16 @@ const App: React.FC = () => {
                 </div>
              </div>
              
+             <BarbershopBrandingSettings
+                barbershop={ownerBarbershop}
+                role={authSession?.role || 'owner'}
+                loading={isOwnerBarbershopLoading}
+                saving={isSavingOwnerBarbershop}
+                error={ownerBarbershopError}
+                success={ownerBarbershopSuccess}
+                onSave={handleSaveOwnerBarbershopBranding}
+             />
+
              {/* New Dashboard Charts */}
              <div className="mb-6">
                 <DashboardCharts clients={chartClients} />
