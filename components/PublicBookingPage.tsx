@@ -156,6 +156,26 @@ export const getPublicBookingBranding = (barbershop: Barbershop | null, settings
   };
 };
 
+const DEFAULT_PUBLIC_BOOKING_DESCRIPTION = 'Corte, barba e acabamento com horario marcado. Escolha o melhor horario e confirme seu atendimento online.';
+
+export const getPublicBookingLandingContent = (branding: ReturnType<typeof getPublicBookingBranding>) => {
+  const description = branding.description || DEFAULT_PUBLIC_BOOKING_DESCRIPTION;
+
+  return {
+    eyebrow: 'Agenda oficial da barbearia',
+    headline: `Agende seu horario na ${branding.shopName}`,
+    description,
+    ctaLabel: 'Agendar agora',
+    trustItems: ['Confirmacao rapida', 'Horario reservado', 'Atendimento por barbeiro']
+  };
+};
+
+export const getPublicBookingContactLinks = (branding: ReturnType<typeof getPublicBookingBranding>) => ({
+  whatsapp: branding.whatsapp ? getWhatsAppHref(branding.whatsapp) : null,
+  instagram: branding.instagramUrl ? getExternalHref(branding.instagramUrl) : null,
+  address: branding.address || null
+});
+
 const getExternalHref = (value: string): string => {
   if (/^https?:\/\//i.test(value)) return value;
   return `https://${value}`;
@@ -255,6 +275,14 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     () => getPublicBookingBranding(barbershop, settings),
     [barbershop, settings]
   );
+  const landingContent = useMemo(
+    () => getPublicBookingLandingContent(branding),
+    [branding]
+  );
+  const contactLinks = useMemo(
+    () => getPublicBookingContactLinks(branding),
+    [branding]
+  );
   const primaryColor = isSafeHexColor(branding.primaryColor) ? branding.primaryColor : '#f59e0b';
   const secondaryColor = isSafeHexColor(branding.secondaryColor) ? branding.secondaryColor : '#0ea5e9';
   const brandingHeaderStyle = {
@@ -263,6 +291,10 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   const primaryActionStyle = {
     backgroundColor: primaryColor,
     boxShadow: `0 18px 36px ${primaryColor}24`
+  };
+  const heroCtaStyle = {
+    backgroundColor: primaryColor,
+    boxShadow: `0 24px 50px ${primaryColor}30`
   };
   const selectedCardStyle = {
     borderColor: primaryColor,
@@ -455,9 +487,9 @@ const handleSubmit = async (event: React.FormEvent) => {
       <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
         <div className="glass-card w-full max-w-lg rounded-3xl p-7 text-center">
           <div className="mx-auto mb-5 h-16 w-16 animate-pulse rounded-2xl border border-gold-400/20 bg-gold-500/10" />
-          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-gold-300">Agendamento online</p>
+              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-gold-300">Reserva publica</p>
           <h1 className="font-display text-2xl font-bold text-white mb-3">Carregando barbearia...</h1>
-          <p className="text-sm text-gray-400">Estamos preparando os horarios disponiveis para voce.</p>
+              <p className="text-sm text-gray-400">Estamos preparando a agenda da barbearia para voce.</p>
         </div>
       </div>
     );
@@ -489,8 +521,8 @@ const handleSubmit = async (event: React.FormEvent) => {
             <CheckCircle size={42} />
           </div>
           <p className="mb-2 text-xs font-bold uppercase tracking-widest text-green-300">Solicitacao enviada</p>
-          <h1 className="font-display text-2xl font-bold text-white mb-2">Horario solicitado com sucesso</h1>
-          <p className="text-gray-400 text-sm mb-6">A barbearia recebeu seu agendamento na agenda interna.</p>
+          <h1 className="font-display text-2xl font-bold text-white mb-2">Horario reservado com sucesso</h1>
+          <p className="text-gray-400 text-sm mb-6">A barbearia ja recebeu seu agendamento.</p>
 
           <div className="bg-gray-900/60 border border-gray-700 rounded-2xl p-4 text-left space-y-3 mb-6">
             <p className="text-white font-bold">{createdAppointment.clientName}</p>
@@ -527,7 +559,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             <img src="/brand-mark.svg" alt="Gestao Maxima" className="w-12 h-12" />
             <div>
               <h1 className="text-white font-display font-bold text-xl">{branding.shopName}</h1>
-              <p className="text-gold-400 text-[10px] uppercase tracking-widest font-bold">Agendamento online</p>
+              <p className="text-gold-400 text-[10px] uppercase tracking-widest font-bold">Agenda oficial</p>
             </div>
           </div>
           <a href="/" className="hidden xs:inline-flex bg-gray-800 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl text-sm font-bold">
@@ -536,7 +568,7 @@ const handleSubmit = async (event: React.FormEvent) => {
         </header>
 
         <section className="glass-card overflow-hidden rounded-3xl mb-5">
-          <div className="relative min-h-[240px]" style={brandingHeaderStyle}>
+          <div className="relative min-h-[520px] md:min-h-[560px]" style={brandingHeaderStyle}>
             {branding.coverImageUrl && (
               <img
                 src={branding.coverImageUrl}
@@ -544,46 +576,68 @@ const handleSubmit = async (event: React.FormEvent) => {
                 className="absolute inset-0 h-full w-full object-cover"
               />
             )}
-            <div className="absolute inset-0 bg-black/55" />
-            <div className="relative flex min-h-[240px] flex-col justify-end p-5 md:p-8">
-              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                <div className="flex items-end gap-4">
-                  <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/15 bg-gray-950/75 text-gold-300 shadow-xl shadow-black/30">
-                    {branding.logoUrl ? (
-                      <img src={branding.logoUrl} alt={`Logo da ${branding.shopName}`} className="h-full w-full object-cover" />
-                    ) : (
-                      <Scissors size={34} />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gold-300">Reserva publica</p>
-                    <h2 className="font-display text-4xl font-bold text-white md:text-5xl">{branding.shopName}</h2>
-                    {branding.description && (
-                      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-200">{branding.description}</p>
-                    )}
-                  </div>
-                </div>
-
+            <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/62 to-gray-950/95" />
+            <div className="relative flex min-h-[520px] flex-col justify-between p-5 md:min-h-[560px] md:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 text-xs font-bold uppercase tracking-widest text-gray-100">
+                  <CalendarCheck size={14} />
+                  {landingContent.eyebrow}
+                </span>
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-gray-200 md:justify-end">
-                  {branding.address && (
+                  {contactLinks.address && (
                     <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/35 px-3 py-2">
                       <MapPin size={14} />
-                      {branding.address}
+                      {contactLinks.address}
                     </span>
                   )}
-                  {branding.whatsapp && (
-                    <a href={getWhatsAppHref(branding.whatsapp)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-green-400/20 bg-green-500/10 px-3 py-2 text-green-200">
+                  {contactLinks.whatsapp && (
+                    <a href={contactLinks.whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-green-400/20 bg-green-500/10 px-3 py-2 text-green-200">
                       <Phone size={14} />
                       WhatsApp
                     </a>
                   )}
-                  {branding.instagramUrl && (
-                    <a href={getExternalHref(branding.instagramUrl)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-pink-400/20 bg-pink-500/10 px-3 py-2 text-pink-100">
+                  {contactLinks.instagram && (
+                    <a href={contactLinks.instagram} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-pink-400/20 bg-pink-500/10 px-3 py-2 text-pink-100">
                       <MessageCircle size={14} />
                       Instagram
                     </a>
                   )}
                 </div>
+              </div>
+
+              <div className="max-w-3xl">
+                <div className="mb-5 flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/15 bg-gray-950/75 text-gold-300 shadow-xl shadow-black/30 md:h-28 md:w-28">
+                  {branding.logoUrl ? (
+                    <img src={branding.logoUrl} alt={`Logo da ${branding.shopName}`} className="h-full w-full object-cover" />
+                  ) : (
+                    <Scissors size={38} />
+                  )}
+                </div>
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.24em] text-gold-300">{branding.shopName}</p>
+                <h2 className="font-display text-4xl font-black leading-tight text-white md:text-6xl">{landingContent.headline}</h2>
+                <p className="mt-4 max-w-2xl text-base leading-relaxed text-gray-200 md:text-lg">{landingContent.description}</p>
+
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <a href="#booking-flow" className="inline-flex items-center justify-center rounded-2xl px-5 py-4 text-sm font-black text-black" style={heroCtaStyle}>
+                    {landingContent.ctaLabel}
+                  </a>
+                  {contactLinks.whatsapp && (
+                    <a href={contactLinks.whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-sm font-bold text-white">
+                      <MessageCircle size={18} />
+                      Falar no WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                {landingContent.trustItems.map((item) => (
+                  <div key={item} className="rounded-2xl border border-white/10 bg-black/35 p-4 backdrop-blur">
+                    <CheckCircle size={18} className="mb-2 text-green-300" />
+                    <p className="text-sm font-bold text-white">{item}</p>
+                    <p className="mt-1 text-xs text-gray-400">Fluxo simples e direto pelo link oficial.</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -606,15 +660,15 @@ const handleSubmit = async (event: React.FormEvent) => {
           </div>
         </section>
 
-        <main className="grid lg:grid-cols-[0.85fr_1.15fr] gap-5 items-start">
+        <main id="booking-flow" className="grid scroll-mt-6 lg:grid-cols-[0.85fr_1.15fr] gap-5 items-start">
           <section className="glass-card rounded-3xl p-6 md:p-7 lg:sticky lg:top-6">
             <div className="flex items-center gap-2 text-gold-400 mb-3">
               <CalendarCheck size={22} />
-              <span className="text-xs font-bold uppercase tracking-widest">Escolha seu horario</span>
+              <span className="text-xs font-bold uppercase tracking-widest">Reserva em poucos passos</span>
             </div>
-            <h2 className="font-display text-3xl font-bold text-white mb-3">Agende sem espera</h2>
+            <h2 className="font-display text-3xl font-bold text-white mb-3">Monte seu atendimento</h2>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
-              Selecione barbeiro, servico, data e um horario disponivel. A barbearia recebe sua solicitacao direto na agenda interna.
+              Escolha seu barbeiro, reserve o servico e confirme em poucos segundos.
             </p>
 
             <div className="grid xs:grid-cols-2 gap-3">
@@ -633,8 +687,8 @@ const handleSubmit = async (event: React.FormEvent) => {
             <div className="mt-5 rounded-2xl border border-gray-700 bg-gray-950/70 p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Resumo</p>
-                  <h3 className="font-display text-xl font-bold text-white">Seu agendamento</h3>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Sua reserva</p>
+                  <h3 className="font-display text-xl font-bold text-white">Detalhes do atendimento</h3>
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs font-bold ${bookingSummary.ready ? 'bg-green-500/10 text-green-200 border border-green-400/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>
                   {bookingSummary.ready ? 'Pronto' : 'Em andamento'}
@@ -648,7 +702,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                 <SummaryRow label="Horario" value={bookingSummary.slotLabel} highlight={Boolean(selectedSlot)} />
               </div>
               <p className="mt-4 rounded-xl border border-blue-400/20 bg-blue-500/10 p-3 text-xs leading-relaxed text-blue-100">
-                Status antes de confirmar: o horario sera enviado como solicitado para a agenda da barbearia.
+                Ao confirmar, a barbearia recebe sua reserva com os detalhes escolhidos.
               </p>
             </div>
           </section>
@@ -667,7 +721,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             )}
 
             <div className="space-y-3">
-              <SectionTitle step="01" title="Escolha o barbeiro" description="Selecione quem vai te atender." />
+              <SectionTitle step="01" title="Quem vai te atender?" description="Escolha o profissional para o seu horario." />
               {barberOptions.length === 0 ? (
                 <EmptyState message="Nenhum barbeiro disponivel para esta barbearia." />
               ) : (
@@ -695,7 +749,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              <SectionTitle step="02" title="Escolha o servico" description="Veja valor e duracao antes de continuar." />
+              <SectionTitle step="02" title="Qual atendimento voce quer?" description="Confira valor e duracao antes de reservar." />
               {services.length === 0 ? (
                 <EmptyState message="Nenhum servico disponivel para esta barbearia." />
               ) : (
@@ -762,7 +816,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              <SectionTitle step="03" title="Escolha data e horario" description="Mostramos apenas horarios livres para o servico escolhido." />
+              <SectionTitle step="03" title="Quando voce quer vir?" description="Escolha uma data e um horario livre." />
               <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-4" style={subtleAccentStyle}>
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">Data</label>
                 <input type="date" required min={getTodayString()} value={date} onChange={(e) => { setDate(e.target.value); setSelectedSlot(null); }} className="w-full bg-gray-950/80 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
@@ -797,7 +851,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              <SectionTitle step="04" title="Seus dados" description="Usamos essas informacoes para identificar seu horario." />
+              <SectionTitle step="04" title="Como a barbearia te identifica?" description="Informe seus dados para concluir a reserva." />
               <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1.5">Seu nome</label>
@@ -816,17 +870,17 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div className="rounded-2xl border border-gray-700 bg-gray-950/70 p-4">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-gray-500">Antes de confirmar</p>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-gray-500">Confira sua reserva</p>
               <div className="grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
                 <SummaryRow label="Barbeiro" value={bookingSummary.barberName} />
                 <SummaryRow label="Servico" value={bookingSummary.serviceName} />
                 <SummaryRow label="Horario" value={bookingSummary.slotLabel} highlight={Boolean(selectedSlot)} />
-                <SummaryRow label="Status" value="Sera solicitado" />
+                <SummaryRow label="Status" value="Pronto para reservar" />
               </div>
             </div>
 
             <button type="submit" disabled={!barbershop?.id || !selectedBarber?.id || !selectedService?.id || !selectedSlot || isSubmitting} style={primaryActionStyle} className="w-full disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-4 rounded-2xl shadow-lg">
-              {isSubmitting ? 'Confirmando...' : 'Confirmar agendamento'}
+              {isSubmitting ? 'Confirmando...' : 'Reservar horario'}
             </button>
           </form>
         </main>
