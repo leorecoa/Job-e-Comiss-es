@@ -37,6 +37,15 @@ const getTodayString = (): string => {
   return `${year}-${month}-${day}`;
 };
 
+const DEFAULT_PUBLIC_BARBERSHOP_SLUG = 'gestao-maxima';
+
+const normalizeSlugLabel = (slug?: string): string | null => {
+  const trimmed = slug?.trim();
+  if (!trimmed) return null;
+
+  return trimmed.replace(/-/g, ' ');
+};
+
 const isBarberOption = (barber: unknown): barber is BarberOption => {
   return (
     typeof barber === 'object' &&
@@ -133,8 +142,19 @@ const normalizeBarberOptions = (
   return Array.from(byValue.values());
 };
 
-export const getPublicBookingBranding = (barbershop: Barbershop | null, settings: AppSettings) => {
-  const shopName = barbershop?.name?.trim() || settings.shopName || 'Gestao Maxima';
+export const getPublicBookingBranding = (
+  barbershop: Barbershop | null,
+  settings: AppSettings,
+  barbershopSlug?: string
+) => {
+  const explicitSlug = barbershopSlug?.trim();
+  const hasExplicitSlug = Boolean(explicitSlug);
+  const slugLabel = normalizeSlugLabel(explicitSlug);
+  const defaultShopName = settings.shopName || 'Gestao Maxima';
+  const shopName = barbershop?.name?.trim()
+    || (hasExplicitSlug
+      ? (explicitSlug === DEFAULT_PUBLIC_BARBERSHOP_SLUG ? defaultShopName : slugLabel || defaultShopName)
+      : defaultShopName);
   const logoUrl = barbershop?.logoUrl?.trim() || null;
   const coverImageUrl = barbershop?.coverImageUrl?.trim() || null;
   const description = barbershop?.description?.trim() || null;
@@ -164,9 +184,9 @@ export const getPublicBookingLandingContent = (branding: ReturnType<typeof getPu
   const description = branding.description || DEFAULT_PUBLIC_BOOKING_DESCRIPTION;
 
   return {
-    eyebrow: 'Agenda premium',
-    headline: 'Agende seu horario',
-    subheadline: branding.shopName,
+    eyebrow: 'Reserva oficial',
+    headline: branding.shopName,
+    subheadline: 'Agende seu horario',
     description,
     ctaLabel: 'Agendar agora',
     trustItems: ['Horario reservado', 'Atendimento por barbeiro']
@@ -296,8 +316,8 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
 
   const settings = useMemo(() => getPublicBookingScopedSettings(appSettings, barbershop), [appSettings, barbershop]);
   const branding = useMemo(
-    () => getPublicBookingBranding(barbershop, settings),
-    [barbershop, settings]
+    () => getPublicBookingBranding(barbershop, settings, barbershopSlug),
+    [barbershop, settings, barbershopSlug]
   );
   const landingContent = useMemo(
     () => getPublicBookingLandingContent(branding),
@@ -335,6 +355,15 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   );
 
   const services = settings.services || [];
+
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = `${branding.shopName} | Agendamento`;
+
+    return () => {
+      document.title = previousTitle;
+    };
+  }, [branding.shopName]);
 
   useEffect(() => {
     let active = true;
@@ -590,7 +619,7 @@ const handleSubmit = async (event: React.FormEvent) => {
       <div className="max-w-5xl mx-auto">
         <header className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
-            <img src="/brand-mark.svg" alt="Gestao Maxima" className="w-12 h-12" />
+            <img src="/brand-mark.svg" alt={`Marca da ${branding.shopName}`} className="w-12 h-12" />
             <div>
               <h1 className="text-white font-display font-bold text-lg">{branding.shopName}</h1>
               <p className="text-gold-400 text-[10px] uppercase tracking-widest font-bold">Reserva oficial</p>
@@ -644,8 +673,9 @@ const handleSubmit = async (event: React.FormEvent) => {
                     <Scissors size={28} />
                   )}
                 </div>
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.24em] text-gold-300">{landingContent.subheadline}</p>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.24em] text-gold-300">{landingContent.eyebrow}</p>
                 <h2 className="font-display text-3xl font-black leading-tight text-white md:text-5xl">{landingContent.headline}</h2>
+                <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-gray-300">{landingContent.subheadline}</p>
                 <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray-200 md:text-base">{landingContent.description}</p>
 
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
