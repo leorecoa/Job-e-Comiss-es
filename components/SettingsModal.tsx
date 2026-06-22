@@ -27,6 +27,7 @@ interface SettingsModalProps {
   clients: Client[];
   vales: Vale[];
   appointments: Appointment[];
+  manageCatalogRemotely?: boolean;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -38,7 +39,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSubscribe,
   clients,
   vales,
-  appointments
+  appointments,
+  manageCatalogRemotely = false
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [newBarberName, setNewBarberName] = useState('');
@@ -372,6 +374,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
+          {manageCatalogRemotely ? (
+            <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
+              O catalogo operacional da sua barbearia agora e gerenciado direto no painel principal.
+            </div>
+          ) : (
           <div className="p-4 rounded-xl border border-gold-500/20 bg-gold-500/5 space-y-3">
             <div className="flex items-center gap-2 text-gold-400 mb-2">
               <DollarSign size={18} />
@@ -416,6 +423,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
             </div>
           </div>
+          )}
 
           {/* Products List Section */}
           <div className="p-4 rounded-xl border border-gray-700 bg-gray-900/30 space-y-3">
@@ -486,7 +494,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* VIP Barber Management Section */}
-          {isVip && (
+          {isVip && !manageCatalogRemotely && (
             <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-900/10 space-y-3">
               <div className="flex items-center gap-2 text-blue-400 mb-2">
                 <Users size={18} />

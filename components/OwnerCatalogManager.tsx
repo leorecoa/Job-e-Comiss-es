@@ -1,0 +1,397 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Package, Plus, RotateCcw, Save, Scissors } from 'lucide-react';
+import { BarberOption, Service } from '../types';
+
+type OwnerCatalogManagerProps = {
+  barbers: BarberOption[];
+  services: Service[];
+  loading?: boolean;
+  error?: string | null;
+  onCreateBarber: (name: string) => Promise<void> | void;
+  onUpdateBarber: (barberId: string, patch: { name?: string; active?: boolean }) => Promise<void> | void;
+  onCreateService: (input: { name: string; price: number; durationMinutes: number; commissionRate?: number }) => Promise<void> | void;
+  onUpdateService: (serviceId: string, patch: { name?: string; price?: number; durationMinutes?: number; commissionRate?: number; active?: boolean }) => Promise<void> | void;
+};
+
+type BarberDraftMap = Record<string, string>;
+type ServiceDraftMap = Record<string, { name: string; price: string; durationMinutes: string; commissionRate: string }>;
+
+export const getOwnerCatalogPublicSnapshot = (barbers: BarberOption[], services: Service[]) => ({
+  barbers: barbers.filter((barber) => barber.active !== false),
+  services: services.filter((service) => service.active !== false)
+});
+
+export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
+  barbers,
+  services,
+  loading = false,
+  error = null,
+  onCreateBarber,
+  onUpdateBarber,
+  onCreateService,
+  onUpdateService
+}) => {
+  const [newBarberName, setNewBarberName] = useState('');
+  const [newServiceName, setNewServiceName] = useState('');
+  const [newServicePrice, setNewServicePrice] = useState('');
+  const [newServiceDuration, setNewServiceDuration] = useState('30');
+  const [newServiceCommission, setNewServiceCommission] = useState('50');
+  const [pendingBarberId, setPendingBarberId] = useState<string | null>(null);
+  const [pendingServiceId, setPendingServiceId] = useState<string | null>(null);
+  const [isCreatingBarber, setCreatingBarber] = useState(false);
+  const [isCreatingService, setCreatingService] = useState(false);
+  const [barberDrafts, setBarberDrafts] = useState<BarberDraftMap>({});
+  const [serviceDrafts, setServiceDrafts] = useState<ServiceDraftMap>({});
+
+  useEffect(() => {
+    setBarberDrafts(Object.fromEntries(barbers.map((barber) => [barber.id, barber.name])));
+  }, [barbers]);
+
+  useEffect(() => {
+    setServiceDrafts(Object.fromEntries(services.map((service) => [service.id, {
+      name: service.name,
+      price: String(service.price),
+      durationMinutes: String(service.durationMinutes),
+      commissionRate: String(service.commissionRate ?? 0)
+    }])));
+  }, [services]);
+
+  const activeSnapshot = useMemo(
+    () => getOwnerCatalogPublicSnapshot(barbers, services),
+    [barbers, services]
+  );
+
+  const handleCreateBarber = async () => {
+    const trimmedName = newBarberName.trim();
+    if (!trimmedName) return;
+
+    setCreatingBarber(true);
+    try {
+      await onCreateBarber(trimmedName);
+      setNewBarberName('');
+    } finally {
+      setCreatingBarber(false);
+    }
+  };
+
+  const handleCreateService = async () => {
+    const trimmedName = newServiceName.trim();
+    if (!trimmedName) return;
+
+    setCreatingService(true);
+    try {
+      await onCreateService({
+        name: trimmedName,
+        price: Number(newServicePrice) || 0,
+        durationMinutes: Math.max(1, Number(newServiceDuration) || 30),
+        commissionRate: Math.max(0, Math.min(100, Number(newServiceCommission) || 0))
+      });
+      setNewServiceName('');
+      setNewServicePrice('');
+      setNewServiceDuration('30');
+      setNewServiceCommission('50');
+    } finally {
+      setCreatingService(false);
+    }
+  };
+
+  return (
+    <section className="mb-6 rounded-3xl border border-gray-700 bg-gray-800/80 p-5 shadow-xl shadow-black/10">
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-gold-300">Operacao</p>
+          <h2 className="font-display text-2xl font-bold text-white">Catalogo da barbearia</h2>
+          <p className="mt-1 text-sm text-gray-400">Cadastre equipe e servicos para liberar a agenda publica da sua barbearia.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 md:w-[320px]">
+          <SummaryPill label="Barbeiros ativos" value={activeSnapshot.barbers.length.toString()} icon={<Scissors size={16} />} />
+          <SummaryPill label="Servicos ativos" value={activeSnapshot.services.length.toString()} icon={<Package size={16} />} />
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="rounded-2xl border border-gray-700 bg-gray-900/40 px-4 py-5 text-sm text-gray-400">
+          Carregando catalogo da barbearia...
+        </div>
+      ) : (
+        <div className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
+          <div className="space-y-4 rounded-2xl border border-gray-700 bg-gray-900/40 p-4">
+            <div className="flex items-center gap-2 text-blue-300">
+              <Scissors size={18} />
+              <h3 className="font-bold text-white">Barbeiros</h3>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                value={newBarberName}
+                onChange={(event) => setNewBarberName(event.target.value)}
+                placeholder="Nome do barbeiro"
+                className="flex-1 rounded-xl border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={handleCreateBarber}
+                disabled={isCreatingBarber}
+                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-3 py-2.5 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {barbers.length === 0 ? (
+                <EmptyState message="Nenhum barbeiro cadastrado para esta barbearia." />
+              ) : (
+                barbers.map((barber) => (
+                  <div key={barber.id} className="rounded-2xl border border-gray-700 bg-gray-950/70 p-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <input
+                        value={barberDrafts[barber.id] || ''}
+                        onChange={(event) => setBarberDrafts((prev) => ({ ...prev, [barber.id]: event.target.value }))}
+                        className="flex-1 rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <StatusBadge active={barber.active !== false} />
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setPendingBarberId(barber.id);
+                          try {
+                            await onUpdateBarber(barber.id, { name: barberDrafts[barber.id] || barber.name });
+                          } finally {
+                            setPendingBarberId(null);
+                          }
+                        }}
+                        disabled={pendingBarberId === barber.id}
+                        className="inline-flex items-center gap-2 rounded-xl border border-gray-600 bg-gray-900 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+                      >
+                        <Save size={14} />
+                        Salvar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setPendingBarberId(barber.id);
+                          try {
+                            await onUpdateBarber(barber.id, { active: barber.active === false });
+                          } finally {
+                            setPendingBarberId(null);
+                          }
+                        }}
+                        disabled={pendingBarberId === barber.id}
+                        className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-50 ${
+                          barber.active === false
+                            ? 'bg-green-500/10 text-green-200 border border-green-500/20'
+                            : 'bg-red-500/10 text-red-200 border border-red-500/20'
+                        }`}
+                      >
+                        <RotateCcw size={14} />
+                        {barber.active === false ? 'Ativar' : 'Desativar'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4 rounded-2xl border border-gray-700 bg-gray-900/40 p-4">
+            <div className="flex items-center gap-2 text-gold-300">
+              <Package size={18} />
+              <h3 className="font-bold text-white">Servicos</h3>
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-[1.4fr_0.75fr_0.75fr_0.75fr_auto]">
+              <input
+                value={newServiceName}
+                onChange={(event) => setNewServiceName(event.target.value)}
+                placeholder="Nome do servico"
+                className="rounded-xl border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+              />
+              <input
+                value={newServicePrice}
+                onChange={(event) => setNewServicePrice(event.target.value)}
+                placeholder="Valor"
+                type="number"
+                min="0"
+                step="0.01"
+                className="rounded-xl border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+              />
+              <input
+                value={newServiceDuration}
+                onChange={(event) => setNewServiceDuration(event.target.value)}
+                placeholder="Min"
+                type="number"
+                min="1"
+                step="1"
+                className="rounded-xl border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+              />
+              <input
+                value={newServiceCommission}
+                onChange={(event) => setNewServiceCommission(event.target.value)}
+                placeholder="%"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                className="rounded-xl border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+              />
+              <button
+                type="button"
+                onClick={handleCreateService}
+                disabled={isCreatingService}
+                className="inline-flex items-center justify-center rounded-xl bg-gold-500 px-3 py-2.5 font-bold text-black disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {services.length === 0 ? (
+                <EmptyState message="Nenhum servico cadastrado para esta barbearia." />
+              ) : (
+                services.map((service) => {
+                  const draft = serviceDrafts[service.id] || {
+                    name: service.name,
+                    price: String(service.price),
+                    durationMinutes: String(service.durationMinutes),
+                    commissionRate: String(service.commissionRate ?? 0)
+                  };
+
+                  return (
+                    <div key={service.id} className="rounded-2xl border border-gray-700 bg-gray-950/70 p-3">
+                      <div className="grid gap-2 md:grid-cols-[1.35fr_0.8fr_0.8fr_0.8fr]">
+                        <input
+                          value={draft.name}
+                          onChange={(event) => setServiceDrafts((prev) => ({
+                            ...prev,
+                            [service.id]: { ...draft, name: event.target.value }
+                          }))}
+                          className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                        />
+                        <input
+                          value={draft.price}
+                          onChange={(event) => setServiceDrafts((prev) => ({
+                            ...prev,
+                            [service.id]: { ...draft, price: event.target.value }
+                          }))}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                        />
+                        <input
+                          value={draft.durationMinutes}
+                          onChange={(event) => setServiceDrafts((prev) => ({
+                            ...prev,
+                            [service.id]: { ...draft, durationMinutes: event.target.value }
+                          }))}
+                          type="number"
+                          min="1"
+                          step="1"
+                          className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                        />
+                        <input
+                          value={draft.commissionRate}
+                          onChange={(event) => setServiceDrafts((prev) => ({
+                            ...prev,
+                            [service.id]: { ...draft, commissionRate: event.target.value }
+                          }))}
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                        />
+                      </div>
+
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <StatusBadge active={service.active !== false} />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setPendingServiceId(service.id);
+                              try {
+                                await onUpdateService(service.id, {
+                                  name: draft.name,
+                                  price: Number(draft.price) || 0,
+                                  durationMinutes: Math.max(1, Number(draft.durationMinutes) || 30),
+                                  commissionRate: Math.max(0, Math.min(100, Number(draft.commissionRate) || 0))
+                                });
+                              } finally {
+                                setPendingServiceId(null);
+                              }
+                            }}
+                            disabled={pendingServiceId === service.id}
+                            className="inline-flex items-center gap-2 rounded-xl border border-gray-600 bg-gray-900 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+                          >
+                            <Save size={14} />
+                            Salvar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setPendingServiceId(service.id);
+                              try {
+                                await onUpdateService(service.id, { active: service.active === false });
+                              } finally {
+                                setPendingServiceId(null);
+                              }
+                            }}
+                            disabled={pendingServiceId === service.id}
+                            className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-50 ${
+                              service.active === false
+                                ? 'bg-green-500/10 text-green-200 border border-green-500/20'
+                                : 'bg-red-500/10 text-red-200 border border-red-500/20'
+                            }`}
+                          >
+                            <RotateCcw size={14} />
+                            {service.active === false ? 'Ativar' : 'Desativar'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+};
+
+const SummaryPill: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({ label, value, icon }) => (
+  <div className="rounded-2xl border border-gray-700 bg-gray-900/60 px-4 py-3">
+    <div className="mb-2 text-gold-300">{icon}</div>
+    <p className="text-lg font-bold text-white">{value}</p>
+    <p className="text-xs uppercase tracking-widest text-gray-500">{label}</p>
+  </div>
+);
+
+const StatusBadge: React.FC<{ active: boolean }> = ({ active }) => (
+  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
+    active
+      ? 'border border-green-400/20 bg-green-500/10 text-green-200'
+      : 'border border-gray-600 bg-gray-800 text-gray-400'
+  }`}>
+    <CheckCircle2 size={12} />
+    {active ? 'Ativo' : 'Inativo'}
+  </span>
+);
+
+const EmptyState: React.FC<{ message: string }> = ({ message }) => (
+  <div className="rounded-2xl border border-gray-700 bg-gray-950/70 px-4 py-5 text-sm text-gray-400">
+    {message}
+  </div>
+);
