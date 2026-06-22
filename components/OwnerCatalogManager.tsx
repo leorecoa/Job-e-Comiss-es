@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Package, Plus, RotateCcw, Save, Scissors } from 'lucide-react';
+import { CheckCircle2, Package, Plus, RotateCcw, Save, Scissors, Trash2 } from 'lucide-react';
 import { BarberOption, Service } from '../types';
 
 type OwnerCatalogManagerProps = {
@@ -9,8 +9,10 @@ type OwnerCatalogManagerProps = {
   error?: string | null;
   onCreateBarber: (name: string) => Promise<void> | void;
   onUpdateBarber: (barberId: string, patch: { name?: string; active?: boolean }) => Promise<void> | void;
+  onRemoveBarber: (barberId: string) => Promise<void> | void;
   onCreateService: (input: { name: string; price: number; durationMinutes: number; commissionRate?: number }) => Promise<void> | void;
   onUpdateService: (serviceId: string, patch: { name?: string; price?: number; durationMinutes?: number; commissionRate?: number; active?: boolean }) => Promise<void> | void;
+  onRemoveService: (serviceId: string) => Promise<void> | void;
 };
 
 type BarberDraftMap = Record<string, string>;
@@ -28,8 +30,10 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
   error = null,
   onCreateBarber,
   onUpdateBarber,
+  onRemoveBarber,
   onCreateService,
-  onUpdateService
+  onUpdateService,
+  onRemoveService
 }) => {
   const [newBarberName, setNewBarberName] = useState('');
   const [newServiceName, setNewServiceName] = useState('');
@@ -100,8 +104,8 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-gold-300">Operacao</p>
-          <h2 className="font-display text-2xl font-bold text-white">Catalogo da barbearia</h2>
-          <p className="mt-1 text-sm text-gray-400">Cadastre equipe e servicos para liberar a agenda publica da sua barbearia.</p>
+          <h2 className="font-display text-2xl font-bold text-white">Catalogo operacional</h2>
+          <p className="mt-1 text-sm text-gray-400">Cadastre equipe e servicos da sua propria barbearia. Itens com historico sao desativados para preservar agendamentos antigos.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:w-[320px]">
@@ -192,9 +196,25 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                             ? 'bg-green-500/10 text-green-200 border border-green-500/20'
                             : 'bg-red-500/10 text-red-200 border border-red-500/20'
                         }`}
+                        >
+                          <RotateCcw size={14} />
+                          {barber.active === false ? 'Ativar' : 'Desativar'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setPendingBarberId(barber.id);
+                          try {
+                            await onRemoveBarber(barber.id);
+                          } finally {
+                            setPendingBarberId(null);
+                          }
+                        }}
+                        disabled={pendingBarberId === barber.id}
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-bold text-red-200 disabled:opacity-50"
                       >
-                        <RotateCcw size={14} />
-                        {barber.active === false ? 'Ativar' : 'Desativar'}
+                        <Trash2 size={14} />
+                        Excluir
                       </button>
                     </div>
                   </div>
@@ -356,6 +376,22 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                           >
                             <RotateCcw size={14} />
                             {service.active === false ? 'Ativar' : 'Desativar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setPendingServiceId(service.id);
+                              try {
+                                await onRemoveService(service.id);
+                              } finally {
+                                setPendingServiceId(null);
+                              }
+                            }}
+                            disabled={pendingServiceId === service.id}
+                            className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-bold text-red-200 disabled:opacity-50"
+                          >
+                            <Trash2 size={14} />
+                            Excluir
                           </button>
                         </div>
                       </div>

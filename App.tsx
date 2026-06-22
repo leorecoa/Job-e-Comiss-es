@@ -35,8 +35,8 @@ import { BarbershopBrandingSettings } from './components/BarbershopBrandingSetti
 import { OwnerCatalogManager } from './components/OwnerCatalogManager';
 import { OwnerBarbershopOnboarding } from './components/OwnerBarbershopOnboarding';
 import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
-import { createBarber, listBarbers, updateBarber } from './services/barberRepository';
-import { createService, listServices, updateService } from './services/serviceRepository';
+import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
+import { createService, listServices, removeService, updateService } from './services/serviceRepository';
 import { AppRole, AuthSession, canAccessInternalPanel, getCurrentAuthSession, signInWithPassword, signOut as signOutAuth, signUpWithPassword } from './services/authRepository';
 import { 
   Scissors, 
@@ -790,6 +790,34 @@ const App: React.FC = () => {
     addToast(updated.active === false ? 'Barbeiro desativado.' : 'Barbeiro atualizado.', 'success');
   };
 
+  const handleRemoveOwnerBarber = async (barberId: string) => {
+    const barbershopId = getOwnerCatalogBarbershopId();
+
+    if (!barbershopId) {
+      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para remover barbeiro.');
+      return;
+    }
+
+    setOwnerCatalogError(null);
+    const result = await removeBarber(barberId, barbershopId);
+    const nextBarbers = result.action === 'deleted'
+      ? ownerCatalogBarbers.filter((barber) => barber.id !== barberId)
+      : ownerCatalogBarbers.map((barber) => (
+          barber.id === barberId
+            ? { ...barber, active: false }
+            : barber
+        ));
+
+    setOwnerCatalogBarbers(nextBarbers);
+    syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
+    addToast(
+      result.action === 'deleted'
+        ? 'Barbeiro removido.'
+        : 'Barbeiro com historico foi desativado para preservar a agenda.',
+      'success'
+    );
+  };
+
   const handleCreateOwnerService = async (input: {
     name: string;
     price: number;
@@ -835,6 +863,34 @@ const App: React.FC = () => {
     setOwnerCatalogServices(nextServices);
     syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
     addToast(updated.active === false ? 'Servico desativado.' : 'Servico atualizado.', 'success');
+  };
+
+  const handleRemoveOwnerService = async (serviceId: string) => {
+    const barbershopId = getOwnerCatalogBarbershopId();
+
+    if (!barbershopId) {
+      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para remover servico.');
+      return;
+    }
+
+    setOwnerCatalogError(null);
+    const result = await removeService(serviceId, barbershopId);
+    const nextServices = result.action === 'deleted'
+      ? ownerCatalogServices.filter((service) => service.id !== serviceId)
+      : ownerCatalogServices.map((service) => (
+          service.id === serviceId
+            ? { ...service, active: false }
+            : service
+        ));
+
+    setOwnerCatalogServices(nextServices);
+    syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
+    addToast(
+      result.action === 'deleted'
+        ? 'Servico removido.'
+        : 'Servico com historico foi desativado para preservar os agendamentos.',
+      'success'
+    );
   };
 
   const handleSaveOwnerBarbershopBranding = async (input: BarbershopBrandingInput) => {
@@ -1441,9 +1497,11 @@ const App: React.FC = () => {
                 error={ownerCatalogError}
                 onCreateBarber={handleCreateOwnerBarber}
                 onUpdateBarber={handleUpdateOwnerBarber}
+                onRemoveBarber={handleRemoveOwnerBarber}
                 onCreateService={handleCreateOwnerService}
                 onUpdateService={handleUpdateOwnerService}
-             />
+                onRemoveService={handleRemoveOwnerService}
+              />
 
              {/* New Dashboard Charts */}
              <div className="mb-6">

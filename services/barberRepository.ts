@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { BarberOption } from '../types';
 import { generateId, isUuid } from '../utils';
+import { countAppointmentsForBarber } from './appointmentRepository';
 
 // This key is for local storage fallback when Supabase is not configured
 const SETTINGS_STORAGE_KEY = 'barbearia_settings';
@@ -25,6 +26,11 @@ export type CreateBarberInput = {
 export type UpdateBarberInput = {
   name?: string;
   active?: boolean;
+};
+
+export type RemoveBarberResult = {
+  action: 'deleted' | 'deactivated';
+  barberId: string;
 };
 
 const readLocalSettings = (): { barbers?: Array<string | BarberOption> } => {
@@ -207,5 +213,69 @@ export const updateBarber = async (
     name: data.name,
     barbershopId: data.barbershop_id || undefined,
     active: data.active
+  };
+};
+
+export const removeBarber = async (
+  barberId: string,
+  barbershopId?: string
+): Promise<RemoveBarberResult> => {
+  if (!barberId.trim()) {
+    throw new Error('Barbeiro nao encontrado.');
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    const appointmentsCount = await countAppointmentsForBarber(barberId, barbershopId);
+    const current = listLocalBarbers(undefined, { includeInactive: true });
+
+    if (appointmentsCount > 0) {
+      const next = current.map((barber) => (
+        barber.id === barberId
+          ? { ...barber, active: false }
+          : barber
+      ));
+      writeLocalBarbers(next);
+      return {
+        action: 'deactivated',
+        barberId
+      };
+    }
+
+    writeLocalBarbers(current.filter((barber) => barber.id !== barberId));
+    return {
+      action: 'deleted',
+      barberId
+    };
+  }
+
+  if (!barbershopId) {
+    throw new Error('Barbearia nao encontrada para remover barbeiro.');
+  }
+
+  if (!isUuid(barbershopId)) {
+    throw new Error('Sua conta nao possui uma barbearia valida para remover barbeiro.');
+  }
+
+  const appointmentsCount = await countAppointmentsForBarber(barberId, barbershopId);
+
+  if (appointmentsCount > 0) {
+    await updateBarber(barberId, { active: false }, barbershopId);
+    return {
+      action: 'deactivated',
+      barberId
+    };
+  }
+
+  const { error } = await supabase
+    .from('barbers')
+    .delete()
+    .eq('id', barberId)
+    .eq('barbershop_id', barbershopId);
+
+  if (error) throw error;
+
+  return {
+    action: 'deleted',
+    barberId
   };
 };

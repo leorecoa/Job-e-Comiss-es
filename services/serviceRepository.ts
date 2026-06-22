@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULT_SETTINGS, Service } from '../types';
 import { generateId, isUuid } from '../utils';
+import { countAppointmentsForService } from './appointmentRepository';
 
 const SETTINGS_STORAGE_KEY = 'barbearia_settings';
 
@@ -34,6 +35,11 @@ export type UpdateServiceInput = {
   durationMinutes?: number;
   commissionRate?: number;
   active?: boolean;
+};
+
+export type RemoveServiceResult = {
+  action: 'deleted' | 'deactivated';
+  serviceId: string;
 };
 
 const readLocalSettings = (): { services?: Service[] } => {
@@ -238,4 +244,68 @@ export const updateService = async (
   if (error) throw error;
 
   return mapServiceFromDb(data);
+};
+
+export const removeService = async (
+  serviceId: string,
+  barbershopId?: string
+): Promise<RemoveServiceResult> => {
+  if (!serviceId.trim()) {
+    throw new Error('Servico nao encontrado.');
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    const appointmentsCount = await countAppointmentsForService(serviceId, barbershopId);
+    const current = listLocalServices(undefined, { includeInactive: true });
+
+    if (appointmentsCount > 0) {
+      const next = current.map((service) => (
+        service.id === serviceId
+          ? { ...service, active: false }
+          : service
+      ));
+      writeLocalServices(next);
+      return {
+        action: 'deactivated',
+        serviceId
+      };
+    }
+
+    writeLocalServices(current.filter((service) => service.id !== serviceId));
+    return {
+      action: 'deleted',
+      serviceId
+    };
+  }
+
+  if (!barbershopId) {
+    throw new Error('Barbearia nao encontrada para remover servico.');
+  }
+
+  if (!isUuid(barbershopId)) {
+    throw new Error('Sua conta nao possui uma barbearia valida para remover servico.');
+  }
+
+  const appointmentsCount = await countAppointmentsForService(serviceId, barbershopId);
+
+  if (appointmentsCount > 0) {
+    await updateService(serviceId, { active: false }, barbershopId);
+    return {
+      action: 'deactivated',
+      serviceId
+    };
+  }
+
+  const { error } = await supabase!
+    .from('services')
+    .delete()
+    .eq('id', serviceId)
+    .eq('barbershop_id', barbershopId);
+
+  if (error) throw error;
+
+  return {
+    action: 'deleted',
+    serviceId
+  };
 };

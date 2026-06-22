@@ -12,8 +12,8 @@ vi.mock('./lib/supabase', () => ({
 import { DEFAULT_SETTINGS } from './types';
 import { getPublicBookingScopedSettings } from './components/PublicBookingPage';
 import { getOwnerCatalogPublicSnapshot } from './components/OwnerCatalogManager';
-import { createBarber, listBarbers, updateBarber } from './services/barberRepository';
-import { createService, listServices, updateService } from './services/serviceRepository';
+import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
+import { createService, listServices, removeService, updateService } from './services/serviceRepository';
 import { resolveOwnerScopedBarbershopId } from './utils';
 
 const OWNER_BARBERSHOP_UUID = '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce';
@@ -249,6 +249,178 @@ describe('owner catalog management', () => {
     });
   });
 
+  it('owner removes a service from the current barbershop without leaking to another tenant', async () => {
+    const appointmentsCountQuery = {
+      eq: vi.fn(),
+      count: 0,
+      error: null
+    };
+    appointmentsCountQuery.eq.mockReturnValue(appointmentsCountQuery);
+    const deleteQuery = {
+      eq: vi.fn().mockResolvedValue({ error: null })
+    };
+    deleteQuery.eq.mockReturnValue(deleteQuery);
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'appointments') {
+        return {
+          select: vi.fn().mockReturnValue(appointmentsCountQuery)
+        };
+      }
+
+      if (table === 'services') {
+        return {
+          delete: vi.fn().mockReturnValue(deleteQuery)
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await removeService(SERVICE_UUID, OWNER_BARBERSHOP_UUID);
+
+    expect(result).toEqual({
+      action: 'deleted',
+      serviceId: SERVICE_UUID
+    });
+    expect(deleteQuery.eq).toHaveBeenNthCalledWith(1, 'id', SERVICE_UUID);
+    expect(deleteQuery.eq).toHaveBeenNthCalledWith(2, 'barbershop_id', OWNER_BARBERSHOP_UUID);
+  });
+
+  it('service with history is not deleted physically and is only deactivated', async () => {
+    const appointmentsCountQuery = {
+      eq: vi.fn(),
+      count: 2,
+      error: null
+    };
+    appointmentsCountQuery.eq.mockReturnValue(appointmentsCountQuery);
+    const single = vi.fn().mockResolvedValue({
+      data: {
+        id: SERVICE_UUID,
+        name: 'Corte Leo',
+        barbershop_id: OWNER_BARBERSHOP_UUID,
+        price: 70,
+        duration_minutes: 45,
+        commission_rate: 40,
+        active: false
+      },
+      error: null
+    });
+    const updateQuery = {
+      eq: vi.fn(),
+      select: vi.fn().mockReturnValue({ single })
+    };
+    updateQuery.eq.mockReturnValue(updateQuery);
+    const deleteSpy = vi.fn();
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'appointments') {
+        return {
+          select: vi.fn().mockReturnValue(appointmentsCountQuery)
+        };
+      }
+
+      if (table === 'services') {
+        return {
+          update: vi.fn().mockReturnValue(updateQuery),
+          delete: deleteSpy
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await removeService(SERVICE_UUID, OWNER_BARBERSHOP_UUID);
+
+    expect(result).toEqual({
+      action: 'deactivated',
+      serviceId: SERVICE_UUID
+    });
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it('owner removes a barber only inside the current barbershop', async () => {
+    const appointmentsCountQuery = {
+      eq: vi.fn(),
+      count: 0,
+      error: null
+    };
+    appointmentsCountQuery.eq.mockReturnValue(appointmentsCountQuery);
+    const deleteQuery = {
+      eq: vi.fn().mockResolvedValue({ error: null })
+    };
+    deleteQuery.eq.mockReturnValue(deleteQuery);
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'appointments') {
+        return {
+          select: vi.fn().mockReturnValue(appointmentsCountQuery)
+        };
+      }
+
+      if (table === 'barbers') {
+        return {
+          delete: vi.fn().mockReturnValue(deleteQuery)
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await removeBarber(BARBER_UUID, OWNER_BARBERSHOP_UUID);
+
+    expect(result).toEqual({
+      action: 'deleted',
+      barberId: BARBER_UUID
+    });
+    expect(deleteQuery.eq).toHaveBeenNthCalledWith(1, 'id', BARBER_UUID);
+    expect(deleteQuery.eq).toHaveBeenNthCalledWith(2, 'barbershop_id', OWNER_BARBERSHOP_UUID);
+  });
+
+  it('barber with history is not deleted physically and is only deactivated', async () => {
+    const appointmentsCountQuery = {
+      eq: vi.fn(),
+      count: 1,
+      error: null
+    };
+    appointmentsCountQuery.eq.mockReturnValue(appointmentsCountQuery);
+    const single = vi.fn().mockResolvedValue({
+      data: { id: BARBER_UUID, name: 'Leo', barbershop_id: OWNER_BARBERSHOP_UUID, active: false },
+      error: null
+    });
+    const updateQuery = {
+      eq: vi.fn(),
+      select: vi.fn().mockReturnValue({ single })
+    };
+    updateQuery.eq.mockReturnValue(updateQuery);
+    const deleteSpy = vi.fn();
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'appointments') {
+        return {
+          select: vi.fn().mockReturnValue(appointmentsCountQuery)
+        };
+      }
+
+      if (table === 'barbers') {
+        return {
+          update: vi.fn().mockReturnValue(updateQuery),
+          delete: deleteSpy
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await removeBarber(BARBER_UUID, OWNER_BARBERSHOP_UUID);
+
+    expect(result).toEqual({
+      action: 'deactivated',
+      barberId: BARBER_UUID
+    });
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
   it('does not send a local fallback id to Supabase when creating a service', async () => {
     await expect(createService({
       name: 'Corte Leo',
@@ -355,5 +527,17 @@ describe('owner catalog management', () => {
     expect(leoDoLeo.barbers.map((barber) => barber.id)).toEqual([BARBER_UUID]);
     expect(gestaoMaxima.services.map((service) => service.id)).toEqual([OTHER_SERVICE_UUID]);
     expect(leoDoLeo.services.map((service) => service.id)).toEqual([SERVICE_UUID]);
+  });
+
+  it('removed or deactivated services do not appear in the public booking snapshot', () => {
+    const snapshot = getOwnerCatalogPublicSnapshot(
+      [{ id: BARBER_UUID, name: 'Leo', barbershopId: OWNER_BARBERSHOP_UUID, active: true }],
+      [
+        { id: SERVICE_UUID, name: 'Corte Leo', price: 70, durationMinutes: 45, commissionRate: 40, barbershopId: OWNER_BARBERSHOP_UUID, active: false },
+        { id: OTHER_SERVICE_UUID, name: 'Barba Leo', price: 40, durationMinutes: 30, commissionRate: 30, barbershopId: OWNER_BARBERSHOP_UUID, active: true }
+      ]
+    );
+
+    expect(snapshot.services.map((service) => service.id)).toEqual([OTHER_SERVICE_UUID]);
   });
 });

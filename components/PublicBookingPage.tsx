@@ -211,6 +211,11 @@ const getWhatsAppHref = (value: string): string => {
   return getExternalHref(value);
 };
 
+const getTimeValueInMinutes = (timeInput: string): number => {
+  const [hours, minutes] = timeInput.split(':').map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+};
+
 const isSafeHexColor = (value: string | null): value is string => {
   return Boolean(value && /^#[0-9a-f]{6}$/i.test(value));
 };
@@ -439,17 +444,24 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   );
 
   const slotStepMinutes = barbershop?.slotStepMinutes || DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES;
+  const workdayHasValidRange = selectedWorkday
+    ? getTimeValueInMinutes(selectedWorkday.start) < getTimeValueInMinutes(selectedWorkday.end)
+    : false;
 
   const workdayLabel = selectedWorkday
     ? `${selectedWorkday.start} - ${selectedWorkday.end}`
     : 'Fechado';
 
   const workdayDescription = selectedWorkday
-    ? `Expediente do dia selecionado · intervalos de ${slotStepMinutes} min`
+    ? workdayHasValidRange
+      ? `Expediente do dia selecionado · intervalos de ${slotStepMinutes} min`
+      : 'Horario configurado de forma invalida para este dia'
     : 'Sem atendimento neste dia';
 
   const emptySlotsMessage = selectedWorkday
-    ? 'Nenhum horario disponivel para esta combinacao.'
+    ? workdayHasValidRange
+      ? 'Nenhum horario disponivel para esta combinacao.'
+      : 'Horario de funcionamento indisponivel neste dia.'
     : 'A barbearia nao atende neste dia.';
   
   const availableSlots = useMemo(() => {
