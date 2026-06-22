@@ -275,12 +275,33 @@ describe('Public Booking Page Logic', () => {
       whatsapp: null,
       primaryColor: null,
       secondaryColor: null
-    }, DEFAULT_SETTINGS);
+    }, DEFAULT_SETTINGS, DEFAULT_BARBERSHOP_SLUG);
 
     expect(branding.shopName).toBe('Gestao Maxima');
     expect(branding.logoUrl).toBeNull();
     expect(branding.coverImageUrl).toBeNull();
     expect(branding.hasVisualBranding).toBe(false);
+  });
+
+  it('/book without slug keeps the gestao-maxima fallback branding', () => {
+    const branding = getPublicBookingBranding(null, DEFAULT_SETTINGS);
+
+    expect(branding.shopName).toBe(DEFAULT_SETTINGS.shopName);
+  });
+
+  it('/book/leo-do-leo resolves the public branding name from the explicit slug', () => {
+    const branding = getPublicBookingBranding(null, DEFAULT_SETTINGS, 'leo-do-leo');
+    const landingContent = getPublicBookingLandingContent(branding);
+
+    expect(branding.shopName).toBe('leo do leo');
+    expect(landingContent.headline).toBe('leo do leo');
+    expect(landingContent.subheadline).toBe('Agende seu horario');
+  });
+
+  it('/book/leo-do-leo does not fall back to Gestao Maxima in the public branding', () => {
+    const branding = getPublicBookingBranding(null, DEFAULT_SETTINGS, 'leo-do-leo');
+
+    expect(branding.shopName).not.toBe('Gestao Maxima');
   });
 
   it('/book/:slug exposes public branding when fields exist', () => {
@@ -298,7 +319,7 @@ describe('Public Booking Page Logic', () => {
       whatsapp: '5585999999999',
       primaryColor: '#111111',
       secondaryColor: '#eeeeee'
-    }, DEFAULT_SETTINGS);
+    }, DEFAULT_SETTINGS, 'barbearia-premium');
 
     expect(branding.shopName).toBe('Barbearia Premium');
     expect(branding.description).toBe('Cortes classicos com agenda online.');
@@ -356,6 +377,7 @@ describe('Public Booking Page Logic', () => {
 
     expect(scopedSettings.barbers).toEqual([]);
     expect(scopedSettings.services).toEqual([]);
+    expect(scopedSettings.shopName).toBe('Leo do Leo');
   });
 
   it('public booking landing content renders a headline with barbershop name', () => {
@@ -364,11 +386,11 @@ describe('Public Booking Page Logic', () => {
       name: 'Barbearia Premium',
       slug: 'barbearia-premium',
       active: true
-    }, DEFAULT_SETTINGS);
+    }, DEFAULT_SETTINGS, 'barbearia-premium');
     const content = getPublicBookingLandingContent(branding);
 
-    expect(content.headline).toBe('Agende seu horario');
-    expect(content.subheadline).toBe('Barbearia Premium');
+    expect(content.headline).toBe('Barbearia Premium');
+    expect(content.subheadline).toBe('Agende seu horario');
     expect(content.ctaLabel).toBe('Agendar agora');
     expect(content.trustItems).toContain('Horario reservado');
   });
@@ -380,7 +402,7 @@ describe('Public Booking Page Logic', () => {
       slug: 'barbearia-premium',
       description: 'Cortes classicos com acabamento premium.',
       active: true
-    }, DEFAULT_SETTINGS);
+    }, DEFAULT_SETTINGS, 'barbearia-premium');
 
     expect(getPublicBookingLandingContent(branding).description).toBe('Cortes classicos com acabamento premium.');
   });
@@ -391,7 +413,7 @@ describe('Public Booking Page Logic', () => {
       name: 'Gestao Maxima',
       slug: DEFAULT_BARBERSHOP_SLUG,
       active: true
-    }, DEFAULT_SETTINGS);
+    }, DEFAULT_SETTINGS, DEFAULT_BARBERSHOP_SLUG);
 
     expect(getPublicBookingLandingContent(branding).description).toBe('Corte, barba e acabamento com horario marcado.');
   });
@@ -405,7 +427,7 @@ describe('Public Booking Page Logic', () => {
       instagramUrl: 'instagram.com/barbearia',
       address: 'Rua Central, 100',
       active: true
-    }, DEFAULT_SETTINGS));
+    }, DEFAULT_SETTINGS, 'barbearia-premium'));
 
     expect(withLinks.whatsapp).toBe('https://wa.me/5585999999999');
     expect(withLinks.instagram).toBe('https://instagram.com/barbearia');
@@ -416,7 +438,7 @@ describe('Public Booking Page Logic', () => {
       name: 'Gestao Maxima',
       slug: DEFAULT_BARBERSHOP_SLUG,
       active: true
-    }, DEFAULT_SETTINGS));
+    }, DEFAULT_SETTINGS, DEFAULT_BARBERSHOP_SLUG));
 
     expect(withoutLinks).toEqual({
       whatsapp: null,
