@@ -25,6 +25,7 @@ import {
   createPublicAppointment, 
   validatePublicBookingInput 
 } from './scheduling';
+import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES } from './scheduling';
 
 // Mock all external services
 vi.mock('./services/authRepository', async (importOriginal) => {
@@ -556,7 +557,9 @@ describe('Public Booking Page Logic', () => {
       logoUrl: 'https://cdn.example.com/logo.png',
       coverImageUrl: 'https://cdn.example.com/cover.jpg',
       primaryColor: '#f59e0b',
-      secondaryColor: '#0ea5e9'
+      secondaryColor: '#0ea5e9',
+      businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     });
 
     expect(formData.name).toBe('Gestao Maxima');
@@ -581,7 +584,9 @@ describe('Public Booking Page Logic', () => {
       logoUrl: 'https://cdn.example.com/logo.png',
       coverImageUrl: 'https://cdn.example.com/cover.jpg',
       primaryColor: '#f59e0b',
-      secondaryColor: '#0ea5e9'
+      secondaryColor: '#0ea5e9',
+      businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     });
 
     expect(payload).toEqual({
@@ -594,10 +599,26 @@ describe('Public Booking Page Logic', () => {
       logoUrl: 'https://cdn.example.com/logo.png',
       coverImageUrl: 'https://cdn.example.com/cover.jpg',
       primaryColor: '#f59e0b',
-      secondaryColor: '#0ea5e9'
+      secondaryColor: '#0ea5e9',
+      businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     });
     expect('id' in payload).toBe(false);
     expect('slug' in payload).toBe(false);
+  });
+
+  it('branding form exposes business hours and slot interval defaults', () => {
+    const formData = getBarbershopBrandingFormData({
+      id: DEFAULT_BARBERSHOP_ID,
+      name: 'Gestao Maxima',
+      slug: DEFAULT_BARBERSHOP_SLUG,
+      active: true
+    });
+
+    expect(formData.slotStepMinutes).toBe(DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES);
+    expect(formData.businessHours.monday.active).toBe(false);
+    expect(formData.businessHours.tuesday.open).toBe('08:00');
+    expect(formData.businessHours.sunday.close).toBe('18:00');
   });
 
   it('branding preview renders logo and cover when available', () => {
@@ -779,7 +800,7 @@ describe('Public Booking Page Logic', () => {
     }
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('Selecione um serviço.');
+    expect(result.errors).toContain('Selecione um servico.');
     expect(createAppointment).not.toHaveBeenCalled();
   });
 
@@ -795,7 +816,7 @@ describe('Public Booking Page Logic', () => {
 
     const result = validatePublicBookingInput(input, []);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('Barbearia não encontrada ou indisponível.');
+    expect(result.errors).toContain('Barbearia nao encontrada ou indisponivel.');
   });
 });
 

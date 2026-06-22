@@ -4,6 +4,7 @@ import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfil
 import { getBarbershopBySlug } from '../services/barbershopRepository';
 import {
   buildWhatsAppLink,
+  DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
   createPublicAppointment,
   getAvailableTimeSlots,
   getPublicBookingWorkdayForDate,
@@ -433,32 +434,37 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     [selectedBarber, selectedService, selectedSlot]
   );
   const selectedWorkday = useMemo(
-  () => getPublicBookingWorkdayForDate(date),
-  [date]
-);
+    () => getPublicBookingWorkdayForDate(date, barbershop?.businessHours),
+    [date, barbershop?.businessHours]
+  );
 
-const workdayLabel = selectedWorkday
-  ? `${selectedWorkday.start} - ${selectedWorkday.end}`
-  : 'Fechado';
+  const slotStepMinutes = barbershop?.slotStepMinutes || DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES;
 
-const workdayDescription = selectedWorkday
-  ? 'Expediente do dia selecionado'
-  : 'Sem atendimento neste dia';
+  const workdayLabel = selectedWorkday
+    ? `${selectedWorkday.start} - ${selectedWorkday.end}`
+    : 'Fechado';
 
-const emptySlotsMessage = selectedWorkday
-  ? 'Nenhum horario disponivel para esta combinacao.'
-  : 'A barbearia nao atende neste dia.';
+  const workdayDescription = selectedWorkday
+    ? `Expediente do dia selecionado · intervalos de ${slotStepMinutes} min`
+    : 'Sem atendimento neste dia';
+
+  const emptySlotsMessage = selectedWorkday
+    ? 'Nenhum horario disponivel para esta combinacao.'
+    : 'A barbearia nao atende neste dia.';
   
   const availableSlots = useMemo(() => {
     if (!selectedBarber || !selectedService || !date) return [];
 
-   return getAvailableTimeSlots({
-  date,
-  barberName: selectedBarber.name,
-  serviceDurationMinutes: selectedService.durationMinutes,
-  appointments
-}).filter((slot) => slot.available);
-  }, [appointments, date, selectedBarber, selectedService]);
+    return getAvailableTimeSlots({
+      date,
+      barberId: selectedBarber.id,
+      barberName: selectedBarber.name,
+      serviceDurationMinutes: selectedService.durationMinutes,
+      appointments,
+      businessHours: barbershop?.businessHours,
+      slotStepMinutes: barbershop?.slotStepMinutes || undefined
+    }).filter((slot) => slot.available);
+  }, [appointments, barbershop?.businessHours, barbershop?.slotStepMinutes, date, selectedBarber, selectedService]);
 
   const handleBarberChange = (value: string) => {
     setSelectedBarberValue(value);

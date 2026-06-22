@@ -5,9 +5,12 @@ import {
   completeAppointmentFinancialRecord,
   appointmentToClient,
   createPublicAppointment,
+  DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+  DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
   getAvailableTimeSlots,
   getPublicBookingWorkdayForDate,
   hasAppointmentConflict,
+  normalizeBarbershopBusinessHours,
   TimeSlot,
   validatePublicBookingInput
 } from './scheduling';
@@ -389,6 +392,77 @@ describe('public booking business hours', () => {
     expect(slots[0]?.label).toBe('10:00');
     expect(slots.at(-1)?.label).toBe('17:30');
   });
+
+  it('does not inherit business hours from another barbershop', () => {
+    const gestaoMaximaHours = normalizeBarbershopBusinessHours({
+      tuesday: { active: true, open: '08:00', close: '20:00' }
+    });
+    const leoDoLeoHours = normalizeBarbershopBusinessHours({
+      tuesday: { active: true, open: '12:00', close: '16:00' }
+    });
+
+    expect(getPublicBookingWorkdayForDate('2026-06-09', gestaoMaximaHours)).toEqual({
+      start: '08:00',
+      end: '20:00'
+    });
+    expect(getPublicBookingWorkdayForDate('2026-06-09', leoDoLeoHours)).toEqual({
+      start: '12:00',
+      end: '16:00'
+    });
+  });
+
+  it('/book/leo-do-leo uses leo do leo business hours', () => {
+    const leoDoLeoHours = normalizeBarbershopBusinessHours({
+      tuesday: { active: true, open: '12:00', close: '18:00' }
+    });
+
+    const slots = getAvailableTimeSlots({
+      date: '2026-06-09',
+      barberName: 'Leo',
+      serviceDurationMinutes: 30,
+      appointments: [],
+      businessHours: leoDoLeoHours,
+      slotStepMinutes: 20,
+      now: new Date(2026, 5, 8, 8, 0)
+    });
+
+    expect(slots[0]?.label).toBe('12:00');
+    expect(slots[1]?.label).toBe('12:20');
+    expect(slots.at(-1)?.label).toBe('17:20');
+  });
+
+  it('/book/gestao-maxima keeps Gestao Maxima business hours', () => {
+    const gestaoMaximaHours = normalizeBarbershopBusinessHours(DEFAULT_BARBERSHOP_BUSINESS_HOURS);
+
+    const slots = getAvailableTimeSlots({
+      date: '2026-06-09',
+      barberName: 'Carlos',
+      serviceDurationMinutes: 30,
+      appointments: [],
+      businessHours: gestaoMaximaHours,
+      now: new Date(2026, 5, 8, 8, 0)
+    });
+
+    expect(slots[0]?.label).toBe('08:00');
+    expect(slots.at(-1)?.label).toBe('19:30');
+  });
+
+  it('does not show available slots on a closed custom day', () => {
+    const leoDoLeoHours = normalizeBarbershopBusinessHours({
+      tuesday: { active: false, open: '12:00', close: '18:00' }
+    });
+
+    const slots = getAvailableTimeSlots({
+      date: '2026-06-09',
+      barberName: 'Leo',
+      serviceDurationMinutes: 30,
+      appointments: [],
+      businessHours: leoDoLeoHours,
+      now: new Date(2026, 5, 8, 8, 0)
+    });
+
+    expect(slots).toEqual([]);
+  });
 });
 
 describe('public booking helpers', () => {
@@ -456,7 +530,7 @@ describe('public booking helpers', () => {
       barberName: 'Carlos',
       service: { ...settings.services[0], id: '' },
       selectedSlot: slot
-    }, 'public-1')).toThrow('Selecione um serviço.');
+    }, 'public-1')).toThrow('Selecione um servico.');
   });
 
   it('validates required public booking fields', () => {
@@ -470,9 +544,9 @@ describe('public booking helpers', () => {
     }, []);
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('Barbearia não encontrada ou indisponível.');
+    expect(result.errors).toContain('Barbearia nao encontrada ou indisponivel.');
     expect(result.errors).toContain('Selecione um barbeiro.');
-    expect(result.errors).toContain('Selecione um serviço.');
+    expect(result.errors).toContain('Selecione um servico.');
     expect(result.errors).toContain('Escolha um barbeiro.');
     expect(result.errors).toContain('Escolha um servico.');
     expect(result.errors).toContain('Escolha um horario disponivel.');
@@ -536,6 +610,8 @@ describe('barbershop repository local fallback', () => {
         whatsapp: '5585999999999',
         primary_color: '#111111',
         secondary_color: '#eeeeee',
+        business_hours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        slot_step_minutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
         active: true
       },
       error: null
@@ -561,11 +637,13 @@ describe('barbershop repository local fallback', () => {
       instagramUrl: 'https://instagram.com/barbearia_premium',
       whatsapp: '5585999999999',
       primaryColor: '#111111',
-      secondaryColor: '#eeeeee'
+      secondaryColor: '#eeeeee',
+      businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     });
 
     expect(from).toHaveBeenCalledWith('barbershops');
-    expect(select).toHaveBeenCalledWith('id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,primary_color,secondary_color,active');
+    expect(select).toHaveBeenCalledWith('id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,primary_color,secondary_color,business_hours,slot_step_minutes,active');
 
     vi.doUnmock('./lib/supabase');
   });
@@ -589,7 +667,9 @@ describe('barbershop repository local fallback', () => {
       logoUrl: 'https://cdn.example.com/logo.png',
       coverImageUrl: 'https://cdn.example.com/cover.jpg',
       primaryColor: '#f59e0b',
-      secondaryColor: '#0ea5e9'
+      secondaryColor: '#0ea5e9',
+      businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     })).toEqual({
       name: 'Gestao Maxima',
       phone: null,
@@ -600,7 +680,9 @@ describe('barbershop repository local fallback', () => {
       logo_url: 'https://cdn.example.com/logo.png',
       cover_image_url: 'https://cdn.example.com/cover.jpg',
       primary_color: '#f59e0b',
-      secondary_color: '#0ea5e9'
+      secondary_color: '#0ea5e9',
+      business_hours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slot_step_minutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     });
 
     vi.doUnmock('./lib/supabase');
@@ -726,6 +808,8 @@ describe('barbershop repository local fallback', () => {
         whatsapp: '5585999999999',
         primary_color: '#f59e0b',
         secondary_color: '#0ea5e9',
+        business_hours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        slot_step_minutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
         active: true
       },
       error: null
@@ -752,11 +836,14 @@ describe('barbershop repository local fallback', () => {
       logoUrl: 'https://cdn.example.com/logo.png',
       coverImageUrl: 'https://cdn.example.com/cover.jpg',
       primaryColor: '#f59e0b',
-      secondaryColor: '#0ea5e9'
+      secondaryColor: '#0ea5e9',
+      businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     })).resolves.toMatchObject({
       id: 'barbershop-1',
       primaryColor: '#f59e0b',
-      secondaryColor: '#0ea5e9'
+      secondaryColor: '#0ea5e9',
+      slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     });
 
     expect(from).toHaveBeenCalledWith('barbershops');
@@ -770,7 +857,9 @@ describe('barbershop repository local fallback', () => {
       logo_url: 'https://cdn.example.com/logo.png',
       cover_image_url: 'https://cdn.example.com/cover.jpg',
       primary_color: '#f59e0b',
-      secondary_color: '#0ea5e9'
+      secondary_color: '#0ea5e9',
+      business_hours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slot_step_minutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     });
     expect(eq).toHaveBeenCalledWith('id', 'barbershop-1');
 

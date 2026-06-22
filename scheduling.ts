@@ -1,4 +1,4 @@
-import { Appointment, AppSettings, Client, ClientType, Service, ServiceType } from './types';
+import { Appointment, AppSettings, BarbershopBusinessDay, BarbershopBusinessDayKey, BarbershopBusinessHours, Client, ClientType, Service, ServiceType } from './types';
 
 export const APPOINTMENT_STORAGE_KEY = 'barbearia_appointments';
 
@@ -10,6 +10,17 @@ export const PUBLIC_BOOKING_SLOT_STEP_MINUTES = 30;
 
 export const PUBLIC_BOOKING_WORKDAY_START = PUBLIC_BOOKING_WEEKDAY_START;
 export const PUBLIC_BOOKING_WORKDAY_END = PUBLIC_BOOKING_WEEKDAY_END;
+export const DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES = PUBLIC_BOOKING_SLOT_STEP_MINUTES;
+
+export const DEFAULT_BARBERSHOP_BUSINESS_HOURS: BarbershopBusinessHours = {
+  sunday: { active: true, open: PUBLIC_BOOKING_SUNDAY_START, close: PUBLIC_BOOKING_SUNDAY_END },
+  monday: { active: false, open: PUBLIC_BOOKING_WEEKDAY_START, close: PUBLIC_BOOKING_WEEKDAY_END },
+  tuesday: { active: true, open: PUBLIC_BOOKING_WEEKDAY_START, close: PUBLIC_BOOKING_WEEKDAY_END },
+  wednesday: { active: true, open: PUBLIC_BOOKING_WEEKDAY_START, close: PUBLIC_BOOKING_WEEKDAY_END },
+  thursday: { active: true, open: PUBLIC_BOOKING_WEEKDAY_START, close: PUBLIC_BOOKING_WEEKDAY_END },
+  friday: { active: true, open: PUBLIC_BOOKING_WEEKDAY_START, close: PUBLIC_BOOKING_WEEKDAY_END },
+  saturday: { active: true, open: PUBLIC_BOOKING_WEEKDAY_START, close: PUBLIC_BOOKING_WEEKDAY_END }
+};
 
 export type TimeSlot = {
   startAt: string;
@@ -37,6 +48,26 @@ export type PublicBookingValidationResult = {
 export type PublicBookingWorkday = {
   start: string;
   end: string;
+};
+
+const BUSINESS_DAY_KEYS: BarbershopBusinessDayKey[] = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday'
+];
+
+const DAY_KEY_BY_WEEKDAY: Record<number, BarbershopBusinessDayKey> = {
+  0: 'sunday',
+  1: 'monday',
+  2: 'tuesday',
+  3: 'wednesday',
+  4: 'thursday',
+  5: 'friday',
+  6: 'saturday'
 };
 
 export const normalizePhoneDigits = (phone?: string): string => {
@@ -82,6 +113,41 @@ const getTimeInputFromMinutes = (totalMinutes: number): string => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
 
+const isValidTimeInput = (value: string): boolean => /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
+
+const normalizeBusinessDay = (
+  fallback: BarbershopBusinessDay,
+  input?: Partial<BarbershopBusinessDay> | null
+): BarbershopBusinessDay => {
+  const open = typeof input?.open === 'string' && isValidTimeInput(input.open) ? input.open : fallback.open;
+  const close = typeof input?.close === 'string' && isValidTimeInput(input.close) ? input.close : fallback.close;
+
+  return {
+    active: typeof input?.active === 'boolean' ? input.active : fallback.active,
+    open,
+    close
+  };
+};
+
+export const normalizeBarbershopBusinessHours = (
+  input?: Partial<Record<BarbershopBusinessDayKey, Partial<BarbershopBusinessDay> | null>> | null
+): BarbershopBusinessHours => {
+  return BUSINESS_DAY_KEYS.reduce((acc, dayKey) => {
+    acc[dayKey] = normalizeBusinessDay(DEFAULT_BARBERSHOP_BUSINESS_HOURS[dayKey], input?.[dayKey]);
+    return acc;
+  }, {} as BarbershopBusinessHours);
+};
+
+export const normalizeBarbershopSlotStepMinutes = (value?: number | null): number => {
+  const numeric = Number(value);
+
+  if (!Number.isFinite(numeric)) {
+    return DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES;
+  }
+
+  return Math.max(5, Math.min(120, Math.round(numeric)));
+};
+
 const getLocalDayOfWeekFromDateInput = (dateInput: string): number | null => {
   const [year, month, day] = dateInput.split('-').map(Number);
 
@@ -90,28 +156,25 @@ const getLocalDayOfWeekFromDateInput = (dateInput: string): number | null => {
   return new Date(year, month - 1, day).getDay();
 };
 
-export const getPublicBookingWorkdayForDate = (dateInput: string): PublicBookingWorkday | null => {
+export const getPublicBookingWorkdayForDate = (
+  dateInput: string,
+  businessHours?: Partial<Record<BarbershopBusinessDayKey, Partial<BarbershopBusinessDay> | null>> | null
+): PublicBookingWorkday | null => {
   const dayOfWeek = getLocalDayOfWeekFromDateInput(dateInput);
 
   if (dayOfWeek === null) return null;
 
-  // 0 = domingo
-  if (dayOfWeek === 0) {
-    return {
-      start: PUBLIC_BOOKING_SUNDAY_START,
-      end: PUBLIC_BOOKING_SUNDAY_END
-    };
-  }
+  const normalizedBusinessHours = normalizeBarbershopBusinessHours(businessHours);
+  const dayKey = DAY_KEY_BY_WEEKDAY[dayOfWeek];
+  const workday = normalizedBusinessHours[dayKey];
 
-  // 1 = segunda-feira
-  if (dayOfWeek === 1) {
+  if (!workday.active) {
     return null;
   }
 
-  // 2 a 6 = terça-feira a sábado
   return {
-    start: PUBLIC_BOOKING_WEEKDAY_START,
-    end: PUBLIC_BOOKING_WEEKDAY_END
+    start: workday.open,
+    end: workday.close
   };
 };
 
@@ -152,10 +215,11 @@ export const hasAppointmentConflict = (
 
 export const getAvailableTimeSlots = (params: {
   date: string;
-  barberId?: string; // Now optional, but preferred
+  barberId?: string;
   barberName: string;
   serviceDurationMinutes: number;
   appointments: Appointment[];
+  businessHours?: Partial<Record<BarbershopBusinessDayKey, Partial<BarbershopBusinessDay> | null>> | null;
   workdayStart?: string;
   workdayEnd?: string;
   slotStepMinutes?: number;
@@ -167,15 +231,17 @@ export const getAvailableTimeSlots = (params: {
     barberName,
     serviceDurationMinutes,
     appointments,
+    businessHours,
     workdayStart,
     workdayEnd,
-    slotStepMinutes = PUBLIC_BOOKING_SLOT_STEP_MINUTES,
+    slotStepMinutes = DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
     now = new Date()
   } = params;
 
   if (!date || !barberName || serviceDurationMinutes <= 0) return [];
 
-  const publicWorkday = getPublicBookingWorkdayForDate(date);
+  const publicWorkday = getPublicBookingWorkdayForDate(date, businessHours);
+  const resolvedSlotStepMinutes = normalizeBarbershopSlotStepMinutes(slotStepMinutes);
 
   if (!publicWorkday && (!workdayStart || !workdayEnd)) {
     return [];
@@ -200,7 +266,7 @@ export const getAvailableTimeSlots = (params: {
   for (
     let minutes = startMinutes;
     minutes + serviceDurationMinutes <= endMinutes;
-    minutes += slotStepMinutes
+    minutes += resolvedSlotStepMinutes
   ) {
     const startAt = buildLocalDateTimeIso(date, getTimeInputFromMinutes(minutes));
     const endAt = addMinutesIso(startAt, serviceDurationMinutes);
@@ -235,9 +301,9 @@ export const validatePublicBookingInput = (
   const errors: string[] = [];
   const phoneDigits = normalizePhoneDigits(input.clientPhone);
   if (!input.barberId) errors.push('Selecione um barbeiro.');
-  if (!input.service?.id) errors.push('Selecione um serviço.');
+  if (!input.service?.id) errors.push('Selecione um servico.');
 
-  if (!input.barbershopId) errors.push('Barbearia não encontrada ou indisponível.');
+  if (!input.barbershopId) errors.push('Barbearia nao encontrada ou indisponivel.');
   if (!input.barberName) errors.push('Escolha um barbeiro.');
   if (!input.service) errors.push('Escolha um servico.');
   if (!input.selectedSlot) errors.push('Escolha um horario disponivel.');
@@ -268,10 +334,10 @@ export const createPublicAppointment = (
   id: string,
   now: Date = new Date()
 ): Appointment => {
-  if (!input.barbershopId) throw new Error('Barbearia não encontrada ou indisponível.');
+  if (!input.barbershopId) throw new Error('Barbearia nao encontrada ou indisponivel.');
   if (!input.barberId) throw new Error('Selecione um barbeiro.');
-  if (!input.service?.id) throw new Error('Selecione um serviço.');
-  if (!input.selectedSlot) throw new Error('Selecione um horário.');
+  if (!input.service?.id) throw new Error('Selecione um servico.');
+  if (!input.selectedSlot) throw new Error('Selecione um horario.');
 
   const timestamp = now.toISOString();
 
@@ -325,7 +391,6 @@ export const appointmentToClient = (
 ): Client => {
   const serviceType = serviceNameToServiceType(appointment.serviceType);
 
-  // Prefer snapshot from appointment
   const rate =
     appointment.commissionRate ??
     settings.services.find((service) => service.name === appointment.serviceType)?.commissionRate ??
