@@ -17,6 +17,7 @@ export type ProfileRow = {
   id: string;
   display_name: string | null;
   role: AppRole | string;
+  active?: boolean | null;
   barbershop_id: string | null;
   barber_id: string | null;
 };
@@ -121,7 +122,7 @@ export const signUpWithPassword = async (
     options: {
       data: {
         display_name: displayName,
-        role: 'barber'
+        role
       }
     }
   });
@@ -134,6 +135,10 @@ export const signUpWithPassword = async (
    */
   if (!data.session?.user) {
     return null;
+  }
+
+  if (role === 'owner') {
+    return mapAuthSession(data.session, null);
   }
 
   const profile = await upsertProfile(
@@ -172,7 +177,7 @@ export const getProfile = async (userId: string): Promise<ProfileRow | null> => 
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,display_name,role,barbershop_id,barber_id')
+    .select('id,display_name,role,active,barbershop_id,barber_id')
     .eq('id', userId)
     .maybeSingle();
 
@@ -215,7 +220,51 @@ export const upsertProfile = async (
       display_name: displayName,
       role: safeRole
     }, { onConflict: 'id' }) // upsert does not take barber_id as an argument in this context, as it's not part of signup.
-    .select('id,display_name,role,barbershop_id,barber_id')
+    .select('id,display_name,role,active,barbershop_id,barber_id')
+    .single();
+
+  if (error) throw error;
+
+  return data as ProfileRow;
+};
+
+export const upsertOwnerProfileForBarbershop = async (
+  userId: string,
+  displayName: string,
+  barbershopId: string
+): Promise<ProfileRow> => {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      id: userId,
+      display_name: displayName,
+      role: 'owner',
+      active: true,
+      barbershop_id: barbershopId,
+      barber_id: null
+    };
+  }
+
+  const authenticatedUserId = await getAuthenticatedUserId();
+
+  if (!authenticatedUserId) {
+    throw new Error('Usuario nao autenticado para atualizar profile.');
+  }
+
+  if (authenticatedUserId !== userId) {
+    throw new Error('Nao e permitido atualizar profile de outro usuario.');
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert({
+      id: userId,
+      display_name: displayName,
+      role: 'owner',
+      active: true,
+      barbershop_id: barbershopId,
+      barber_id: null
+    }, { onConflict: 'id' })
+    .select('id,display_name,role,active,barbershop_id,barber_id')
     .single();
 
   if (error) throw error;
