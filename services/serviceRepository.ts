@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULT_SETTINGS, Service } from '../types';
-import { generateId } from '../utils';
+import { generateId, isUuid } from '../utils';
 
 const SETTINGS_STORAGE_KEY = 'barbearia_settings';
 
@@ -154,10 +154,13 @@ export const createService = async (service: CreateServiceInput): Promise<Servic
     throw new Error('Barbearia nao encontrada para criar servico.');
   }
 
+  if (!isUuid(service.barbershopId)) {
+    throw new Error('Sua conta nao possui uma barbearia valida para cadastrar servico.');
+  }
+
   const { data, error } = await supabase
     .from('services')
     .insert({
-      id: service.id || generateId(),
       name,
       barbershop_id: service.barbershopId,
       price,
@@ -213,6 +216,10 @@ export const updateService = async (
     const updated = next.find((service) => service.id === serviceId);
     if (!updated) throw new Error('Servico nao encontrado.');
     return updated;
+  }
+
+  if (barbershopId && !isUuid(barbershopId)) {
+    throw new Error('Sua conta nao possui uma barbearia valida para atualizar servico.');
   }
 
   let query = supabase

@@ -28,6 +28,30 @@ export const generateId = (): string => {
   return Math.random().toString(36).substr(2, 9);
 };
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export const isUuid = (value?: string | null): value is string => {
+  const trimmed = value?.trim();
+  return Boolean(trimmed && UUID_REGEX.test(trimmed));
+};
+
+export const resolveOwnerScopedBarbershopId = ({
+  authBarbershopId,
+  fallbackBarbershopId,
+  supabaseConfigured
+}: {
+  authBarbershopId?: string;
+  fallbackBarbershopId?: string;
+  supabaseConfigured: boolean;
+}): string | undefined => {
+  if (!supabaseConfigured) {
+    const localId = authBarbershopId?.trim() || fallbackBarbershopId?.trim();
+    return localId || 'local-barbershop';
+  }
+
+  return isUuid(authBarbershopId) ? authBarbershopId.trim() : undefined;
+};
+
 export const parseLocalDateInput = (dateInput: string): Date => {
   const [year, month, day] = dateInput.split('-').map(Number);
   if (!year || !month || !day) {

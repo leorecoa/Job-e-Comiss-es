@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { BarberOption } from '../types';
-import { generateId } from '../utils';
+import { generateId, isUuid } from '../utils';
 
 // This key is for local storage fallback when Supabase is not configured
 const SETTINGS_STORAGE_KEY = 'barbearia_settings';
@@ -124,6 +124,10 @@ export const createBarber = async ({ name, barbershopId, active = true }: Create
     throw new Error('Barbearia nao encontrada para criar barbeiro.');
   }
 
+  if (!isUuid(barbershopId)) {
+    throw new Error('Sua conta nao possui uma barbearia valida para cadastrar barbeiro.');
+  }
+
   const { data, error } = await supabase
     .from('barbers')
     .insert({
@@ -174,6 +178,10 @@ export const updateBarber = async (
     const updated = next.find((barber) => barber.id === barberId);
     if (!updated) throw new Error('Barbeiro nao encontrado.');
     return updated;
+  }
+
+  if (barbershopId && !isUuid(barbershopId)) {
+    throw new Error('Sua conta nao possui uma barbearia valida para atualizar barbeiro.');
   }
 
   let query = supabase
