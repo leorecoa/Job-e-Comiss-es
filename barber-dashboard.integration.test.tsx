@@ -16,6 +16,11 @@ import {
   getBarbershopBrandingFormData,
   getBarbershopBrandingSaveInput
 } from './components/BarbershopBrandingSettings';
+import {
+  OwnerBarbershopOnboarding,
+  getOwnerBarbershopOnboardingPayload,
+  getOwnerBarbershopOnboardingPreview
+} from './components/OwnerBarbershopOnboarding';
 import { 
   createPublicAppointment, 
   validatePublicBookingInput 
@@ -45,7 +50,17 @@ vi.mock('./lib/supabase', () => ({
     }
   }
 }));
-vi.mock('./services/barbershopRepository');
+vi.mock('./services/barbershopRepository', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./services/barbershopRepository')>();
+  return {
+    ...actual,
+    getBarbershopBySlug: vi.fn(),
+    getBarbershopById: vi.fn(),
+    updateCurrentBarbershopBranding: vi.fn(),
+    uploadBarbershopBrandingImage: vi.fn(),
+    createBarbershopForCurrentOwner: vi.fn()
+  };
+});
 
 // Mock localStorage and DOM for rendering tests
 const localStorageMock = (() => {
@@ -713,5 +728,59 @@ describe('Public Booking Page Logic', () => {
     const result = validatePublicBookingInput(input, []);
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Barbearia não encontrada ou indisponível.');
+  });
+});
+
+describe('Owner onboarding UI helpers', () => {
+  it('authenticated owner sees the onboarding form', () => {
+    const html = renderToStaticMarkup(
+      <OwnerBarbershopOnboarding
+        authSession={{
+          userId: 'owner-1',
+          email: 'owner@example.com',
+          displayName: 'Leo',
+          role: 'owner'
+        }}
+        onCreate={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('Crie sua barbearia');
+    expect(html).toContain('Criar barbearia');
+    expect(html).toContain('Preview do link');
+  });
+
+  it('slug preview uses the normalized public booking path', () => {
+    expect(getOwnerBarbershopOnboardingPreview('Barbearia São João Premium')).toBe('/book/barbearia-sao-joao-premium');
+  });
+
+  it('onboarding payload normalizes slug and trims optional fields', () => {
+    expect(getOwnerBarbershopOnboardingPayload({
+      name: ' Barbearia Premium ',
+      slug: ' Barbearia São João ',
+      phone: ' 558500000000 ',
+      address: ' Rua Central ',
+      whatsapp: ' 5585999999999 ',
+      description: ' Agenda premium '
+    })).toEqual({
+      name: 'Barbearia Premium',
+      slug: 'barbearia-sao-joao',
+      phone: '558500000000',
+      address: 'Rua Central',
+      whatsapp: '5585999999999',
+      description: 'Agenda premium'
+    });
+  });
+
+  it('user without session receives the onboarding access block', () => {
+    const html = renderToStaticMarkup(
+      <OwnerBarbershopOnboarding
+        authSession={null}
+        onCreate={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('Crie sua barbearia');
+    expect(html).toContain('Entre com sua conta');
   });
 });

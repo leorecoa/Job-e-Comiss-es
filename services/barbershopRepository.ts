@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getUserProfileName, upsertOwnerProfileForBarbershop } from './authRepository';
 import { Barbershop } from '../types';
 
 const DEFAULT_LOCAL_BARBERSHOP_SLUG = 'gestao-maxima';
@@ -36,6 +37,15 @@ export type BarbershopBrandingInput = {
   secondaryColor?: string | null;
 };
 
+export type CreateBarbershopForCurrentOwnerInput = {
+  name: string;
+  slug: string;
+  phone?: string | null;
+  address?: string | null;
+  whatsapp?: string | null;
+  description?: string | null;
+};
+
 export type BarbershopBrandingImageType = 'logo' | 'cover';
 
 export type BarbershopBrandingImageUploadInput = {
@@ -51,6 +61,8 @@ const BRANDING_MAX_BYTES: Record<BarbershopBrandingImageType, number> = {
   logo: 2 * 1024 * 1024,
   cover: 5 * 1024 * 1024
 };
+
+const normalizeWhitespace = (value: string): string => value.trim().replace(/\s+/g, ' ');
 
 const mapBarbershopRow = (row: DatabaseBarbershopRow | DatabaseBarbershopBrandingRow): Barbershop => ({
   id: row.id,
@@ -167,6 +179,25 @@ const cleanOptional = (value: string | null | undefined): string | null => {
   return trimmed || null;
 };
 
+export const normalizeBarbershopSlug = (value: string): string => {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+};
+
+export const getBarbershopPublicBookingPath = (slug: string): string => `/book/${slug}`;
+
+const isDuplicateSlugError = (error: { code?: string; message?: string }): boolean => {
+  const message = error.message || '';
+  return error.code === '23505' || /slug/i.test(message);
+};
+
 export const getBarbershopBrandingImageExtension = (fileName: string): string => {
   const extension = fileName.split('.').pop()?.toLowerCase() || '';
   return extension === 'jpg' ? 'jpg' : extension;
@@ -248,6 +279,78 @@ export const updateCurrentBarbershopBranding = async (
     .single<DatabaseBarbershopBrandingRow>();
 
   if (error) throw error;
+
+  return mapBarbershopRow(data);
+};
+
+export const createBarbershopForCurrentOwner = async (
+  input: CreateBarbershopForCurrentOwnerInput
+): Promise<Barbershop> => {
+  const normalizedName = normalizeWhitespace(input.name);
+  const normalizedSlug = normalizeBarbershopSlug(input.slug);
+
+  if (!normalizedName) {
+    throw new Error('Informe o nome da barbearia.');
+  }
+
+  if (!normalizedSlug) {
+    throw new Error('Informe um slug valido.');
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Onboarding automatico requer Supabase configurado.');
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+
+  if (authError) throw authError;
+  if (!authData.user) {
+    throw new Error('Usuario nao autenticado para criar barbearia.');
+  }
+
+  const existingSlug = await supabase
+    .from('barbershops')
+    .select('id')
+    .eq('slug', normalizedSlug)
+    .maybeSingle();
+
+  if (existingSlug.error && !isDuplicateSlugError(existingSlug.error)) {
+    throw existingSlug.error;
+  }
+
+  if (existingSlug.data?.id) {
+    throw new Error('Este slug ja esta em uso. Escolha outro.');
+  }
+
+  const payload = {
+    name: normalizedName,
+    slug: normalizedSlug,
+    phone: cleanOptional(input.phone),
+    address: cleanOptional(input.address),
+    whatsapp: cleanOptional(input.whatsapp),
+    description: cleanOptional(input.description),
+    active: true
+  };
+
+  const { data, error } = await supabase
+    .from('barbershops')
+    .insert(payload)
+    .select(BRANDING_SELECT)
+    .single<DatabaseBarbershopBrandingRow>();
+
+  if (error) {
+    if (isDuplicateSlugError(error)) {
+      throw new Error('Este slug ja esta em uso. Escolha outro.');
+    }
+
+    throw error;
+  }
+
+  const displayName = normalizeWhitespace(
+    String(authData.user.user_metadata?.display_name || getUserProfileName(authData.user))
+  );
+
+  await upsertOwnerProfileForBarbershop(authData.user.id, displayName, data.id);
 
   return mapBarbershopRow(data);
 };

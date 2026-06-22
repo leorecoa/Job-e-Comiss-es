@@ -2,7 +2,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
 import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById } from './utils';
-import { BarbershopBrandingImageType, BarbershopBrandingInput, getBarbershopById, getBarbershopBySlug, updateCurrentBarbershopBranding, uploadBarbershopBrandingImage } from './services/barbershopRepository';
+import {
+  BarbershopBrandingImageType,
+  BarbershopBrandingInput,
+  createBarbershopForCurrentOwner,
+  getBarbershopById,
+  getBarbershopBySlug,
+  getBarbershopPublicBookingPath,
+  updateCurrentBarbershopBranding,
+  uploadBarbershopBrandingImage
+} from './services/barbershopRepository';
 import { APPOINTMENT_STORAGE_KEY, completeAppointmentFinancialRecord, getAppointmentDateInput, hasAppointmentConflict } from './scheduling';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
@@ -23,6 +32,7 @@ import { DashboardCharts } from './components/DashboardCharts';
 import { isSupabaseConfigured } from './lib/supabase';
 import { BarberDashboard } from './components/BarberDashboard';
 import { BarbershopBrandingSettings } from './components/BarbershopBrandingSettings';
+import { OwnerBarbershopOnboarding } from './components/OwnerBarbershopOnboarding';
 import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { listBarbers } from './services/barberRepository';
 import { listServices } from './services/serviceRepository';
@@ -100,13 +110,17 @@ export const getPublicBookingSlugFromPath = (pathname: string): string | undefin
   return undefined;
 };
 
+export const isOwnerOnboardingPath = (pathname: string): boolean => pathname === '/onboarding';
+
 const CODES_PRO = ["MENSAL", "PRO", "LIBERADO"];
 const CODES_VIP = ["VIP", "EQUIPE", "TIME", "VIP4"];
 const CODES_ADMIN: string[] = [];
 
 const App: React.FC = () => {
-  const publicBookingSlug = getPublicBookingSlugFromPath(window.location.pathname);
-  const isPublicBookingRoute = window.location.pathname === '/book' || window.location.pathname === '/agendar' || window.location.pathname.startsWith('/book/');
+  const pathname = window.location.pathname;
+  const publicBookingSlug = getPublicBookingSlugFromPath(pathname);
+  const isPublicBookingRoute = pathname === '/book' || pathname === '/agendar' || pathname.startsWith('/book/');
+  const isOnboardingRoute = isOwnerOnboardingPath(pathname);
 
   // -- Handle Splash Screen --
   useEffect(() => {
@@ -321,6 +335,19 @@ const App: React.FC = () => {
       active = false;
     };
   }, [authSession]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || isAuthLoading || isPublicBookingRoute || !authSession) return;
+
+    if (!authSession.barbershopId && !isOnboardingRoute && authSession.role === 'owner') {
+      window.location.replace('/onboarding');
+      return;
+    }
+
+    if (authSession.barbershopId && isOnboardingRoute) {
+      window.location.replace('/');
+    }
+  }, [authSession, isAuthLoading, isOnboardingRoute, isPublicBookingRoute]);
 
   useEffect(() => {
     let active = true;
@@ -612,6 +639,53 @@ const App: React.FC = () => {
         return true;
     }
     return false;
+  };
+
+  const handleCreateOwnerBarbershop = async (input: {
+    name: string;
+    slug: string;
+    phone?: string | null;
+    address?: string | null;
+    whatsapp?: string | null;
+    description?: string | null;
+  }) => {
+    const createdBarbershop = await createBarbershopForCurrentOwner(input);
+    const refreshedSession = await getCurrentAuthSession();
+
+    setOwnerBarbershop(createdBarbershop);
+    setSettings(prev => normalizeSettings({
+      ...prev,
+      shopName: createdBarbershop.name
+    }));
+
+    if (refreshedSession) {
+      handleAuthProfile(refreshedSession);
+    } else if (authSession) {
+      const fallbackSession: AuthSession = {
+        ...authSession,
+        role: 'owner',
+        barbershopId: createdBarbershop.id
+      };
+      setAuthSession(fallbackSession);
+      handleAuthProfile(fallbackSession);
+    }
+
+    setUserProfile(prev => ({
+      ownerName: refreshedSession?.displayName || authSession?.displayName || prev?.ownerName || createdBarbershop.name,
+      shopName: createdBarbershop.name,
+      email: refreshedSession?.email || authSession?.email || prev?.email || '',
+      startDate: prev?.startDate || Date.now(),
+      isPro: true,
+      planType: 'admin_life'
+    }));
+
+    addToast(`Barbearia criada. Link publico: ${getBarbershopPublicBookingPath(createdBarbershop.slug)}`, 'success');
+
+    return createdBarbershop;
+  };
+
+  const handleCompleteOwnerBarbershopOnboarding = () => {
+    window.location.assign('/');
   };
 
   const handleSaveOwnerBarbershopBranding = async (input: BarbershopBrandingInput) => {
@@ -1052,6 +1126,24 @@ const App: React.FC = () => {
           onSignUp={handleAuthSignUp}
           loading={isAuthLoading}
           error={authError}
+        />
+      </>
+    );
+  }
+
+  if (
+    isSupabaseConfigured &&
+    authSession &&
+    authSession.role === 'owner' &&
+    !authSession.barbershopId
+  ) {
+    return (
+      <>
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <OwnerBarbershopOnboarding
+          authSession={authSession}
+          onCreate={handleCreateOwnerBarbershop}
+          onComplete={handleCompleteOwnerBarbershopOnboarding}
         />
       </>
     );
