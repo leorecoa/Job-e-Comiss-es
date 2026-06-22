@@ -7,30 +7,39 @@ const SETTINGS_STORAGE_KEY = 'barbearia_settings';
 type DatabaseBarberRow = {
   id: string;
   name: string;
+  barbershop_id: string | null;
   active: boolean; // Assuming active is always present in DB
 };
 
-const listLocalBarbers = (): BarberOption[] => {
+const isLocalTenantMatch = (itemBarbershopId: string | undefined, barbershopId?: string): boolean => {
+  if (!barbershopId) return true;
+  if (barbershopId === 'local-barbershop') return !itemBarbershopId || itemBarbershopId === barbershopId;
+  return itemBarbershopId === barbershopId;
+};
+
+const listLocalBarbers = (barbershopId?: string): BarberOption[] => {
   try {
     const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
     const settings = saved ? JSON.parse(saved) : {};
     // For local storage, barbers might just be strings. Convert to BarberOption.
-    return Array.isArray(settings.barbers) && settings.barbers.every((b: any) => typeof b === 'string' || (typeof b === 'object' && 'name' in b && 'id' in b))
+    const localBarbers = Array.isArray(settings.barbers) && settings.barbers.every((b: any) => typeof b === 'string' || (typeof b === 'object' && 'name' in b && 'id' in b))
       ? settings.barbers.map((b: string | BarberOption) =>
           typeof b === 'string' ? { id: b, name: b } : b
         )
       : [];
+
+    return localBarbers.filter((barber: BarberOption) => isLocalTenantMatch(barber.barbershopId, barbershopId));
   } catch {
     return [];
   }
 };
 
 export const listBarbers = async (barbershopId?: string): Promise<BarberOption[]> => {
-  if (!isSupabaseConfigured || !supabase) return listLocalBarbers();
+  if (!isSupabaseConfigured || !supabase) return listLocalBarbers(barbershopId);
 
   let query = supabase
     .from('barbers')
-    .select('id,name,active')
+    .select('id,name,barbershop_id,active')
     .eq('active', true);
   
   if (barbershopId) {
@@ -42,7 +51,11 @@ export const listBarbers = async (barbershopId?: string): Promise<BarberOption[]
     .returns<DatabaseBarberRow[]>(); // Explicitly cast to ensure type safety
 
   if (error) throw error;
-  return (data || []).map(row => ({ id: row.id, name: row.name }));
+  return (data || []).map(row => ({
+    id: row.id,
+    name: row.name,
+    barbershopId: row.barbershop_id || undefined
+  }));
 };
 
 export const createBarber = async (name: string): Promise<BarberOption> => {
@@ -56,10 +69,10 @@ export const createBarber = async (name: string): Promise<BarberOption> => {
   const { data, error } = await supabase
     .from('barbers')
     .insert({ name })
-    .select('id,name') // Select id and name to return BarberOption
+    .select('id,name,barbershop_id') // Select fields to return BarberOption
     .single()
     .returns<DatabaseBarberRow>(); // Explicitly cast to ensure type safety
   
   if (error) throw error;
-  return { id: data.id, name: data.name };
+  return { id: data.id, name: data.name, barbershopId: data.barbershop_id || undefined };
 };

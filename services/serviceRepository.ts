@@ -6,6 +6,7 @@ const SETTINGS_STORAGE_KEY = 'barbearia_settings';
 type DatabaseServiceRow = {
   id: string;
   name: string;
+  barbershop_id: string | null;
   price: number | string;
   duration_minutes: number;
   commission_rate: number | string | null;
@@ -15,12 +16,19 @@ type DatabaseServiceRow = {
 export const mapServiceFromDb = (row: DatabaseServiceRow): Service => ({
   id: row.id,
   name: row.name,
+  barbershopId: row.barbershop_id || undefined,
   price: Number(row.price) || 0,
   durationMinutes: Number(row.duration_minutes) || 30,
   commissionRate: row.commission_rate === null ? undefined : Number(row.commission_rate)
 });
 
-const listLocalServices = (): Service[] => {
+const isLocalTenantMatch = (itemBarbershopId: string | undefined, barbershopId?: string): boolean => {
+  if (!barbershopId) return true;
+  if (barbershopId === 'local-barbershop') return !itemBarbershopId || itemBarbershopId === barbershopId;
+  return itemBarbershopId === barbershopId;
+};
+
+const listLocalServices = (barbershopId?: string): Service[] => {
   try {
     const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
     const settings = saved ? JSON.parse(saved) : {};
@@ -29,22 +37,26 @@ const listLocalServices = (): Service[] => {
     const allLocalServices = Array.isArray(settings.services)
       ? settings.services.map((s: any) => ({
           id: s.id || s.name, // Fallback ID if not present
-          name: s.name, price: Number(s.price) || 0, durationMinutes: Number(s.durationMinutes) || 30, commissionRate: Number(s.commissionRate) || undefined
+          name: s.name,
+          barbershopId: typeof s.barbershopId === 'string' ? s.barbershopId : undefined,
+          price: Number(s.price) || 0,
+          durationMinutes: Number(s.durationMinutes) || 30,
+          commissionRate: Number(s.commissionRate) || undefined
         }))
       : DEFAULT_SETTINGS.services; // Fallback to default if no services in local storage
 
-    return allLocalServices; // Local storage doesn't support barbershop filtering yet
+    return allLocalServices.filter((service: Service) => isLocalTenantMatch(service.barbershopId, barbershopId));
   } catch {
-    return DEFAULT_SETTINGS.services;
+    return DEFAULT_SETTINGS.services.filter((service: Service) => isLocalTenantMatch(service.barbershopId, barbershopId));
   }
 };
 
 export const listServices = async (barbershopId?: string): Promise<Service[]> => {
-  if (!isSupabaseConfigured || !supabase) return listLocalServices();
+  if (!isSupabaseConfigured || !supabase) return listLocalServices(barbershopId);
 
   let query = supabase
     .from('services')
-    .select('id,name,price,duration_minutes,commission_rate,active')
+    .select('id,name,barbershop_id,price,duration_minutes,commission_rate,active')
     .eq('active', true);
 
   if (barbershopId) {
@@ -70,7 +82,7 @@ export const createService = async (service: Service): Promise<Service> => {
       duration_minutes: service.durationMinutes,
       commission_rate: service.commissionRate ?? null
     })
-    .select('id,name,price,duration_minutes,commission_rate,active')
+    .select('id,name,barbershop_id,price,duration_minutes,commission_rate,active')
     .single();
 
   if (error) throw error;

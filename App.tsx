@@ -388,8 +388,8 @@ const App: React.FC = () => {
         setAppointments(remoteAppointments);
         setSettings(prev => normalizeSettings({
           ...prev,
-          barbers: remoteBarbers.length > 0 ? remoteBarbers : prev.barbers,
-          services: remoteServices.length > 0 ? remoteServices : prev.services
+          barbers: remoteBarbers,
+          services: remoteServices
         }));
       } catch (error) {
         if (!active) return;
