@@ -32,10 +32,11 @@ import { DashboardCharts } from './components/DashboardCharts';
 import { isSupabaseConfigured } from './lib/supabase';
 import { BarberDashboard } from './components/BarberDashboard';
 import { BarbershopBrandingSettings } from './components/BarbershopBrandingSettings';
+import { OwnerCatalogManager } from './components/OwnerCatalogManager';
 import { OwnerBarbershopOnboarding } from './components/OwnerBarbershopOnboarding';
 import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
-import { listBarbers } from './services/barberRepository';
-import { listServices } from './services/serviceRepository';
+import { createBarber, listBarbers, updateBarber } from './services/barberRepository';
+import { createService, listServices, updateService } from './services/serviceRepository';
 import { AppRole, AuthSession, canAccessInternalPanel, getCurrentAuthSession, signInWithPassword, signOut as signOutAuth, signUpWithPassword } from './services/authRepository';
 import { 
   Scissors, 
@@ -65,7 +66,7 @@ import {
 
 const normalizeSettings = (settings: Partial<AppSettings> | null | undefined): AppSettings => {
   const merged = { ...DEFAULT_SETTINGS, ...(settings || {}) };
-  const services = Array.isArray(settings?.services) && settings.services.length > 0
+  const services = Array.isArray(settings?.services)
     ? settings.services.map((service: Service) => ({ ...service, price: Number(service.price) || 0, durationMinutes: Number(service.durationMinutes) || 30 }))
     : DEFAULT_SETTINGS.services;
 
@@ -222,6 +223,10 @@ const App: React.FC = () => {
   const [ownerBarbershopError, setOwnerBarbershopError] = useState<string | null>(null);
   const [ownerBarbershopSuccess, setOwnerBarbershopSuccess] = useState<string | null>(null);
   const [isSavingOwnerBarbershop, setSavingOwnerBarbershop] = useState(false);
+  const [ownerCatalogBarbers, setOwnerCatalogBarbers] = useState<BarberOption[]>([]);
+  const [ownerCatalogServices, setOwnerCatalogServices] = useState<Service[]>([]);
+  const [isOwnerCatalogLoading, setOwnerCatalogLoading] = useState(false);
+  const [ownerCatalogError, setOwnerCatalogError] = useState<string | null>(null);
 
   // Tour State
   const [isTourOpen, setTourOpen] = useState(false);
@@ -236,6 +241,17 @@ const App: React.FC = () => {
 
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  const syncActiveCatalogIntoSettings = (
+    barbers: BarberOption[],
+    services: Service[]
+  ) => {
+    setSettings(prev => normalizeSettings({
+      ...prev,
+      barbers: barbers.filter((barber) => barber.active !== false),
+      services: services.filter((service) => service.active !== false)
+    }));
   };
 
   // -- Effects --
@@ -335,6 +351,46 @@ const App: React.FC = () => {
       active = false;
     };
   }, [authSession]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadOwnerCatalog = async () => {
+      if (isPublicBookingRoute) return;
+      if (authSession?.role === 'barber') return;
+      if (isSupabaseConfigured && (isAuthLoading || !authSession?.barbershopId)) return;
+
+      const catalogBarbershopId = authSession?.barbershopId || (!isSupabaseConfigured ? 'local-barbershop' : undefined);
+
+      if (!catalogBarbershopId) return;
+
+      setOwnerCatalogLoading(true);
+      setOwnerCatalogError(null);
+
+      try {
+        const [catalogBarbers, catalogServices] = await Promise.all([
+          listBarbers(catalogBarbershopId, { includeInactive: true }),
+          listServices(catalogBarbershopId, { includeInactive: true })
+        ]);
+
+        if (!active) return;
+        setOwnerCatalogBarbers(catalogBarbers);
+        setOwnerCatalogServices(catalogServices);
+        syncActiveCatalogIntoSettings(catalogBarbers, catalogServices);
+      } catch (error) {
+        if (!active) return;
+        console.error(error);
+        setOwnerCatalogError('Nao foi possivel carregar o catalogo operacional.');
+      } finally {
+        if (active) setOwnerCatalogLoading(false);
+      }
+    };
+
+    loadOwnerCatalog();
+    return () => {
+      active = false;
+    };
+  }, [authSession, isAuthLoading, isPublicBookingRoute, userProfile?.shopName]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || isAuthLoading || isPublicBookingRoute || !authSession) return;
@@ -686,6 +742,95 @@ const App: React.FC = () => {
 
   const handleCompleteOwnerBarbershopOnboarding = () => {
     window.location.assign('/');
+  };
+
+  const getOwnerCatalogBarbershopId = (): string | undefined => (
+    authSession?.barbershopId || ownerBarbershop?.id || (!isSupabaseConfigured ? 'local-barbershop' : undefined)
+  );
+
+  const handleCreateOwnerBarber = async (name: string) => {
+    const barbershopId = getOwnerCatalogBarbershopId();
+
+    if (!barbershopId) {
+      setOwnerCatalogError('Barbearia nao encontrada para cadastrar barbeiro.');
+      return;
+    }
+
+    setOwnerCatalogError(null);
+    const created = await createBarber({ name, barbershopId, active: true });
+    const nextBarbers = [...ownerCatalogBarbers.filter((barber) => barber.id !== created.id), created]
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    setOwnerCatalogBarbers(nextBarbers);
+    syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
+    addToast('Barbeiro cadastrado!', 'success');
+  };
+
+  const handleUpdateOwnerBarber = async (
+    barberId: string,
+    patch: { name?: string; active?: boolean }
+  ) => {
+    const barbershopId = getOwnerCatalogBarbershopId();
+
+    if (!barbershopId) {
+      setOwnerCatalogError('Barbearia nao encontrada para atualizar barbeiro.');
+      return;
+    }
+
+    setOwnerCatalogError(null);
+    const updated = await updateBarber(barberId, patch, barbershopId);
+    const nextBarbers = ownerCatalogBarbers
+      .map((barber) => (barber.id === barberId ? updated : barber))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    setOwnerCatalogBarbers(nextBarbers);
+    syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
+    addToast(updated.active === false ? 'Barbeiro desativado.' : 'Barbeiro atualizado.', 'success');
+  };
+
+  const handleCreateOwnerService = async (input: {
+    name: string;
+    price: number;
+    durationMinutes: number;
+    commissionRate?: number;
+  }) => {
+    const barbershopId = getOwnerCatalogBarbershopId();
+
+    if (!barbershopId) {
+      setOwnerCatalogError('Barbearia nao encontrada para cadastrar servico.');
+      return;
+    }
+
+    setOwnerCatalogError(null);
+    const created = await createService({
+      ...input,
+      barbershopId,
+      active: true
+    });
+    const nextServices = [...ownerCatalogServices.filter((service) => service.id !== created.id), created]
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    setOwnerCatalogServices(nextServices);
+    syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
+    addToast('Servico cadastrado!', 'success');
+  };
+
+  const handleUpdateOwnerService = async (
+    serviceId: string,
+    patch: { name?: string; price?: number; durationMinutes?: number; commissionRate?: number; active?: boolean }
+  ) => {
+    const barbershopId = getOwnerCatalogBarbershopId();
+
+    if (!barbershopId) {
+      setOwnerCatalogError('Barbearia nao encontrada para atualizar servico.');
+      return;
+    }
+
+    setOwnerCatalogError(null);
+    const updated = await updateService(serviceId, patch, barbershopId);
+    const nextServices = ownerCatalogServices
+      .map((service) => (service.id === serviceId ? updated : service))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    setOwnerCatalogServices(nextServices);
+    syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
+    addToast(updated.active === false ? 'Servico desativado.' : 'Servico atualizado.', 'success');
   };
 
   const handleSaveOwnerBarbershopBranding = async (input: BarbershopBrandingInput) => {
@@ -1277,6 +1422,17 @@ const App: React.FC = () => {
                 onUploadImage={handleUploadOwnerBarbershopBrandingImage}
              />
 
+             <OwnerCatalogManager
+                barbers={ownerCatalogBarbers}
+                services={ownerCatalogServices}
+                loading={isOwnerCatalogLoading}
+                error={ownerCatalogError}
+                onCreateBarber={handleCreateOwnerBarber}
+                onUpdateBarber={handleUpdateOwnerBarber}
+                onCreateService={handleCreateOwnerService}
+                onUpdateService={handleUpdateOwnerService}
+             />
+
              {/* New Dashboard Charts */}
              <div className="mb-6">
                 <DashboardCharts clients={chartClients} />
@@ -1508,12 +1664,17 @@ const App: React.FC = () => {
         isOpen={isSettingsModalOpen} 
         onClose={() => setSettingsModalOpen(false)} 
         settings={settings} 
-        onSave={(nextSettings) => setSettings(normalizeSettings(nextSettings))} 
+        onSave={(nextSettings) => setSettings(normalizeSettings(
+          isSupabaseConfigured
+            ? { ...nextSettings, barbers: settings.barbers, services: settings.services }
+            : nextSettings
+        ))} 
         userProfile={userProfile} 
         onSubscribe={() => setSubscriptionModalOpen(true)} 
         clients={clients}
         vales={vales}
         appointments={appointments}
+        manageCatalogRemotely={isSupabaseConfigured}
       />
       <AppointmentModal
         isOpen={isAppointmentModalOpen}

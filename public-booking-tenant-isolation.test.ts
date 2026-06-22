@@ -103,10 +103,10 @@ describe('public booking tenant isolation repositories', () => {
 
     expect(supabaseMock.from).toHaveBeenCalledWith('barbers');
     expect(select).toHaveBeenCalledWith('id,name,barbershop_id,active');
-    expect(query.eq).toHaveBeenNthCalledWith(1, 'active', true);
-    expect(query.eq).toHaveBeenNthCalledWith(2, 'barbershop_id', 'shop-leo');
+    expect(query.eq).toHaveBeenNthCalledWith(1, 'barbershop_id', 'shop-leo');
+    expect(query.eq).toHaveBeenNthCalledWith(2, 'active', true);
     expect(barbers).toEqual([
-      { id: 'barber-leo', name: 'Leo', barbershopId: 'shop-leo' }
+      { id: 'barber-leo', name: 'Leo', barbershopId: 'shop-leo', active: true }
     ]);
   });
 
@@ -136,8 +136,8 @@ describe('public booking tenant isolation repositories', () => {
 
     expect(supabaseMock.from).toHaveBeenCalledWith('services');
     expect(select).toHaveBeenCalledWith('id,name,barbershop_id,price,duration_minutes,commission_rate,active');
-    expect(query.eq).toHaveBeenNthCalledWith(1, 'active', true);
-    expect(query.eq).toHaveBeenNthCalledWith(2, 'barbershop_id', 'shop-leo');
+    expect(query.eq).toHaveBeenNthCalledWith(1, 'barbershop_id', 'shop-leo');
+    expect(query.eq).toHaveBeenNthCalledWith(2, 'active', true);
     expect(services).toEqual([
       {
         id: 'service-leo',
@@ -145,7 +145,8 @@ describe('public booking tenant isolation repositories', () => {
         barbershopId: 'shop-leo',
         price: 70,
         durationMinutes: 45,
-        commissionRate: 40
+        commissionRate: 40,
+        active: true
       }
     ]);
   });

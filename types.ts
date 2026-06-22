@@ -16,6 +16,7 @@ export type BarberOption = {
   id: string;
   name: string;
   barbershopId?: string; // Added for multi-tenancy
+  active?: boolean;
 };
 
 export type Barbershop = {
@@ -48,6 +49,7 @@ export interface Service {
   barbershopId?: string; // Added for multi-tenancy
   durationMinutes: number;
   commissionRate?: number;
+  active?: boolean;
 }
 
 export type AppointmentStatus =
