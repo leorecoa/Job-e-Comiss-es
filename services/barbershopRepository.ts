@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getUserProfileName, upsertOwnerProfileForBarbershop } from './authRepository';
-import { Barbershop } from '../types';
+import { Barbershop, BarbershopBusinessHours } from '../types';
+import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES, normalizeBarbershopBusinessHours, normalizeBarbershopSlotStepMinutes } from '../scheduling';
 
 const DEFAULT_LOCAL_BARBERSHOP_SLUG = 'gestao-maxima';
 const LOCAL_BARBERSHOP_STORAGE_KEY = 'barbearia_barbershop_branding';
@@ -11,6 +12,8 @@ type DatabaseBarbershopRow = {
   slug: string;
   phone: string | null;
   address: string | null;
+  business_hours?: unknown | null;
+  slot_step_minutes?: number | null;
   active: boolean;
 };
 
@@ -22,6 +25,8 @@ type DatabaseBarbershopBrandingRow = DatabaseBarbershopRow & {
   whatsapp: string | null;
   primary_color: string | null;
   secondary_color: string | null;
+  business_hours: unknown | null;
+  slot_step_minutes: number | null;
 };
 
 export type BarbershopBrandingInput = {
@@ -35,6 +40,8 @@ export type BarbershopBrandingInput = {
   coverImageUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  businessHours?: BarbershopBusinessHours | null;
+  slotStepMinutes?: number | null;
 };
 
 export type CreateBarbershopForCurrentOwnerInput = {
@@ -44,6 +51,8 @@ export type CreateBarbershopForCurrentOwnerInput = {
   address?: string | null;
   whatsapp?: string | null;
   description?: string | null;
+  businessHours?: BarbershopBusinessHours | null;
+  slotStepMinutes?: number | null;
 };
 
 export type BarbershopBrandingImageType = 'logo' | 'cover';
@@ -77,12 +86,14 @@ const mapBarbershopRow = (row: DatabaseBarbershopRow | DatabaseBarbershopBrandin
   whatsapp: 'whatsapp' in row ? row.whatsapp : null,
   primaryColor: 'primary_color' in row ? row.primary_color : null,
   secondaryColor: 'secondary_color' in row ? row.secondary_color : null,
+  businessHours: normalizeBarbershopBusinessHours('business_hours' in row ? (row.business_hours as Partial<BarbershopBusinessHours> | null | undefined) : DEFAULT_BARBERSHOP_BUSINESS_HOURS),
+  slotStepMinutes: normalizeBarbershopSlotStepMinutes('slot_step_minutes' in row ? row.slot_step_minutes : DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES),
   active: row.active
 });
 
 const isMissingBrandingColumnError = (error: { message?: string; code?: string }): boolean => {
   const message = error.message || '';
-  return error.code === '42703' || /logo_url|cover_image_url|instagram_url|whatsapp|description|primary_color|secondary_color/i.test(message);
+  return error.code === '42703' || /logo_url|cover_image_url|instagram_url|whatsapp|description|primary_color|secondary_color|business_hours|slot_step_minutes/i.test(message);
 };
 
 const readLocalBarbershop = (): Barbershop => {
@@ -99,6 +110,8 @@ const readLocalBarbershop = (): Barbershop => {
       whatsapp: null,
       primaryColor: null,
       secondaryColor: null,
+      businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
       active: true
     };
 
@@ -127,6 +140,7 @@ const writeLocalBarbershop = (barbershop: Barbershop): void => {
 };
 
 const BRANDING_SELECT = 'id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,primary_color,secondary_color,active';
+const BRANDING_WITH_HOURS_SELECT = 'id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,primary_color,secondary_color,business_hours,slot_step_minutes,active';
 const BASIC_SELECT = 'id,name,slug,phone,address,active';
 
 const getActiveBarbershopBy = async (column: 'id' | 'slug', value: string): Promise<Barbershop | null> => {
@@ -134,7 +148,7 @@ const getActiveBarbershopBy = async (column: 'id' | 'slug', value: string): Prom
 
   const { data, error } = await supabase
     .from('barbershops')
-    .select(BRANDING_SELECT)
+    .select(BRANDING_WITH_HOURS_SELECT)
     .eq(column, value)
     .eq('active', true)
     .maybeSingle<DatabaseBarbershopBrandingRow>();
@@ -236,7 +250,9 @@ export const toBarbershopBrandingPayload = (input: BarbershopBrandingInput) => (
   logo_url: cleanOptional(input.logoUrl),
   cover_image_url: cleanOptional(input.coverImageUrl),
   primary_color: cleanOptional(input.primaryColor),
-  secondary_color: cleanOptional(input.secondaryColor)
+  secondary_color: cleanOptional(input.secondaryColor),
+  business_hours: normalizeBarbershopBusinessHours(input.businessHours),
+  slot_step_minutes: normalizeBarbershopSlotStepMinutes(input.slotStepMinutes)
 });
 
 export const updateCurrentBarbershopBranding = async (
@@ -265,6 +281,8 @@ export const updateCurrentBarbershopBranding = async (
       coverImageUrl: input.coverImageUrl || null,
       primaryColor: input.primaryColor || null,
       secondaryColor: input.secondaryColor || null,
+      businessHours: normalizeBarbershopBusinessHours(input.businessHours),
+      slotStepMinutes: normalizeBarbershopSlotStepMinutes(input.slotStepMinutes),
       active: true
     };
     writeLocalBarbershop(updated);
@@ -275,7 +293,7 @@ export const updateCurrentBarbershopBranding = async (
     .from('barbershops')
     .update(payload)
     .eq('id', barbershopId)
-    .select(BRANDING_SELECT)
+    .select(BRANDING_WITH_HOURS_SELECT)
     .single<DatabaseBarbershopBrandingRow>();
 
   if (error) throw error;
@@ -329,13 +347,15 @@ export const createBarbershopForCurrentOwner = async (
     address: cleanOptional(input.address),
     whatsapp: cleanOptional(input.whatsapp),
     description: cleanOptional(input.description),
+    business_hours: normalizeBarbershopBusinessHours(input.businessHours),
+    slot_step_minutes: normalizeBarbershopSlotStepMinutes(input.slotStepMinutes),
     active: true
   };
 
   const { data, error } = await supabase
     .from('barbershops')
     .insert(payload)
-    .select(BRANDING_SELECT)
+    .select(BRANDING_WITH_HOURS_SELECT)
     .single<DatabaseBarbershopBrandingRow>();
 
   if (error) {

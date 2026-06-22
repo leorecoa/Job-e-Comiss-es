@@ -21,9 +21,11 @@ vi.mock('./services/authRepository', () => authRepositoryMock);
 
 import {
   createBarbershopForCurrentOwner,
+  updateCurrentBarbershopBranding,
   getBarbershopPublicBookingPath,
   normalizeBarbershopSlug
 } from './services/barbershopRepository';
+import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES } from './scheduling';
 
 describe('barbershop onboarding repository', () => {
   beforeEach(() => {
@@ -118,6 +120,8 @@ describe('barbershop onboarding repository', () => {
         whatsapp: '5585999999999',
         primary_color: null,
         secondary_color: null,
+        business_hours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        slot_step_minutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
         active: true
       },
       error: null
@@ -162,6 +166,8 @@ describe('barbershop onboarding repository', () => {
       address: 'Rua Central',
       whatsapp: '5585999999999',
       description: 'Agenda premium',
+      business_hours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slot_step_minutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
       active: true
     });
     expect(authRepositoryMock.upsertOwnerProfileForBarbershop).toHaveBeenCalledWith('owner-1', 'Leo Owner', 'shop-1');
@@ -171,7 +177,73 @@ describe('barbershop onboarding repository', () => {
       slug: 'barbearia-sao-joao',
       whatsapp: '5585999999999',
       description: 'Agenda premium',
+      businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
       active: true
+    });
+  });
+
+  it('updates business hours only for the requested barbershop', async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: {
+        id: 'shop-1',
+        name: 'Barbearia Premium',
+        slug: 'barbearia-premium',
+        phone: null,
+        address: null,
+        logo_url: null,
+        cover_image_url: null,
+        description: null,
+        instagram_url: null,
+        whatsapp: null,
+        primary_color: '#111111',
+        secondary_color: '#eeeeee',
+        business_hours: {
+          ...DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+          monday: { active: true, open: '09:00', close: '18:00' }
+        },
+        slot_step_minutes: 20,
+        active: true
+      },
+      error: null
+    });
+    const query = {
+      eq: vi.fn(),
+      select: vi.fn().mockReturnValue({
+        single
+      })
+    };
+    query.eq.mockReturnValue(query);
+    const update = vi.fn().mockReturnValue(query);
+
+    supabaseMock.from.mockImplementation(() => ({
+      update
+    }));
+
+    const updated = await updateCurrentBarbershopBranding('shop-1', {
+      name: 'Barbearia Premium',
+      primaryColor: '#111111',
+      secondaryColor: '#eeeeee',
+      businessHours: {
+        ...DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        monday: { active: true, open: '09:00', close: '18:00' }
+      },
+      slotStepMinutes: 20
+    });
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Barbearia Premium',
+      business_hours: expect.objectContaining({
+        monday: { active: true, open: '09:00', close: '18:00' }
+      }),
+      slot_step_minutes: 20
+    }));
+    expect(query.eq).toHaveBeenCalledWith('id', 'shop-1');
+    expect(updated.slotStepMinutes).toBe(20);
+    expect(updated.businessHours?.monday).toEqual({
+      active: true,
+      open: '09:00',
+      close: '18:00'
     });
   });
 });

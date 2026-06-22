@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Eye, Globe2, Save, Upload } from 'lucide-react';
-import { Barbershop } from '../types';
+import { Barbershop, BarbershopBusinessDayKey, BarbershopBusinessHours } from '../types';
 import { AppRole } from '../services/authRepository';
 import { BarbershopBrandingImageType, BarbershopBrandingInput } from '../services/barbershopRepository';
+import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES, normalizeBarbershopBusinessHours, normalizeBarbershopSlotStepMinutes } from '../scheduling';
 
 export type BarbershopBrandingFormData = {
   name: string;
@@ -15,7 +16,19 @@ export type BarbershopBrandingFormData = {
   coverImageUrl: string;
   primaryColor: string;
   secondaryColor: string;
+  businessHours: BarbershopBusinessHours;
+  slotStepMinutes: number;
 };
+
+const BUSINESS_DAY_FIELDS: Array<{ key: BarbershopBusinessDayKey; label: string }> = [
+  { key: 'sunday', label: 'Domingo' },
+  { key: 'monday', label: 'Segunda' },
+  { key: 'tuesday', label: 'Terca' },
+  { key: 'wednesday', label: 'Quarta' },
+  { key: 'thursday', label: 'Quinta' },
+  { key: 'friday', label: 'Sexta' },
+  { key: 'saturday', label: 'Sabado' }
+];
 
 type BarbershopBrandingSettingsProps = {
   barbershop: Barbershop | null;
@@ -40,7 +53,9 @@ export const getBarbershopBrandingFormData = (barbershop: Barbershop | null): Ba
   logoUrl: barbershop?.logoUrl || '',
   coverImageUrl: barbershop?.coverImageUrl || '',
   primaryColor: barbershop?.primaryColor || '#f59e0b',
-  secondaryColor: barbershop?.secondaryColor || '#0ea5e9'
+  secondaryColor: barbershop?.secondaryColor || '#0ea5e9',
+  businessHours: normalizeBarbershopBusinessHours(barbershop?.businessHours || DEFAULT_BARBERSHOP_BUSINESS_HOURS),
+  slotStepMinutes: normalizeBarbershopSlotStepMinutes(barbershop?.slotStepMinutes || DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES)
 });
 
 export const getBarbershopBrandingSaveInput = (formData: BarbershopBrandingFormData): BarbershopBrandingInput => ({
@@ -53,7 +68,9 @@ export const getBarbershopBrandingSaveInput = (formData: BarbershopBrandingFormD
   logoUrl: formData.logoUrl,
   coverImageUrl: formData.coverImageUrl,
   primaryColor: formData.primaryColor,
-  secondaryColor: formData.secondaryColor
+  secondaryColor: formData.secondaryColor,
+  businessHours: normalizeBarbershopBusinessHours(formData.businessHours),
+  slotStepMinutes: normalizeBarbershopSlotStepMinutes(formData.slotStepMinutes)
 });
 
 export const getBarbershopBrandingImageField = (type: BarbershopBrandingImageType): 'logoUrl' | 'coverImageUrl' => (
@@ -104,6 +121,30 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
 
   const handleChange = (field: keyof BarbershopBrandingFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleBusinessDayChange = (
+    dayKey: BarbershopBusinessDayKey,
+    field: 'active' | 'open' | 'close',
+    value: boolean | string
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      businessHours: {
+        ...prev.businessHours,
+        [dayKey]: {
+          ...prev.businessHours[dayKey],
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  const handleSlotStepMinutesChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      slotStepMinutes: normalizeBarbershopSlotStepMinutes(Number(value))
+    }));
   };
 
   const handleImageUpload = async (type: BarbershopBrandingImageType, event: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,6 +244,58 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
               className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
             />
           </label>
+
+          <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-4">
+            <div className="mb-4">
+              <h3 className="text-base font-bold text-white">Funcionamento da barbearia</h3>
+              <p className="mt-1 text-sm text-gray-400">Defina os dias ativos, horario de abertura e fechamento e o intervalo entre horarios para o booking publico.</p>
+            </div>
+
+            <div className="mb-4 max-w-xs">
+              <Field
+                label="Intervalo entre horarios (minutos)"
+                type="number"
+                value={String(formData.slotStepMinutes)}
+                onChange={handleSlotStepMinutesChange}
+              />
+            </div>
+
+            <div className="space-y-3">
+              {BUSINESS_DAY_FIELDS.map((day) => {
+                const dayConfig = formData.businessHours[day.key];
+
+                return (
+                  <div key={day.key} className="rounded-2xl border border-gray-800 bg-black/20 p-3">
+                    <div className="grid gap-3 md:grid-cols-[1.1fr_1fr_1fr] md:items-end">
+                      <label className="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-950/70 px-3 py-3 text-sm text-gray-200">
+                        <input
+                          type="checkbox"
+                          checked={dayConfig.active}
+                          onChange={(event) => handleBusinessDayChange(day.key, 'active', event.target.checked)}
+                          className="h-4 w-4 rounded border-gray-600 bg-gray-900 text-gold-500 focus:ring-gold-500"
+                        />
+                        <span className="font-medium">{day.label}</span>
+                      </label>
+
+                      <Field
+                        label="Abre"
+                        type="time"
+                        value={dayConfig.open}
+                        onChange={(value) => handleBusinessDayChange(day.key, 'open', value)}
+                      />
+
+                      <Field
+                        label="Fecha"
+                        type="time"
+                        value={dayConfig.close}
+                        onChange={(value) => handleBusinessDayChange(day.key, 'close', value)}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           <button type="submit" disabled={saving || loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-gold-500 px-4 py-3 font-bold text-black shadow-lg shadow-gold-500/20 disabled:cursor-not-allowed disabled:opacity-50">
             <Save size={18} />

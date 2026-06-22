@@ -19,6 +19,23 @@ export type BarberOption = {
   active?: boolean;
 };
 
+export type BarbershopBusinessDayKey =
+  | 'sunday'
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday';
+
+export type BarbershopBusinessDay = {
+  active: boolean;
+  open: string;
+  close: string;
+};
+
+export type BarbershopBusinessHours = Record<BarbershopBusinessDayKey, BarbershopBusinessDay>;
+
 export type Barbershop = {
   id: string;
   name: string;
@@ -32,6 +49,8 @@ export type Barbershop = {
   whatsapp?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  businessHours?: BarbershopBusinessHours | null;
+  slotStepMinutes?: number | null;
   active: boolean;
 };
 
