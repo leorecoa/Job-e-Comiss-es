@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
-import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById } from './utils';
+import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById, resolveOwnerScopedBarbershopId } from './utils';
 import {
   BarbershopBrandingImageType,
   BarbershopBrandingInput,
@@ -745,14 +745,18 @@ const App: React.FC = () => {
   };
 
   const getOwnerCatalogBarbershopId = (): string | undefined => (
-    authSession?.barbershopId || ownerBarbershop?.id || (!isSupabaseConfigured ? 'local-barbershop' : undefined)
+    resolveOwnerScopedBarbershopId({
+      authBarbershopId: authSession?.barbershopId,
+      fallbackBarbershopId: ownerBarbershop?.id,
+      supabaseConfigured: isSupabaseConfigured
+    })
   );
 
   const handleCreateOwnerBarber = async (name: string) => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
     if (!barbershopId) {
-      setOwnerCatalogError('Barbearia nao encontrada para cadastrar barbeiro.');
+      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para cadastrar barbeiro.');
       return;
     }
 
@@ -772,7 +776,7 @@ const App: React.FC = () => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
     if (!barbershopId) {
-      setOwnerCatalogError('Barbearia nao encontrada para atualizar barbeiro.');
+      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para atualizar barbeiro.');
       return;
     }
 
@@ -795,7 +799,7 @@ const App: React.FC = () => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
     if (!barbershopId) {
-      setOwnerCatalogError('Barbearia nao encontrada para cadastrar servico.');
+      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para cadastrar servico.');
       return;
     }
 
@@ -819,7 +823,7 @@ const App: React.FC = () => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
     if (!barbershopId) {
-      setOwnerCatalogError('Barbearia nao encontrada para atualizar servico.');
+      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para atualizar servico.');
       return;
     }
 
@@ -836,7 +840,11 @@ const App: React.FC = () => {
   const handleSaveOwnerBarbershopBranding = async (input: BarbershopBrandingInput) => {
     if (authSession?.role === 'barber') return;
 
-    const barbershopId = authSession?.barbershopId || ownerBarbershop?.id || (!isSupabaseConfigured ? 'local-barbershop' : undefined);
+    const barbershopId = resolveOwnerScopedBarbershopId({
+      authBarbershopId: authSession?.barbershopId,
+      fallbackBarbershopId: ownerBarbershop?.id,
+      supabaseConfigured: isSupabaseConfigured
+    });
 
     if (!barbershopId) {
       setOwnerBarbershopError('Barbearia nao encontrada para atualizar.');
@@ -869,7 +877,11 @@ const App: React.FC = () => {
       throw new Error('Barbeiro nao pode alterar a identidade da barbearia.');
     }
 
-    const barbershopId = authSession?.barbershopId || ownerBarbershop?.id || (!isSupabaseConfigured ? 'local-barbershop' : undefined);
+    const barbershopId = resolveOwnerScopedBarbershopId({
+      authBarbershopId: authSession?.barbershopId,
+      fallbackBarbershopId: ownerBarbershop?.id,
+      supabaseConfigured: isSupabaseConfigured
+    });
 
     if (!barbershopId) {
       throw new Error('Barbearia nao encontrada para upload.');
