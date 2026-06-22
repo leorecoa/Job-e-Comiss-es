@@ -95,6 +95,58 @@ const writeLocalAppointments = (appointments: Appointment[]) => {
   localStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(appointments));
 };
 
+const countLocalAppointmentsBy = (
+  field: 'barberId' | 'serviceId',
+  entityId: string,
+  barbershopId?: string
+): number => {
+  return readLocalAppointments().filter((appointment) => (
+    appointment[field] === entityId
+    && (!barbershopId || appointment.barbershopId === barbershopId)
+  )).length;
+};
+
+const countRemoteAppointmentsBy = async (
+  column: 'barber_id' | 'service_id',
+  entityId: string,
+  barbershopId?: string
+): Promise<number> => {
+  if (!supabase) return 0;
+
+  let query = supabase
+    .from('appointments')
+    .select('id', { count: 'exact', head: true })
+    .eq(column, entityId);
+
+  if (barbershopId) {
+    query = query.eq('barbershop_id', barbershopId);
+  }
+
+  const { count, error } = await query;
+
+  if (error) throw error;
+
+  return count || 0;
+};
+
+export const countAppointmentsForBarber = async (barberId: string, barbershopId?: string): Promise<number> => {
+  if (!barberId.trim()) return 0;
+  if (!isSupabaseConfigured || !supabase) {
+    return countLocalAppointmentsBy('barberId', barberId, barbershopId);
+  }
+
+  return countRemoteAppointmentsBy('barber_id', barberId, barbershopId);
+};
+
+export const countAppointmentsForService = async (serviceId: string, barbershopId?: string): Promise<number> => {
+  if (!serviceId.trim()) return 0;
+  if (!isSupabaseConfigured || !supabase) {
+    return countLocalAppointmentsBy('serviceId', serviceId, barbershopId);
+  }
+
+  return countRemoteAppointmentsBy('service_id', serviceId, barbershopId);
+};
+
 export const listInternalAppointments = async (barbershopId?: string, barberId?: string): Promise<Appointment[]> => {
   if (!isSupabaseConfigured || !supabase) return readLocalAppointments();
 

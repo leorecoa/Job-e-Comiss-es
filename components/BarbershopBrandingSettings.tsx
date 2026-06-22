@@ -30,6 +30,8 @@ const BUSINESS_DAY_FIELDS: Array<{ key: BarbershopBusinessDayKey; label: string 
   { key: 'saturday', label: 'Sabado' }
 ];
 
+const SLOT_STEP_OPTIONS = [15, 30, 45, 60] as const;
+
 type BarbershopBrandingSettingsProps = {
   barbershop: Barbershop | null;
   role?: AppRole | null;
@@ -93,6 +95,7 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
   const [uploadingType, setUploadingType] = useState<BarbershopBrandingImageType | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [operationalError, setOperationalError] = useState<string | null>(null);
 
   useEffect(() => {
     setFormData(getBarbershopBrandingFormData(barbershop));
@@ -143,7 +146,9 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
   const handleSlotStepMinutesChange = (value: string) => {
     setFormData((prev) => ({
       ...prev,
-      slotStepMinutes: normalizeBarbershopSlotStepMinutes(Number(value))
+      slotStepMinutes: SLOT_STEP_OPTIONS.includes(Number(value) as typeof SLOT_STEP_OPTIONS[number])
+        ? Number(value)
+        : DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     }));
   };
 
@@ -177,6 +182,17 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    const invalidDay = BUSINESS_DAY_FIELDS.find(({ key }) => {
+      const current = formData.businessHours[key];
+      return current.active && current.open >= current.close;
+    });
+
+    if (invalidDay) {
+      setOperationalError(`Revise o horario de ${invalidDay.label}. O fechamento precisa ser maior que a abertura.`);
+      return;
+    }
+
+    setOperationalError(null);
     await onSave(getBarbershopBrandingSaveInput(formData));
   };
 
@@ -203,6 +219,7 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
       {success && <p className="mb-4 rounded-xl border border-green-500/20 bg-green-500/10 p-3 text-sm text-green-200">{success}</p>}
       {uploadError && <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{uploadError}</p>}
       {uploadSuccess && <p className="mb-4 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-sm text-blue-200">{uploadSuccess}</p>}
+      {operationalError && <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{operationalError}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -247,17 +264,25 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
 
           <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-4">
             <div className="mb-4">
-              <h3 className="text-base font-bold text-white">Funcionamento da barbearia</h3>
-              <p className="mt-1 text-sm text-gray-400">Defina os dias ativos, horario de abertura e fechamento e o intervalo entre horarios para o booking publico.</p>
+              <h3 className="text-base font-bold text-white">Dias e horarios de funcionamento</h3>
+              <p className="mt-1 text-sm text-gray-400">Cada dia pode ficar aberto ou fechado. O booking publico da sua barbearia usa somente esta configuracao.</p>
             </div>
 
             <div className="mb-4 max-w-xs">
-              <Field
-                label="Intervalo entre horarios (minutos)"
-                type="number"
-                value={String(formData.slotStepMinutes)}
-                onChange={handleSlotStepMinutesChange}
-              />
+              <label className="block">
+                <span className="block text-sm font-medium text-gray-400 mb-1.5">Intervalo entre horarios</span>
+                <select
+                  value={String(formData.slotStepMinutes)}
+                  onChange={(event) => handleSlotStepMinutesChange(event.target.value)}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+                >
+                  {SLOT_STEP_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option} minutos
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <div className="space-y-3">
