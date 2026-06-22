@@ -36,6 +36,11 @@ type DatabasePublicAppointmentSlotRow = {
   status: Appointment['status'];
 };
 
+type DatabaseTenantEntityRow = {
+  id: string;
+  barbershop_id: string | null;
+};
+
 const nullableUuid = (value?: string | null): string | null => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
@@ -155,11 +160,53 @@ export const listAppointmentsByDate = async (date: string): Promise<Appointment[
   return appointments.filter(appointment => getAppointmentDateInput(appointment) === date);
 };
 
+const assertAppointmentTenantIntegrity = async (appointment: Appointment): Promise<void> => {
+  const barbershopId = nullableUuid(appointment.barbershopId);
+
+  if (!isSupabaseConfigured || !supabase || !barbershopId) return;
+
+  const checks: Array<Promise<void>> = [];
+
+  if (appointment.barberId) {
+    checks.push((async () => {
+      const { data, error } = await supabase
+        .from('barbers')
+        .select('id,barbershop_id')
+        .eq('id', appointment.barberId)
+        .eq('active', true)
+        .maybeSingle<DatabaseTenantEntityRow>();
+
+      if (error) throw error;
+      if (!data || data.barbershop_id !== barbershopId) {
+        throw new Error('Barbeiro invalido para esta barbearia.');
+      }
+    })());
+  }
+
+  if (appointment.serviceId) {
+    checks.push((async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('id,barbershop_id')
+        .eq('id', appointment.serviceId)
+        .eq('active', true)
+        .maybeSingle<DatabaseTenantEntityRow>();
+
+      if (error) throw error;
+      if (!data || data.barbershop_id !== barbershopId) {
+        throw new Error('Servico invalido para esta barbearia.');
+      }
+    })());
+  }
+
+  await Promise.all(checks);
+};
+
 export const createAppointment = async ( // This function is used by both internal and public booking
   appointment: Appointment,
   existingAppointments?: Appointment[]
 ): Promise<Appointment> => {
-  const appointments = existingAppointments || await listPublicAppointmentSlots();
+  const appointments = existingAppointments || await listPublicAppointmentSlots(appointment.barbershopId);
 
   if (hasAppointmentConflict(appointments, appointment)) {
     throw new Error('Horario indisponivel para este barbeiro.');
@@ -169,6 +216,8 @@ export const createAppointment = async ( // This function is used by both intern
     writeLocalAppointments([appointment, ...appointments]);
     return appointment;
   }
+
+  await assertAppointmentTenantIntegrity(appointment);
 
   const { error } = await supabase
     .from('appointments')

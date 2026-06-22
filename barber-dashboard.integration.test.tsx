@@ -8,7 +8,7 @@ import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
 import { Appointment, DEFAULT_SETTINGS } from './types';
 import { getPublicBookingSlugFromPath } from './App';
-import { getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingSteps, getPublicBookingSummary } from './components/PublicBookingPage';
+import { getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingScopedSettings, getPublicBookingSteps, getPublicBookingSummary } from './components/PublicBookingPage';
 import {
   BarbershopBrandingSettings,
   canManageBarbershopBranding,
@@ -310,6 +310,52 @@ describe('Public Booking Page Logic', () => {
     expect(branding.primaryColor).toBe('#111111');
     expect(branding.secondaryColor).toBe('#eeeeee');
     expect(branding.hasVisualBranding).toBe(true);
+  });
+
+  it('/book/leo-do-leo does not expose barbers or services from another barbershop', () => {
+    const scopedSettings = getPublicBookingScopedSettings({
+      ...DEFAULT_SETTINGS,
+      barbers: [
+        { id: 'barber-leo', name: 'Leo', barbershopId: 'shop-leo' },
+        { id: 'barber-gm', name: 'Gestao Maxima Barber', barbershopId: DEFAULT_BARBERSHOP_ID }
+      ],
+      services: [
+        { id: 'service-leo', name: 'Corte Leo', price: 70, durationMinutes: 45, barbershopId: 'shop-leo' },
+        { id: 'service-gm', name: 'Corte GM', price: 50, durationMinutes: 30, barbershopId: DEFAULT_BARBERSHOP_ID }
+      ]
+    }, {
+      id: 'shop-leo',
+      name: 'Leo do Leo',
+      slug: 'leo-do-leo',
+      active: true
+    });
+
+    expect(scopedSettings.barbers).toEqual([
+      { id: 'barber-leo', name: 'Leo', barbershopId: 'shop-leo' }
+    ]);
+    expect(scopedSettings.services).toEqual([
+      { id: 'service-leo', name: 'Corte Leo', price: 70, durationMinutes: 45, barbershopId: 'shop-leo' }
+    ]);
+  });
+
+  it('/book/leo-do-leo keeps the catalog empty when the tenant has no own barbers or services', () => {
+    const scopedSettings = getPublicBookingScopedSettings({
+      ...DEFAULT_SETTINGS,
+      barbers: [
+        { id: 'barber-gm', name: 'Gestao Maxima Barber', barbershopId: DEFAULT_BARBERSHOP_ID }
+      ],
+      services: [
+        { id: 'service-gm', name: 'Corte GM', price: 50, durationMinutes: 30, barbershopId: DEFAULT_BARBERSHOP_ID }
+      ]
+    }, {
+      id: 'shop-leo',
+      name: 'Leo do Leo',
+      slug: 'leo-do-leo',
+      active: true
+    });
+
+    expect(scopedSettings.barbers).toEqual([]);
+    expect(scopedSettings.services).toEqual([]);
   });
 
   it('public booking landing content renders a headline with barbershop name', () => {

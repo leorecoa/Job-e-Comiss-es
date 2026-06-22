@@ -25,6 +25,7 @@ type PublicBarberOption = {
   value: string;
   id?: string;
   name: string;
+  barbershopId?: string;
 };
 
 const getTodayString = (): string => {
@@ -114,7 +115,8 @@ const normalizeBarberOptions = (
       byValue.set(id ? `id:${id}` : `name:${name}`, {
         value: id ? `id:${id}` : `name:${name}`,
         id: id || undefined,
-        name
+        name,
+        barbershopId: barber.barbershopId
       });
     }
   });
@@ -239,6 +241,38 @@ export const getPublicBookingSummary = (
   ready: Boolean(barber?.id && service?.id && slot)
 });
 
+const isLocalFallbackBarbershop = (barbershop: Barbershop): boolean => barbershop.id === 'local-barbershop';
+
+const belongsToPublicTenant = (
+  itemBarbershopId: string | undefined,
+  currentBarbershopId: string,
+  allowUnscopedLocalItems: boolean
+): boolean => {
+  if (allowUnscopedLocalItems) {
+    return !itemBarbershopId || itemBarbershopId === currentBarbershopId;
+  }
+
+  return itemBarbershopId === currentBarbershopId;
+};
+
+export const getPublicBookingScopedSettings = (
+  appSettings: AppSettings,
+  barbershop: Barbershop | null
+): AppSettings => {
+  if (!barbershop) {
+    return appSettings;
+  }
+
+  const allowUnscopedLocalItems = isLocalFallbackBarbershop(barbershop);
+
+  return {
+    ...appSettings,
+    shopName: barbershop.name,
+    barbers: appSettings.barbers.filter((barber) => belongsToPublicTenant(barber.barbershopId, barbershop.id, allowUnscopedLocalItems)),
+    services: appSettings.services.filter((service) => belongsToPublicTenant(service.barbershopId, barbershop.id, allowUnscopedLocalItems))
+  };
+};
+
 export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   settings: appSettings,
   appointments,
@@ -260,18 +294,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   const [isSubmitting, setSubmitting] = useState(false);
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
 
-  const settings = useMemo(() => {
-    if (!barbershop) {
-      return appSettings;
-    }
-
-    return {
-      ...appSettings,
-      shopName: barbershop.name,
-      barbers: appSettings.barbers.filter((barber) => !barber.barbershopId || barber.barbershopId === barbershop.id),
-      services: appSettings.services.filter((service) => !service.barbershopId || service.barbershopId === barbershop.id)
-    };
-  }, [appSettings, barbershop]);
+  const settings = useMemo(() => getPublicBookingScopedSettings(appSettings, barbershop), [appSettings, barbershop]);
   const branding = useMemo(
     () => getPublicBookingBranding(barbershop, settings),
     [barbershop, settings]
@@ -307,8 +330,8 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   };
 
   const barberOptions = useMemo(
-    () => normalizeBarberOptions(settings.barbers || [], userProfile?.ownerName),
-    [settings.barbers, userProfile?.ownerName]
+    () => normalizeBarberOptions(settings.barbers || []),
+    [settings.barbers]
   );
 
   const services = settings.services || [];
@@ -438,6 +461,16 @@ const handleSubmit = async (event: React.FormEvent) => {
 
   if (!selectedSlot) {
     setErrors(['Selecione um horário.']);
+    return;
+  }
+
+  if (selectedBarber.barbershopId && selectedBarber.barbershopId !== barbershop.id) {
+    setErrors(['O barbeiro selecionado nao pertence a esta barbearia.']);
+    return;
+  }
+
+  if (selectedService.barbershopId && selectedService.barbershopId !== barbershop.id) {
+    setErrors(['O servico selecionado nao pertence a esta barbearia.']);
     return;
   }
 
