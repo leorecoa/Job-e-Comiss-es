@@ -1,17 +1,18 @@
-Job e Comissões
+#Job e Comissões
 
 Gestão para barbearias com agenda online, booking público, controle de atendimentos, comissões, relatórios financeiros e persistência com Supabase.
 
 O projeto começou como uma aplicação local para controle diário de barbearia e evoluiu para um MVP SaaS com painel interno, autenticação, papéis de acesso e isolamento multi-tenant por barbearia.
 
-"React" (https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=111827)
-"TypeScript" (https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-"Vite" (https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)
-"Supabase" (https://img.shields.io/badge/Supabase-Auth%20%2B%20Postgres-3FCF8E?style=for-the-badge&logo=supabase&logoColor=111827)
-"RLS" (https://img.shields.io/badge/RLS-Tenant%20Aware-111827?style=for-the-badge&logo=postgresql&logoColor=white)
-"Vitest" (https://img.shields.io/badge/Vitest-Tested-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+[![CI](https://github.com/leorecoa/Job-e-Comiss-es/actions/workflows/ci.yml/badge.svg)](https://github.com/leorecoa/Job-e-Comiss-es/actions/workflows/ci.yml)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=111827)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-React_Build-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-Auth_Postgres-3FCF8E?style=for-the-badge&logo=supabase&logoColor=111827)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-RLS_Tenant_Aware-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-Tested-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 
-Visão geral
+##Visão geral
 
 Job e Comissões é uma aplicação web para pequenas barbearias que precisam centralizar:
 
