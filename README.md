@@ -1,35 +1,131 @@
-# Job e Comissoes
+# Job e Comissões
 
-Aplicacao web para controle diario de atendimentos, vales, vendas de produtos e comissoes em barbearias.
+Gestão para barbearias com agenda online, controle de atendimentos, comissões, relatórios financeiros e persistência com Supabase.
 
-[![CI](https://github.com/leorecoa/Job-e-Comiss-es/actions/workflows/ci.yml/badge.svg)](https://github.com/leorecoa/Job-e-Comiss-es/actions/workflows/ci.yml)
-![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-6-646cff?logo=vite&logoColor=white)
-![Status](https://img.shields.io/badge/status-active-success)
+O projeto começou como uma aplicação local para controle diário de barbearia e evoluiu para um MVP SaaS com booking público, painel interno, autenticação, papéis de acesso e isolamento multi-tenant por barbearia.
 
-## Visao Geral
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=111827)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-Auth%20%2B%20Postgres-3FCF8E?style=for-the-badge&logo=supabase&logoColor=111827)
+![Vitest](https://img.shields.io/badge/Vitest-Tested-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 
-O Job e Comissoes nasceu para simplificar a rotina de barbeiros e pequenas barbearias: registrar atendimentos, calcular comissoes, acompanhar retiradas, exportar relatorios e manter backup local dos dados.
+## Visão geral
 
-O projeto roda como uma SPA em React com persistencia em `localStorage`, geracao de PDF/CSV no navegador e uma camada de testes para as regras financeiras principais.
+Job e Comissões é uma aplicação web para pequenas barbearias que precisam centralizar:
 
-## Funcionalidades
+- agendamento público de clientes;
+- agenda interna por barbeiro;
+- controle de atendimentos;
+- cálculo de comissões;
+- registro de vales e retiradas;
+- relatórios em PDF e CSV;
+- persistência online com Supabase;
+- fallback local para desenvolvimento e demonstração.
 
-- Cadastro de atendimentos com barbeiro, cliente, horario, servico, produtos e observacoes.
-- Calculo de comissao sobre servicos e adicionais, preservando comissoes salvas historicamente.
-- Registro de vales/retiradas por profissional.
-- Dashboard diario e mensal com resumo financeiro e desempenho da equipe.
-- Exportacao de relatorios em PDF e CSV.
-- Backup e restauracao de dados locais com validacao de estrutura.
-- Fluxo de trial e planos PRO/VIP.
+O projeto roda como uma SPA em React, TypeScript e Vite. A camada de dados usa Supabase quando as variáveis de ambiente estão configuradas e mantém fallback em `localStorage` para fluxo local.
 
-## Scheduling MVP
+## Funcionalidades atuais
 
-O app agora inclui um MVP de agenda interna para barbearias. A agenda permite escolher uma data e um barbeiro, criar horarios futuros, editar agendamentos e acompanhar status como agendado, confirmado, concluido, cancelado e nao compareceu.
+### Agenda e booking público
 
-Quando um agendamento e marcado como concluido, ele gera um lancamento financeiro no fluxo atual de atendimentos e comissoes, mantendo rastreabilidade por `appointmentId` e evitando duplicidade se o mesmo agendamento for concluido mais de uma vez.
+- Tela pública de agendamento em `/book` e `/agendar`.
+- Suporte a booking por slug de barbearia, como `/book/gestao-maxima`.
+- Seleção de barbeiro, serviço, data e horário disponível.
+- Criação de agendamento público com vínculo obrigatório a:
+  - `barbershop_id`
+  - `barber_id`
+  - `service_id`
+- Validação para impedir que barbeiro e serviço de barbearias diferentes sejam usados no mesmo agendamento.
+- Link manual para WhatsApp via `wa.me`.
 
+### Painel interno
+
+- Agenda diária por barbeiro.
+- Status de agendamento:
+  - agendado;
+  - confirmado;
+  - concluído;
+  - cancelado;
+  - não compareceu.
+- Conclusão de agendamento com geração de lançamento financeiro.
+- Rastreabilidade entre agendamento e registro financeiro.
+- Prevenção de duplicidade ao concluir o mesmo agendamento mais de uma vez.
+
+### Financeiro e comissões
+
+- Cadastro de atendimentos.
+- Serviços, produtos adicionais e observações.
+- Cálculo de comissão sobre serviços e adicionais.
+- Preservação histórica de comissões já salvas.
+- Registro de vales e retiradas por profissional.
+- Dashboard diário e mensal.
+- Exportação de relatórios em PDF e CSV.
+- Backup e restauração de dados locais.
+
+### Supabase, autenticação e multi-tenant
+
+- Persistência online com Supabase.
+- Fallback automático para `localStorage` quando Supabase não está configurado.
+- Supabase Auth para painel interno.
+- Papéis iniciais:
+  - `owner`
+  - `barber`
+- Modelo tenant-aware por `barbershop_id`.
+- RLS aplicado para isolamento entre barbearias.
+- Owner limitado aos dados da própria barbearia.
+- Barber limitado à própria barbearia e ao próprio vínculo de barbeiro.
+- Booking público preservado sem expor dados sensíveis.
+- Bloqueio de slug inválido.
+
+## Estado atual do projeto
+
+O projeto está em fase de MVP comercial técnico.
+
+Já existe uma base funcional para demonstrar:
+
+- agendamento público;
+- agenda interna;
+- fluxo financeiro;
+- Supabase Auth;
+- persistência em banco;
+- isolamento por barbearia;
+- regras iniciais de segurança com RLS;
+- validações automatizadas.
+
+Ainda não é tratado como SaaS comercial final. Os próximos passos envolvem refinamento de produto, testes e2e, limpeza de dados de demonstração, melhorias no dashboard multi-barbearia e preparação para uso real por múltiplas barbearias.
+
+## Stack
+
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- Framer Motion
+- Supabase Auth
+- Supabase Postgres
+- Row Level Security
+- Vitest
+- jsPDF
+- jspdf-autotable
+- lucide-react
+
+## Estrutura principal
+
+```txt
+.
+├── App.tsx
+├── components/
+├── services/
+├── lib/
+├── docs/
+├── scripts/
+├── public/
+├── scheduling.ts
+├── types.ts
+├── utils.ts
+├── package.json
+└── README.md
 Limitações atuais:
 
 - A visualizacao inicial e diaria por barbeiro, sem calendario semanal complexo.
