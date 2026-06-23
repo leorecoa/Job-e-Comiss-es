@@ -1,4 +1,4 @@
-#Job e Comissões
+# Job e Comissões
 
 Gestão para barbearias com agenda online, booking público, controle de atendimentos, comissões, relatórios financeiros e persistência com Supabase.
 
@@ -12,7 +12,7 @@ O projeto começou como uma aplicação local para controle diário de barbearia
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-RLS_Tenant_Aware-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Vitest](https://img.shields.io/badge/Vitest-Tested-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 
-##Visão geral
+## Visão geral
 
 Job e Comissões é uma aplicação web para pequenas barbearias que precisam centralizar:
 
@@ -382,32 +382,31 @@ Ainda não é tratado como SaaS comercial final. Os próximos passos envolvem re
 ├── utils.ts
 ├── package.json
 └── README.md
-Limitações atuais:
+.
+├── App.tsx
+├── components/
+├── services/
+├── lib/
+├── docs/
+├── scripts/
+├── public/
+├── scheduling.ts
+├── types.ts
+├── utils.ts
+├── package.json
+└── README.md
 
-- A visualizacao inicial e diaria por barbeiro, sem calendario semanal complexo.
-- Os dados ainda ficam em `localStorage`.
-- O WhatsApp e manual via link `wa.me`; nao ha WhatsApp Business API, SMS ou lembrete automatico.
-- A agenda ainda nao sincroniza entre dispositivos.
 
-Proximos passos planejados: Supabase, sincronizacao multi-dispositivo, autenticacao real e lembretes automaticos.
+Para configurar:
 
-## Public Booking MVP
+1. Crie um projeto no Supabase.
+2. Rode o SQL em [`docs/supabase-schema.sql`](docs/supabase-schema.sql).
+3. Copie `.env.example` para `.env`.
+4. Preencha:
 
-Clientes podem criar agendamentos pela tela publica em `/book` ou `/agendar`. O fluxo permite escolher barbeiro, servico, data e apenas horarios disponiveis, informar nome e WhatsApp, confirmar o horario e ver uma mensagem clara de sucesso.
-
-Os agendamentos criados pela tela publica usam o mesmo modelo `Appointment` e o mesmo storage da agenda interna, entao barbeiros/dono visualizam esses horarios no painel existente.
-
-Limitações atuais:
-
-- A persistencia ainda usa `localStorage`.
-- O booking publico funciona bem para demonstracao/local MVP no mesmo navegador/dispositivo.
-- Para uso real multi-dispositivo, o proximo passo e Supabase ou backend.
-- O WhatsApp continua manual via link `wa.me`, sem API paga ou automacao.
-
-## Supabase Persistence
-
-O projeto possui uma camada de repository para persistencia online com Supabase e fallback automatico para `localStorage`.
-
+```env
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 Para configurar:
 
 1. Crie um projeto no Supabase.
