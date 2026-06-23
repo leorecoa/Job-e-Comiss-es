@@ -73,8 +73,8 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   [barberId, settings.barbers]);
 
   const barberName = useMemo(() => {
-    return currentBarber?.name || authSession.displayName || 'Barbeiro';
-  }, [authSession.displayName, currentBarber]);
+    return currentBarber?.name || 'Barbeiro';
+  }, [currentBarber]);
 
   const barberAppointments = useMemo(() => {
     if (!barberId) return [];
@@ -208,7 +208,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       <header className="border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-gray-900/90">
         <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <img src="/brand-mark.svg" alt="Gestao Maxima" className="w-12 h-12 shrink-0" />
+            <img src="/brand-mark.svg" alt="Marca da barbearia" className="w-12 h-12 shrink-0" />
 
             <div className="min-w-0">
               <h1 className="text-white font-bold truncate">{barberName}</h1>
