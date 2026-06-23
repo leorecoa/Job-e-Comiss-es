@@ -38,8 +38,6 @@ const getTodayString = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-const DEFAULT_PUBLIC_BARBERSHOP_SLUG = 'gestao-maxima';
-
 const normalizeSlugLabel = (slug?: string): string | null => {
   const trimmed = slug?.trim();
   if (!trimmed) return null;
@@ -129,11 +127,10 @@ export const getPublicBookingBranding = (
   const explicitSlug = barbershopSlug?.trim();
   const hasExplicitSlug = Boolean(explicitSlug);
   const slugLabel = normalizeSlugLabel(explicitSlug);
-  const defaultShopName = settings.shopName || 'Gestao Maxima';
-  const shopName = barbershop?.name?.trim()
-    || (hasExplicitSlug
-      ? (explicitSlug === DEFAULT_PUBLIC_BARBERSHOP_SLUG ? defaultShopName : slugLabel || defaultShopName)
-      : defaultShopName);
+  const fallbackShopName = hasExplicitSlug
+    ? (slugLabel || 'Agendamento')
+    : 'Escolha uma barbearia';
+  const shopName = barbershop?.name?.trim() || fallbackShopName;
   const logoUrl = barbershop?.logoUrl?.trim() || null;
   const coverImageUrl = barbershop?.coverImageUrl?.trim() || null;
   const description = barbershop?.description?.trim() || null;
@@ -160,7 +157,10 @@ export const getPublicBookingBranding = (
 const DEFAULT_PUBLIC_BOOKING_DESCRIPTION = 'Corte, barba e acabamento com horario marcado.';
 
 export const getPublicBookingLandingContent = (branding: ReturnType<typeof getPublicBookingBranding>) => {
-  const description = branding.description || DEFAULT_PUBLIC_BOOKING_DESCRIPTION;
+  const description = branding.description
+    || (branding.shopName === 'Escolha uma barbearia'
+      ? 'Use o link publico da sua barbearia para abrir a agenda correta.'
+      : DEFAULT_PUBLIC_BOOKING_DESCRIPTION);
 
   return {
     eyebrow: 'Reserva oficial',
@@ -404,7 +404,16 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
 
   useEffect(() => {
     let active = true;
-    const resolvedBarbershopSlug = barbershopSlug?.trim() || 'gestao-maxima';
+    const resolvedBarbershopSlug = barbershopSlug?.trim();
+
+    if (!resolvedBarbershopSlug) {
+      setBarbershop(null);
+      setBarbershopError('Selecione uma barbearia para agendar.');
+      setLoadingBarbershop(false);
+      return () => {
+        active = false;
+      };
+    }
 
     const loadBarbershop = async () => {
       setLoadingBarbershop(true);

@@ -556,7 +556,7 @@ describe('public booking helpers', () => {
 });
 
 describe('barbershop repository local fallback', () => {
-  it('returns the local gestao-maxima fallback without image fields', async () => {
+  it('returns the neutral local fallback without image fields', async () => {
     vi.resetModules();
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: false,
@@ -565,8 +565,9 @@ describe('barbershop repository local fallback', () => {
 
     const { getBarbershopBySlug } = await import('./services/barbershopRepository');
 
-    await expect(getBarbershopBySlug('gestao-maxima')).resolves.toMatchObject({
-      slug: 'gestao-maxima',
+    await expect(getBarbershopBySlug('barbearia-local')).resolves.toMatchObject({
+      slug: 'barbearia-local',
+      name: 'Barbearia Local',
       logoUrl: null,
       coverImageUrl: null,
       description: null,
@@ -579,7 +580,7 @@ describe('barbershop repository local fallback', () => {
     vi.doUnmock('./lib/supabase');
   });
 
-  it("returns null for an invalid slug instead of falling back to gestao-maxima", async () => {
+  it('returns null for an invalid slug instead of falling back to another tenant', async () => {
     vi.resetModules();
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: false,

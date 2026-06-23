@@ -3,7 +3,7 @@ import { getUserProfileName, upsertOwnerProfileForBarbershop } from './authRepos
 import { Barbershop, BarbershopBusinessHours } from '../types';
 import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES, normalizeBarbershopBusinessHours, normalizeBarbershopSlotStepMinutes } from '../scheduling';
 
-const DEFAULT_LOCAL_BARBERSHOP_SLUG = 'gestao-maxima';
+const DEFAULT_LOCAL_BARBERSHOP_SLUG = 'barbearia-local';
 const LOCAL_BARBERSHOP_STORAGE_KEY = 'barbearia_barbershop_branding';
 
 type DatabaseBarbershopRow = {
@@ -99,7 +99,7 @@ const isMissingBrandingColumnError = (error: { message?: string; code?: string }
 const readLocalBarbershop = (): Barbershop => {
   const fallback: Barbershop = {
       id: 'local-barbershop',
-      name: 'Gestao Maxima',
+      name: 'Barbearia Local',
       slug: DEFAULT_LOCAL_BARBERSHOP_SLUG,
       phone: null,
       address: null,

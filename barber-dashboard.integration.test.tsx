@@ -7,7 +7,7 @@ import * as barbershopRepository from './services/barbershopRepository';
 import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
 import { Appointment, DEFAULT_SETTINGS } from './types';
-import { getPublicBookingSlugFromPath } from './App';
+import { getInitialAppSettings, getInitialUserProfile, getPublicBookingSlugFromPath, getResolvedDashboardShopName } from './App';
 import { buildPublicBookingInput, getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingScopedSettings, getPublicBookingSteps, getPublicBookingSummary, normalizePublicBarberOptions } from './components/PublicBookingPage';
 import {
   BarbershopBrandingSettings,
@@ -243,13 +243,11 @@ describe('Public Booking Page Logic', () => {
     vi.mocked(appointmentRepository.createAppointment).mockResolvedValue({} as Appointment);
   });
 
-  it('/book uses the default gestao-maxima fallback slug', async () => {
+  it('/book keeps the slug undefined instead of silently falling back to another tenant', () => {
     const publicBookingSlug = getPublicBookingSlugFromPath('/book');
 
-    await barbershopRepository.getBarbershopBySlug(publicBookingSlug ?? DEFAULT_BARBERSHOP_SLUG);
-
     expect(publicBookingSlug).toBeUndefined();
-    expect(barbershopRepository.getBarbershopBySlug).toHaveBeenCalledWith(DEFAULT_BARBERSHOP_SLUG);
+    expect(barbershopRepository.getBarbershopBySlug).not.toHaveBeenCalled();
   });
 
   it('/book/gestao-maxima uses the explicit gestao-maxima slug', async () => {
@@ -284,10 +282,66 @@ describe('Public Booking Page Logic', () => {
     expect(branding.hasVisualBranding).toBe(false);
   });
 
-  it('/book without slug keeps the gestao-maxima fallback branding', () => {
+  it('/book without slug uses a safe neutral branding state', () => {
     const branding = getPublicBookingBranding(null, DEFAULT_SETTINGS);
 
-    expect(branding.shopName).toBe(DEFAULT_SETTINGS.shopName);
+    expect(branding.shopName).toBe('Escolha uma barbearia');
+    expect(branding.shopName).not.toBe('Gestao Maxima');
+  });
+
+  it('online runtime ignores localStorage tenant settings when bootstrapping app state', () => {
+    const storage = {
+      getItem: vi.fn((key: string) => {
+        if (key === 'barbearia_profile') {
+          return JSON.stringify({ ownerName: 'Leo', shopName: 'Gestao Maxima' });
+        }
+
+        if (key === 'barbearia_settings') {
+          return JSON.stringify({
+            ...DEFAULT_SETTINGS,
+            shopName: 'Gestao Maxima',
+            barbers: [{ id: 'barber-gm', name: 'Gestao Maxima Barber', barbershopId: 'shop-gm' }],
+            services: [{ id: 'service-gm', name: 'Corte GM', price: 50, durationMinutes: 30, barbershopId: 'shop-gm' }]
+          });
+        }
+
+        return null;
+      })
+    };
+
+    expect(getInitialUserProfile(storage, true)).toBeNull();
+    expect(getInitialAppSettings(storage, true)).toMatchObject({
+      shopName: 'Sua barbearia',
+      barbers: [],
+      services: []
+    });
+  });
+
+  it('owner dashboard resolves the visible shop name from the authenticated tenant instead of Gestao Maxima', () => {
+    const shopName = getResolvedDashboardShopName({
+      ownerBarbershop: {
+        id: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true
+      },
+      userProfile: {
+        ownerName: 'Leo',
+        shopName: 'Gestao Maxima',
+        email: 'leo@example.com',
+        startDate: Date.now(),
+        isPro: true,
+        planType: 'admin_life'
+      },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        shopName: 'Gestao Maxima'
+      },
+      supabaseConfigured: true
+    });
+
+    expect(shopName).toBe('leo do leo');
+    expect(shopName).not.toBe('Gestao Maxima');
   });
 
   it('/book/leo-do-leo resolves the public branding name from the explicit slug', () => {
@@ -800,7 +854,9 @@ describe('Public Booking Page Logic', () => {
 
     const publicBookingSlug = getPublicBookingSlugFromPath(`/book/${invalidSlug}`);
 
-    await barbershopRepository.getBarbershopBySlug(publicBookingSlug ?? DEFAULT_BARBERSHOP_SLUG);
+    if (publicBookingSlug) {
+      await barbershopRepository.getBarbershopBySlug(publicBookingSlug);
+    }
 
     expect(publicBookingSlug).toBe(invalidSlug);
     expect(barbershopRepository.getBarbershopBySlug).toHaveBeenCalledWith(invalidSlug);
@@ -818,7 +874,9 @@ describe('Public Booking Page Logic', () => {
 
     const publicBookingSlug = getPublicBookingSlugFromPath(`/book/${fakeSlug}`);
 
-    await barbershopRepository.getBarbershopBySlug(publicBookingSlug ?? DEFAULT_BARBERSHOP_SLUG);
+    if (publicBookingSlug) {
+      await barbershopRepository.getBarbershopBySlug(publicBookingSlug);
+    }
 
     expect(publicBookingSlug).toBe(fakeSlug);
     expect(barbershopRepository.getBarbershopBySlug).toHaveBeenCalledWith(fakeSlug);

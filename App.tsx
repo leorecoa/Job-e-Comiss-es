@@ -96,9 +96,71 @@ const getCurrentMonthString = () => {
 };
 
 const TRIAL_DAYS = 7;
+const SAFE_PUBLIC_BOOKING_SHOP_NAME = 'Escolha uma barbearia';
+const SAFE_INTERNAL_SHOP_NAME = 'Sua barbearia';
+
+export const getInitialUserProfile = (
+  storage: Pick<Storage, 'getItem'>,
+  supabaseConfigured: boolean
+): UserProfile | null => {
+  if (supabaseConfigured) {
+    return null;
+  }
+
+  try {
+    const saved = storage.getItem('barbearia_profile');
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const getInitialAppSettings = (
+  storage: Pick<Storage, 'getItem'>,
+  supabaseConfigured: boolean
+): AppSettings => {
+  if (supabaseConfigured) {
+    return normalizeSettings({
+      ...DEFAULT_SETTINGS,
+      shopName: SAFE_INTERNAL_SHOP_NAME,
+      barbers: [],
+      services: []
+    });
+  }
+
+  try {
+    const saved = storage.getItem('barbearia_settings');
+    const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    return normalizeSettings(parsed);
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+};
+
+export const getResolvedDashboardShopName = ({
+  ownerBarbershop,
+  userProfile,
+  settings,
+  supabaseConfigured
+}: {
+  ownerBarbershop: Barbershop | null;
+  userProfile: UserProfile | null;
+  settings: AppSettings;
+  supabaseConfigured: boolean;
+}): string => {
+  const ownerBarbershopName = ownerBarbershop?.name?.trim();
+  if (ownerBarbershopName) return ownerBarbershopName;
+
+  const profileShopName = userProfile?.shopName?.trim();
+  if (profileShopName) return profileShopName;
+
+  const settingsShopName = settings.shopName?.trim();
+  if (!supabaseConfigured && settingsShopName) return settingsShopName;
+
+  return supabaseConfigured ? SAFE_INTERNAL_SHOP_NAME : SAFE_PUBLIC_BOOKING_SHOP_NAME;
+};
 
 // Códigos
-const DEFAULT_PUBLIC_BARBERSHOP_SLUG = 'gestao-maxima';
 
 export const getPublicBookingSlugFromPath = (pathname: string): string | undefined => {
   if (pathname === '/book' || pathname === '/agendar') return undefined;
@@ -137,14 +199,9 @@ const App: React.FC = () => {
   }, []);
 
   // -- Auth & Profile State --
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem('barbearia_profile');
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
-  });
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => (
+    getInitialUserProfile(localStorage, isSupabaseConfigured)
+  ));
 
   // -- Data State --
   const [clients, setClients] = useState<Client[]>(() => {
@@ -186,15 +243,9 @@ const App: React.FC = () => {
     }
   });
 
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    try {
-      const saved = localStorage.getItem('barbearia_settings');
-      const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
-      return normalizeSettings(parsed); 
-    } catch (e) {
-      return DEFAULT_SETTINGS;
-    }
-  });
+  const [settings, setSettings] = useState<AppSettings>(() => (
+    getInitialAppSettings(localStorage, isSupabaseConfigured)
+  ));
 
   // -- View State --
   const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
@@ -256,7 +307,9 @@ const App: React.FC = () => {
 
   // -- Effects --
   useEffect(() => {
-    localStorage.setItem('barbearia_profile', JSON.stringify(userProfile));
+    if (!isSupabaseConfigured) {
+      localStorage.setItem('barbearia_profile', JSON.stringify(userProfile));
+    }
   }, [userProfile]);
 
   useEffect(() => {
@@ -276,7 +329,7 @@ const App: React.FC = () => {
         if (session) {
           setUserProfile(prev => ({
             ownerName: session.displayName,
-            shopName: prev?.shopName || settings.shopName || 'Gestao Maxima',
+            shopName: prev?.shopName || '',
             email: session.email,
             startDate: prev?.startDate || Date.now(),
             isPro: true,
@@ -313,7 +366,9 @@ const App: React.FC = () => {
   }, [appointments]);
 
   useEffect(() => {
-    localStorage.setItem('barbearia_settings', JSON.stringify(settings));
+    if (!isSupabaseConfigured) {
+      localStorage.setItem('barbearia_settings', JSON.stringify(settings));
+    }
   }, [settings]);
 
   useEffect(() => {
@@ -327,7 +382,10 @@ const App: React.FC = () => {
 
       const barbershopId = authSession?.barbershopId || (!isSupabaseConfigured ? 'local-barbershop' : undefined);
 
-      if (!barbershopId) return;
+      if (!barbershopId) {
+        setOwnerBarbershop(null);
+        return;
+      }
 
       setOwnerBarbershopLoading(true);
       setOwnerBarbershopError(null);
@@ -351,6 +409,24 @@ const App: React.FC = () => {
       active = false;
     };
   }, [authSession]);
+
+  useEffect(() => {
+    if (!ownerBarbershop?.name?.trim()) return;
+
+    setSettings(prev => normalizeSettings({
+      ...prev,
+      shopName: ownerBarbershop.name
+    }));
+
+    setUserProfile(prev => (
+      prev
+        ? {
+            ...prev,
+            shopName: ownerBarbershop.name
+          }
+        : prev
+    ));
+  }, [ownerBarbershop]);
 
   useEffect(() => {
     let active = true;
@@ -390,7 +466,7 @@ const App: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [authSession, isAuthLoading, isPublicBookingRoute, userProfile?.shopName]);
+  }, [authSession, isAuthLoading, isPublicBookingRoute]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || isAuthLoading || isPublicBookingRoute || !authSession) return;
@@ -417,19 +493,34 @@ const App: React.FC = () => {
       try {
         // Determine barbershopId for filtering remote data
         let currentBarbershopId: string | undefined;
+        let currentShopName: string | undefined;
         if (isPublicBookingRoute) {
-          const publicBarbershop = await getBarbershopBySlug(publicBookingSlug ?? DEFAULT_PUBLIC_BARBERSHOP_SLUG);
+          if (!publicBookingSlug) {
+            if (!active) return;
+            setAppointments([]);
+            setSettings(prev => normalizeSettings({
+              ...prev,
+              shopName: SAFE_PUBLIC_BOOKING_SHOP_NAME,
+              barbers: [],
+              services: []
+            }));
+            return;
+          }
+
+          const publicBarbershop = await getBarbershopBySlug(publicBookingSlug);
           if (!publicBarbershop) {
             if (!active) return;
             setAppointments([]);
             setSettings(prev => normalizeSettings({
               ...prev,
+              shopName: SAFE_PUBLIC_BOOKING_SHOP_NAME,
               barbers: [],
               services: []
             }));
             return;
           }
           currentBarbershopId = publicBarbershop?.id;
+          currentShopName = publicBarbershop.name;
         } else if (authSession?.barbershopId) { // For internal dashboards
           currentBarbershopId = authSession.barbershopId;
         }
@@ -444,6 +535,7 @@ const App: React.FC = () => {
         setAppointments(remoteAppointments);
         setSettings(prev => normalizeSettings({
           ...prev,
+          ...(isPublicBookingRoute ? { shopName: currentShopName || SAFE_PUBLIC_BOOKING_SHOP_NAME } : {}),
           barbers: remoteBarbers,
           services: remoteServices
         }));
@@ -509,6 +601,15 @@ const App: React.FC = () => {
     return 'TRIAL ' + trialStatus.daysLeft + 'D';
   }, [isAdmin, isVip, userProfile, trialStatus.daysLeft]);
 
+  const activeShopName = useMemo(() => (
+    getResolvedDashboardShopName({
+      ownerBarbershop,
+      userProfile,
+      settings,
+      supabaseConfigured: isSupabaseConfigured
+    })
+  ), [ownerBarbershop, settings, userProfile]);
+
   const barberFilterOptions = useMemo(() => {
     const names = new Set<string>();
     (settings.barbers || []).forEach(barber => { // settings.barbers is now BarberOption[]
@@ -536,9 +637,8 @@ const App: React.FC = () => {
     clients.forEach(client => {
       if (client.barberName?.trim()) names.add(client.barberName.trim());
     });
-    if (userProfile?.ownerName?.trim()) names.add(userProfile.ownerName.trim()); // Add owner name if it's not already there
     return Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  }, [settings.barbers, appointments, clients, userProfile?.ownerName]);
+  }, [settings.barbers, appointments, clients]);
 
   const chartClients = useMemo(() => {
     if (selectedBarberFilter === 'TODOS') return clients;
@@ -633,7 +733,7 @@ const App: React.FC = () => {
     setAuthSession(session);
     setUserProfile(prev => ({
       ownerName: session.displayName,
-      shopName: prev?.shopName || settings.shopName || 'Gestao Maxima',
+      shopName: prev?.shopName || '',
       email: session.email,
       startDate: prev?.startDate || Date.now(), // Preserve existing startDate if available
       isPro: true,
@@ -1220,7 +1320,7 @@ const App: React.FC = () => {
 
         const { generateReportPDF } = await import('./services/pdfService');
         generateReportPDF(
-            settings.shopName,
+            activeShopName,
             displayLabel,
             rangeStats,
             rangeClients,
@@ -1237,7 +1337,7 @@ const App: React.FC = () => {
     try {
       const { generateReportPDF } = await import('./services/pdfService');
       generateReportPDF(
-        settings.shopName,
+        activeShopName,
         selectedDate,
         stats,
         filteredClients,
@@ -1403,7 +1503,7 @@ const App: React.FC = () => {
                     </svg>
                  </div>
                  <div>
-                    <h1 className="text-white font-bold">{settings.shopName}</h1>
+                    <h1 className="text-white font-bold">{activeShopName}</h1>
                     <span className={`text-[10px] uppercase font-bold ${
                       isAdmin ? 'text-red-400' :
                       isVip ? 'text-gold-500' :
