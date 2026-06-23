@@ -152,7 +152,9 @@ describe('public booking tenant isolation repositories', () => {
   });
 
   it('creates the appointment with the current barbershop_id after validating barber and service tenant ownership', async () => {
-    const insert = vi.fn().mockResolvedValue({ error: null });
+    const insertSelect = vi.fn();
+    const insertSingle = vi.fn();
+    const insert = vi.fn().mockResolvedValue({ error: null, select: insertSelect, single: insertSingle });
 
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'barbers') {
@@ -195,7 +197,11 @@ describe('public booking tenant isolation repositories', () => {
       status: 'scheduled',
       notes: null,
       financial_record_id: null
+    }, {
+      defaultToNull: true
     });
+    expect(insertSelect).not.toHaveBeenCalled();
+    expect(insertSingle).not.toHaveBeenCalled();
     expect(created.barbershopId).toBe('shop-leo');
   });
 

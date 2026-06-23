@@ -271,9 +271,10 @@ export const createAppointment = async ( // This function is used by both intern
 
   await assertAppointmentTenantIntegrity(appointment);
 
+  // Public booking must insert without requesting RETURNING rows, so anon does not need SELECT on appointments.
   const { error } = await supabase
     .from('appointments')
-    .insert(mapAppointmentToDb(appointment));
+    .insert(mapAppointmentToDb(appointment), { defaultToNull: true });
 
   if (error) {
     console.error('Failed to create appointment', error);
