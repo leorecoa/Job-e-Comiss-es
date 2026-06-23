@@ -8,7 +8,7 @@ import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
 import { Appointment, DEFAULT_SETTINGS } from './types';
 import { getPublicBookingSlugFromPath } from './App';
-import { getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingScopedSettings, getPublicBookingSteps, getPublicBookingSummary } from './components/PublicBookingPage';
+import { buildPublicBookingInput, getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingScopedSettings, getPublicBookingSteps, getPublicBookingSummary, normalizePublicBarberOptions } from './components/PublicBookingPage';
 import {
   BarbershopBrandingSettings,
   canManageBarbershopBranding,
@@ -379,6 +379,150 @@ describe('Public Booking Page Logic', () => {
     expect(scopedSettings.barbers).toEqual([]);
     expect(scopedSettings.services).toEqual([]);
     expect(scopedSettings.shopName).toBe('Leo do Leo');
+  });
+
+  it('/book/leo-do-leo creates the public appointment payload with the selected tenant entities', () => {
+    const payload = buildPublicBookingInput({
+      barbershop: {
+        id: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true
+      },
+      selectedBarber: {
+        value: 'id:6a1c35f2-deec-4528-82dc-10dccb601e56',
+        id: '6a1c35f2-deec-4528-82dc-10dccb601e56',
+        name: 'test',
+        barbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce'
+      },
+      selectedService: {
+        id: '8b8a04ef-fd1d-40c9-98e1-c052345cf4b8',
+        name: 'corte',
+        price: 60,
+        durationMinutes: 30,
+        barbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce'
+      },
+      selectedSlot: {
+        startAt: '2026-06-23T12:00:00.000Z',
+        endAt: '2026-06-23T12:30:00.000Z',
+        label: '12:00',
+        available: true
+      },
+      clientName: 'pedro',
+      clientPhone: '81987324097'
+    });
+
+    expect(payload).toMatchObject({
+      barbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce',
+      barberId: '6a1c35f2-deec-4528-82dc-10dccb601e56',
+      barberName: 'test'
+    });
+    expect(payload.barberName).not.toBe('Barbearia Teste SaaS');
+    expect(payload.service?.id).toBe('8b8a04ef-fd1d-40c9-98e1-c052345cf4b8');
+    expect(payload.service?.name).toBe('corte');
+  });
+
+  it('public booking ignores plain string barber fallbacks and keeps the real selected barber name', () => {
+    const options = normalizePublicBarberOptions([
+      'Barbearia Teste SaaS',
+      {
+        id: '6a1c35f2-deec-4528-82dc-10dccb601e56',
+        name: 'test',
+        barbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce'
+      }
+    ]);
+
+    expect(options).toEqual([
+      {
+        value: 'id:6a1c35f2-deec-4528-82dc-10dccb601e56',
+        id: '6a1c35f2-deec-4528-82dc-10dccb601e56',
+        name: 'test',
+        barbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce'
+      }
+    ]);
+    expect(options.some((barber) => barber.name === 'Barbearia Teste SaaS')).toBe(false);
+  });
+
+  it('blocks public booking payload creation when barbershop_id is missing', () => {
+    expect(() => buildPublicBookingInput({
+      barbershop: null,
+      selectedBarber: {
+        value: 'id:6a1c35f2-deec-4528-82dc-10dccb601e56',
+        id: '6a1c35f2-deec-4528-82dc-10dccb601e56',
+        name: 'test'
+      },
+      selectedService: {
+        id: '8b8a04ef-fd1d-40c9-98e1-c052345cf4b8',
+        name: 'corte',
+        price: 60,
+        durationMinutes: 30
+      },
+      selectedSlot: {
+        startAt: '2026-06-23T12:00:00.000Z',
+        endAt: '2026-06-23T12:30:00.000Z',
+        label: '12:00',
+        available: true
+      },
+      clientName: 'pedro',
+      clientPhone: '81987324097'
+    })).toThrow('Barbearia nao encontrada ou indisponivel.');
+  });
+
+  it('blocks public booking payload creation when barber_id is missing', () => {
+    expect(() => buildPublicBookingInput({
+      barbershop: {
+        id: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true
+      },
+      selectedBarber: null,
+      selectedService: {
+        id: '8b8a04ef-fd1d-40c9-98e1-c052345cf4b8',
+        name: 'corte',
+        price: 60,
+        durationMinutes: 30
+      },
+      selectedSlot: {
+        startAt: '2026-06-23T12:00:00.000Z',
+        endAt: '2026-06-23T12:30:00.000Z',
+        label: '12:00',
+        available: true
+      },
+      clientName: 'pedro',
+      clientPhone: '81987324097'
+    })).toThrow('Selecione um barbeiro.');
+  });
+
+  it('blocks public booking payload creation when service_id is missing', () => {
+    expect(() => buildPublicBookingInput({
+      barbershop: {
+        id: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true
+      },
+      selectedBarber: {
+        value: 'id:6a1c35f2-deec-4528-82dc-10dccb601e56',
+        id: '6a1c35f2-deec-4528-82dc-10dccb601e56',
+        name: 'test',
+        barbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce'
+      },
+      selectedService: {
+        id: '',
+        name: 'corte',
+        price: 60,
+        durationMinutes: 30
+      },
+      selectedSlot: {
+        startAt: '2026-06-23T12:00:00.000Z',
+        endAt: '2026-06-23T12:30:00.000Z',
+        label: '12:00',
+        available: true
+      },
+      clientName: 'pedro',
+      clientPhone: '81987324097'
+    })).toThrow('Selecione um servico.');
   });
 
   it('public booking landing content renders a headline with barbershop name', () => {
