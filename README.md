@@ -1,549 +1,472 @@
 # Job e Comissões
 
-Gestão para barbearias com agenda online, booking público, controle de atendimentos, comissões, relatórios financeiros e persistência com Supabase.
+Sistema SaaS para barbearias controlarem agendamentos, comissões, serviços, barbeiros, relatórios financeiros e booking público por barbearia.
 
-O projeto começou como uma aplicação local para controle diário de barbearia e evoluiu para um MVP SaaS com painel interno, autenticação, papéis de acesso e isolamento multi-tenant por barbearia.
+O projeto nasceu como uma ferramenta de controle financeiro para barbearias e evoluiu para uma aplicação multi-tenant com Supabase, autenticação, roles, RLS, booking público e operação por barbearia.
 
-[![CI](https://github.com/leorecoa/Job-e-Comiss-es/actions/workflows/ci.yml/badge.svg)](https://github.com/leorecoa/Job-e-Comiss-es/actions/workflows/ci.yml)
-![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=111827)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-React_Build-646CFF?style=for-the-badge&logo=vite&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-Auth_Postgres-3FCF8E?style=for-the-badge&logo=supabase&logoColor=111827)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-RLS_Tenant_Aware-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
-![Vitest](https://img.shields.io/badge/Vitest-Tested-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+<p align="left">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=111827" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" />
+  <img src="https://img.shields.io/badge/TailwindCSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
+  <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=111827" />
+  <img src="https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" />
+</p>
+
+---
 
 ## Visão geral
 
-Job e Comissões é uma aplicação web para pequenas barbearias que precisam centralizar:
+O **Job e Comissões** é uma aplicação web para gestão operacional de barbearias.
 
-- agendamento público de clientes;
-- agenda interna por barbeiro;
-- controle de atendimentos;
-- cálculo de comissões;
-- registro de vales e retiradas;
-- relatórios em PDF e CSV;
-- persistência online com Supabase;
-- fallback local para desenvolvimento e demonstração;
-- isolamento de dados por barbearia.
+A plataforma permite registrar atendimentos, calcular comissões, controlar vales, acompanhar vendas de produtos, organizar agenda interna e disponibilizar um booking público para clientes agendarem horários.
 
-O projeto roda como uma SPA em React, TypeScript e Vite. A camada de dados usa Supabase quando as variáveis de ambiente estão configuradas e mantém fallback em "localStorage" para fluxo local.
+Além do uso operacional diário, o projeto também explora conceitos importantes de produto SaaS, como autenticação, papéis de usuário, isolamento por barbearia, políticas RLS, rotas públicas por slug e configuração visual da barbearia.
 
-Estado atual do projeto
+---
 
-O projeto está em fase de MVP comercial técnico.
+## Problema que resolve
 
-Já existe uma base funcional para demonstrar:
+Barbearias pequenas e médias costumam controlar agenda, comissões e fechamento financeiro por planilhas, cadernos ou mensagens de WhatsApp.
 
-- booking público;
-- agenda interna;
-- fluxo financeiro;
-- comissões;
-- Supabase Auth;
-- persistência em banco;
-- isolamento por barbearia;
-- regras iniciais de segurança com RLS;
-- validações automatizadas.
+Esse fluxo gera problemas como:
 
-Ainda não é tratado como SaaS comercial final. Os próximos passos envolvem refinamento de produto, testes e2e, limpeza de dados de demonstração, melhorias no dashboard multi-barbearia e preparação para uso real por múltiplas barbearias.
+- perda de histórico financeiro;
+- cálculo manual de comissão;
+- dificuldade para conferir atendimentos por barbeiro;
+- falta de visão diária, semanal ou mensal;
+- risco de agendamento duplicado;
+- pouca organização entre serviços, profissionais e clientes;
+- ausência de uma página pública simples para agendamento.
 
-Funcionalidades atuais
+O Job e Comissões centraliza esse processo em uma aplicação web com foco em clareza operacional, segurança dos dados e evolução para uso comercial.
 
-Agenda e booking público
+---
 
-- Tela pública de agendamento em "/book" e "/agendar".
-- Suporte a booking por slug de barbearia, como "/book/gestao-maxima".
-- Seleção de barbeiro, serviço, data e horário disponível.
-- Criação de agendamento público com vínculo obrigatório a:
-  - "barbershop_id"
-  - "barber_id"
-  - "service_id"
-- Validação para impedir que barbeiro e serviço de barbearias diferentes sejam usados no mesmo agendamento.
-- Bloqueio de slug inválido.
-- Booking público preservado sem expor dados internos sensíveis.
-- Link manual para WhatsApp via "wa.me".
+## Funcionalidades principais
 
-Painel interno
+- Cadastro e controle de atendimentos.
+- Cálculo de comissão por serviço.
+- Registro de vendas de produtos.
+- Controle de vales/adiantamentos.
+- Dashboard financeiro.
+- Agenda interna por barbeiro.
+- Status de agendamento.
+- Booking público para clientes.
+- Gestão de barbeiros.
+- Gestão de serviços.
+- Gestão de horários comerciais.
+- Configuração de identidade visual da barbearia.
+- Exportação de relatórios.
+- Backup e restauração para ambiente de demonstração/desenvolvimento.
+- Autenticação com Supabase Auth.
+- Controle de acesso por roles.
+- Isolamento multi-tenant por barbearia.
+- Policies RLS para proteção dos dados.
 
-- Agenda diária por barbeiro.
-- Visualização de agendamentos por data e profissional.
-- Status de agendamento:
-  - agendado;
-  - confirmado;
-  - concluído;
-  - cancelado;
-  - não compareceu.
-- Conclusão de agendamento com geração de lançamento financeiro.
-- Rastreabilidade entre agendamento e registro financeiro.
-- Prevenção de duplicidade ao concluir o mesmo agendamento mais de uma vez.
+---
 
-Financeiro e comissões
+## Estado atual do produto
 
-- Cadastro de atendimentos.
-- Serviços, produtos adicionais e observações.
-- Cálculo de comissão sobre serviços e adicionais.
-- Preservação histórica de comissões já salvas.
-- Registro de vales e retiradas por profissional.
-- Dashboard diário e mensal.
-- Exportação de relatórios em PDF e CSV.
-- Backup e restauração de dados locais.
-
-Supabase, autenticação e multi-tenant
-
-- Persistência online com Supabase.
-- Fallback automático para "localStorage" quando Supabase não está configurado.
+- Controle financeiro de atendimentos, produtos, vales e comissões.
+- Agenda interna com status de agendamento.
+- Booking público por rota `/book`, `/agendar` e slug da barbearia.
+- Persistência via Supabase com fallback local para desenvolvimento.
 - Supabase Auth para painel interno.
-- Papéis iniciais:
-  - "owner"
-  - "barber"
-- Modelo tenant-aware por "barbershop_id".
-- RLS aplicado para isolamento entre barbearias.
-- Owner limitado aos dados da própria barbearia.
-- Barber limitado à própria barbearia e ao próprio vínculo de barbeiro.
-- View pública para disponibilidade de horários sem exposição de dados sensíveis.
+- Roles `owner` e `barber`.
+- Isolamento multi-tenant por `barbershop_id`.
+- Policies RLS aplicadas para reduzir risco de vazamento entre barbearias.
+- Gestão de catálogo, barbeiros, serviços, horários comerciais e branding.
+
+Sem variáveis Supabase configuradas, o app usa `localStorage` como fallback de desenvolvimento e demonstração. Em ambiente configurado, os fluxos principais usam Supabase.
+
+---
+
+## Demonstração
+
+Deploy:
+
+```txt
+https://job-e-comiss-es.vercel.app
+
+Rotas principais:
+
+/              Página inicial / painel conforme contexto da aplicação
+/book          Booking público
+/agendar       Booking público alternativo
+/login         Autenticação
+/dashboard     Painel interno
+
+Exemplo de fluxo público:
+
+Cliente acessa o link da barbearia
+→ escolhe serviço
+→ escolhe barbeiro
+→ seleciona horário disponível
+→ informa nome e telefone
+→ confirma o agendamento
+
+Exemplo de fluxo interno:
+
+Owner ou barber acessa o painel
+→ visualiza agenda
+→ acompanha atendimentos
+→ altera status
+→ registra conclusão
+→ acompanha impacto financeiro e comissões
+
+---
+
+Arquitetura
+
+A aplicação é organizada em camadas para separar interface, regras de negócio, persistência e integrações.
+
+Frontend React
+├── Páginas públicas
+│   └── Booking / agendamento público
+│
+├── Painel interno
+│   ├── Dashboard
+│   ├── Agenda
+│   ├── Serviços
+│   ├── Barbeiros
+│   ├── Configurações
+│   └── Relatórios
+│
+├── Camada de domínio
+│   ├── Atendimentos
+│   ├── Agendamentos
+│   ├── Comissões
+│   ├── Produtos
+│   ├── Vales
+│   └── Barbearias
+│
+├── Repositórios
+│   ├── Supabase
+│   └── Fallback local
+│
+└── Infraestrutura
+    ├── Supabase Auth
+    ├── Supabase Database
+    ├── Supabase RLS
+    └── Vercel
+
+Principais decisões arquiteturais:
+
+- React + TypeScript para interface e regras client-side.
+- Supabase como backend gerenciado.
+- Repositories para separar acesso a dados da interface.
+- Fallback local para desenvolvimento e demonstração.
+- RLS para reforçar isolamento entre barbearias.
+- Rotas públicas separadas do painel autenticado.
+- Estrutura preparada para evolução SaaS.
+
+---
 
 Stack
 
+Frontend
+
 - React 19
 - TypeScript
 - Vite
-- Tailwind CSS
+- TailwindCSS
 - Framer Motion
-- Supabase Auth
-- Supabase Postgres
-- Row Level Security
-- Vitest
+- React Router
 - jsPDF
-- jspdf-autotable
-- lucide-react
 
-Estrutura principal
+Backend as a Service
 
-.
-├── App.tsx
-├── components/
-├── services/
-├── lib/
-├── docs/
-├── scripts/
-├── public/
-├── scheduling.ts
-├── types.ts
-├── utils.ts
-├── package.json
-└── README.md
-
-Requisitos
-
-- Node.js 22 ou superior
-- npm 10 ou superior
-- Git
-
-Como rodar localmente
-
-npm install
-npm run dev
-
-A aplicação abre por padrão em:
-
-http://localhost:3000
-
-Configuração com Supabase
-
-Copie o arquivo de exemplo:
-
-cp .env.example .env
-
-Preencha as variáveis:
-
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-
-Depois rode:
-
-npm run dev
-
-Quando "VITE_SUPABASE_URL" e "VITE_SUPABASE_ANON_KEY" não estão configuradas, o app usa "localStorage".
-
-Quando as variáveis do Supabase estão configuradas, o app usa a camada de repositories com Supabase para carregar e persistir barbearias, barbeiros, serviços e agendamentos.
-
-Scripts
-
-Comando| Descrição
-"npm run dev"| Inicia o Vite em modo desenvolvimento
-"npm run test"| Executa testes com Vitest
-"npm run typecheck"| Valida TypeScript com "tsc --noEmit"
-"npm run build"| Gera build de produção
-"npm run check"| Executa testes, typecheck e build
-"npm run validate"| Executa validação via script
-"npm run preview"| Serve o build localmente
-
-Validação
-
-Antes de abrir uma PR:
-
-npm run check
-
-Esse comando executa:
-
-- testes automatizados;
-- validação TypeScript;
-- build de produção.
-
-Para auditoria de dependências:
-
-npm audit --audit-level=moderate
-
-Segurança
-
-O projeto evoluiu de um modelo local para uma arquitetura com isolamento multi-tenant.
-
-Pontos implementados:
-
-- policies RLS tenant-aware;
-- "barbershop_id" obrigatório em entidades principais;
-- validação de vínculo entre barbearia, barbeiro e serviço;
-- acesso de owner limitado à própria barbearia;
-- acesso de barber limitado à própria barbearia e ao próprio barbeiro;
-- booking público sem exposição de dados internos sensíveis;
-- fallback local separado do fluxo Supabase.
-
-Pontos ainda recomendados antes de uso comercial amplo:
-
-- testes e2e com navegador real;
-- revisão final das policies em ambiente de produção;
-- remoção ou isolamento definitivo de dados fake;
-- monitoramento de erros;
-- revisão de onboarding para novas barbearias;
-- melhoria do fluxo multi-barbearia no painel administrativo.
-
-Screenshots
-
-As capturas oficiais do projeto devem ficar em:
-
-docs/screenshots
-
-Checklist recomendado:
-
-- dashboard diário com resumo financeiro;
-- tela pública de agendamento;
-- seleção de barbeiro, serviço e horário;
-- agenda interna por barbeiro;
-- modal de novo atendimento;
-- resumo mensal por barbeiro;
-- exportação de relatório;
-- configurações e backup.
-
-Mantenha screenshots sem dados reais de clientes.
-
-Troubleshooting
-
-Problema| Solução
-"vite" não reconhecido| Rode "npm install" novamente
-Porta "3000" ocupada| Encerre o processo usando a porta ou ajuste "server.port" em "vite.config.ts"
-Build falha após atualizar dependências| Remova "node_modules", rode "npm install" e execute "npm run check"
-Relatórios PDF não baixam| Verifique bloqueio de pop-up/download do navegador
-Supabase não carrega dados| Confira "VITE_SUPABASE_URL" e "VITE_SUPABASE_ANON_KEY"
-App caiu para dados locais| Verifique se as variáveis do Supabase estão configuradas corretamente
-
-Roadmap
-
-Curto prazo
-
-- Capturar screenshots oficiais com dados fictícios.
-- Criar ambiente de demonstração mais limpo.
-- Melhorar mensagens de erro no booking público.
-- Criar testes e2e reais para o fluxo público.
-- Avaliar otimização de bundle e PDF.
-
-Médio prazo
-
-- Dashboard multi-barbearia mais avançado.
-- Fluxo comercial para cadastro de novas barbearias.
-- Configuração visual por barbearia.
-- Histórico de pagamentos e status de comissão.
-- Fechamento mensal por barbeiro.
-- Lembretes automáticos para agendamentos.
-
-Longo prazo
-
-- Integração com pagamentos.
-- Controle de estoque.
-- Painel administrativo SaaS.
-- Monitoramento em produção.
-- Domínio próprio e operação comercial.
+- Supabase Auth
+- Supabase Database
+- Supabase Row Level Security
+- Supabase Storage, quando aplicável para branding/imagens
 
 Qualidade
 
-- CI com GitHub Actions.
-- Testes para regras financeiras, persistência, agenda e autenticação.
-- Build de produção validado.
-- Auditoria de dependências via npm audit.
-- Documentação complementar em "docs/".
-- Histórico de versões em "CHANGELOG.md".
+- Vitest
+- Testing Library
+- TypeScript typecheck
+- ESLint
+- Build validation
+- GitHub Actions
 
-Contribuindo
+Deploy
 
-Leia o guia de contribuição antes de abrir uma issue ou pull request:
+- Vercel
 
-CONTRIBUTING.md
+---
+
+Segurança e multi-tenant
+
+O projeto utiliza Supabase com políticas de segurança em nível de linha para reduzir o risco de acesso indevido entre barbearias.
+
+Modelo principal de isolamento:
+
+barbershops
+├── services
+├── barbers
+├── appointments
+├── profiles
+└── financial records
+
+Cada registro operacional relevante é associado a uma barbearia por meio de "barbershop_id".
+
+Estratégia de acesso:
+
+- "owner": acessa e gerencia dados da própria barbearia.
+- "barber": acessa dados relacionados à própria barbearia e ao próprio escopo operacional.
+- público: acessa apenas informações necessárias para booking público.
+- cliente público: consegue criar agendamento sem acessar dados internos da barbearia.
+
+Pontos de segurança trabalhados:
+
+- isolamento por "barbershop_id";
+- uso de policies RLS;
+- separação entre rotas públicas e painel interno;
+- redução de exposição de dados sensíveis no booking público;
+- validação de payloads de agendamento;
+- controle de status dos agendamentos;
+- preservação do vínculo financeiro após conclusão de atendimento.
+
+---
+
+Booking público
+
+O booking público permite que clientes agendem horários sem precisar acessar o painel interno.
+
+Fluxo esperado:
+
+Acessar link público
+→ selecionar serviço
+→ selecionar barbeiro
+→ escolher horário
+→ informar dados básicos
+→ confirmar agendamento
+
+Recursos do booking:
+
+- rota pública "/book";
+- rota alternativa "/agendar";
+- suporte a slug da barbearia;
+- listagem de serviços ativos;
+- listagem de barbeiros ativos;
+- horários disponíveis conforme configuração operacional;
+- criação de agendamento com status inicial;
+- integração com dados da barbearia;
+- preservação do isolamento multi-tenant.
+
+O booking público foi pensado para funcionar como porta de entrada comercial da barbearia, reduzindo dependência de mensagens manuais e melhorando a organização da agenda.
+
+---
+
+Painel interno
+
+O painel interno concentra a operação da barbearia.
+
+Áreas principais:
+
+- Dashboard financeiro.
+- Agenda por barbeiro.
+- Gestão de atendimentos.
+- Gestão de comissões.
+- Gestão de produtos.
+- Gestão de vales.
+- Gestão de barbeiros.
+- Gestão de serviços.
+- Configuração de horários comerciais.
+- Configuração de branding.
+- Relatórios e exportações.
+
+O painel foi desenvolvido para apoiar o uso diário da barbearia, com foco em velocidade, clareza e controle financeiro.
+
+---
+
+Como rodar localmente
+
+Clone o repositório:
+
+git clone https://github.com/leorecoa/Job-e-Comiss-es.git
+cd Job-e-Comiss-es
+
+Instale as dependências:
+
+npm install
+
+Crie o arquivo de ambiente:
+
+cp .env.example .env
+
+Execute o projeto em desenvolvimento:
+
+npm run dev
+
+Acesse no navegador:
+
+http://localhost:5173
+
+Execute as verificações principais:
+
+npm run check
+
+Ou rode separadamente:
+
+npm run test
+npm run typecheck
+npm run build
+
+---
+
+Configuração Supabase
+
+Para usar Supabase, configure as variáveis no ".env":
+
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+
+A aplicação usa essas variáveis para conectar aos fluxos persistidos em Supabase.
+
+Sem variáveis Supabase configuradas, o app usa "localStorage" como fallback de desenvolvimento e demonstração. Em ambiente configurado, os fluxos principais usam Supabase.
+
+Estrutura esperada
+
+A estrutura de banco inclui entidades como:
+
+- "barbershops"
+- "profiles"
+- "barbers"
+- "services"
+- "appointments"
+- registros financeiros relacionados à operação
+
+Segurança
+
+Ao configurar Supabase, revise e aplique as policies RLS documentadas no projeto.
+
+A configuração correta de RLS é essencial para:
+
+- impedir vazamento de dados entre barbearias;
+- limitar acesso por role;
+- permitir booking público apenas com dados necessários;
+- proteger dados internos do painel administrativo.
+
+---
+
+Testes e qualidade
+
+O projeto possui validações automatizadas para reduzir regressões em regras de negócio e fluxos principais.
+
+Comando principal:
+
+npm run check
+
+Esse comando deve validar:
+
+- testes;
+- typecheck;
+- build de produção.
+
+Comandos individuais:
+
+npm run test
+npm run typecheck
+npm run build
+
+Áreas importantes cobertas ou esperadas nos testes:
+
+- cálculo de comissão;
+- controle de vales;
+- registros financeiros;
+- criação de agendamentos;
+- conflitos de horário;
+- mapeamento entre app e Supabase;
+- regras de status;
+- isolamento de dados;
+- fluxos públicos e internos.
+
+---
+
+Roadmap
+
+Concluído ou em evolução avançada
+
+- Controle financeiro de atendimentos.
+- Gestão de comissões.
+- Controle de produtos.
+- Controle de vales.
+- Dashboard operacional.
+- Agenda interna.
+- Booking público.
+- Supabase Auth.
+- Persistência via Supabase.
+- Roles "owner" e "barber".
+- Isolamento por "barbershop_id".
+- Policies RLS.
+- Branding por barbearia.
+- Gestão de serviços.
+- Gestão de barbeiros.
+- Gestão de horários comerciais.
+
+Próximos passos
+
+- Refinar UX do booking público.
+- Melhorar visual das páginas públicas por barbearia.
+- Expandir relatórios gerenciais.
+- Adicionar filtros avançados por período, barbeiro e serviço.
+- Melhorar onboarding do owner.
+- Adicionar métricas de receita, ticket médio e recorrência.
+- Preparar fluxo de assinatura/plano.
+- Criar painel de administração SaaS.
+- Melhorar cobertura de testes end-to-end.
+- Documentar melhor setup Supabase em produção.
+- Criar seed/demo oficial para avaliação do projeto.
+
+---
+
+Screenshots
+
+Adicione aqui imagens reais do produto.
+
+Sugestão de organização:
+
+### Dashboard
+
+![Dashboard](./docs/screenshots/dashboard.png)
+
+### Agenda
+
+![Agenda](./docs/screenshots/agenda.png)
+
+### Booking público
+
+![Booking público](./docs/screenshots/booking.png)
+
+### Gestão de serviços
+
+![Serviços](./docs/screenshots/services.png)
+
+### Branding da barbearia
+
+![Branding](./docs/screenshots/branding.png)
+
+Caso as imagens estejam em outro caminho, ajuste os links conforme a estrutura do repositório.
+
+---
 
 Licença
 
-MIT  - `barbershop_id`
-  - `barber_id`
-  - `service_id`
-- Validação para impedir que barbeiro e serviço de barbearias diferentes sejam usados no mesmo agendamento.
-- Link manual para WhatsApp via `wa.me`.
+Este projeto está disponível sob os termos definidos no arquivo de licença do repositório.
 
-### Painel interno
+Consulte:
 
-- Agenda diária por barbeiro.
-- Status de agendamento:
-  - agendado;
-  - confirmado;
-  - concluído;
-  - cancelado;
-  - não compareceu.
-- Conclusão de agendamento com geração de lançamento financeiro.
-- Rastreabilidade entre agendamento e registro financeiro.
-- Prevenção de duplicidade ao concluir o mesmo agendamento mais de uma vez.
+LICENSE
 
-### Financeiro e comissões
+---
 
-- Cadastro de atendimentos.
-- Serviços, produtos adicionais e observações.
-- Cálculo de comissão sobre serviços e adicionais.
-- Preservação histórica de comissões já salvas.
-- Registro de vales e retiradas por profissional.
-- Dashboard diário e mensal.
-- Exportação de relatórios em PDF e CSV.
-- Backup e restauração de dados locais.
+Autor
 
-### Supabase, autenticação e multi-tenant
+Desenvolvido por Leandro Jessé.
 
-- Persistência online com Supabase.
-- Fallback automático para `localStorage` quando Supabase não está configurado.
-- Supabase Auth para painel interno.
-- Papéis iniciais:
-  - `owner`
-  - `barber`
-- Modelo tenant-aware por `barbershop_id`.
-- RLS aplicado para isolamento entre barbearias.
-- Owner limitado aos dados da própria barbearia.
-- Barber limitado à própria barbearia e ao próprio vínculo de barbeiro.
-- Booking público preservado sem expor dados sensíveis.
-- Bloqueio de slug inválido.
+GitHub:
 
-## Estado atual do projeto
-
-O projeto está em fase de MVP comercial técnico.
-
-Já existe uma base funcional para demonstrar:
-
-- agendamento público;
-- agenda interna;
-- fluxo financeiro;
-- Supabase Auth;
-- persistência em banco;
-- isolamento por barbearia;
-- regras iniciais de segurança com RLS;
-- validações automatizadas.
-
-Ainda não é tratado como SaaS comercial final. Os próximos passos envolvem refinamento de produto, testes e2e, limpeza de dados de demonstração, melhorias no dashboard multi-barbearia e preparação para uso real por múltiplas barbearias.
-
-## Stack
-
-- React 19
-- TypeScript
-- Vite
-- Tailwind CSS
-- Framer Motion
-- Supabase Auth
-- Supabase Postgres
-- Row Level Security
-- Vitest
-- jsPDF
-- jspdf-autotable
-- lucide-react
-
-## Estrutura principal
-
-```txt
-.
-├── App.tsx
-├── components/
-├── services/
-├── lib/
-├── docs/
-├── scripts/
-├── public/
-├── scheduling.ts
-├── types.ts
-├── utils.ts
-├── package.json
-└── README.md
-.
-├── App.tsx
-├── components/
-├── services/
-├── lib/
-├── docs/
-├── scripts/
-├── public/
-├── scheduling.ts
-├── types.ts
-├── utils.ts
-├── package.json
-└── README.md
-
-
-Para configurar:
-
-1. Crie um projeto no Supabase.
-2. Rode o SQL em [`docs/supabase-schema.sql`](docs/supabase-schema.sql).
-3. Copie `.env.example` para `.env`.
-4. Preencha:
-
-```env
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-Para configurar:
-
-1. Crie um projeto no Supabase.
-2. Rode o SQL em [`docs/supabase-schema.sql`](docs/supabase-schema.sql).
-3. Copie `.env.example` para `.env`.
-4. Preencha:
-
-```env
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-```
-
-5. Rode:
-
-```bash
-npm install
-npm run dev
-```
-
-Se `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` nao estiverem configuradas, o app usa `localStorage`, preservando o fluxo local de desenvolvimento.
-
-Com Supabase configurado, a agenda interna e o booking publico passam pela camada de repositories para carregar/criar/atualizar appointments. Barbeiros e servicos ativos tambem podem ser carregados das tabelas `barbers` e `services`.
-
-### Supabase Auth
-
-Quando Supabase esta configurado, o painel interno exige login com email e senha via Supabase Auth. A tela publica `/book` continua aberta para clientes sem login.
-
-Roles iniciais:
-
-- `owner`: acesso ao painel interno como dono.
-- `barber`: acesso ao painel interno como barbeiro.
-
-Nesta etapa, a role principal e lida da tabela `profiles`; `user_metadata.role` fica apenas como fallback durante a transicao. Sem env vars do Supabase, o app continua usando o login local/trial existente.
-
-Limitacoes atuais de seguranca/RLS:
-
-- O schema inclui uma view publica de slots ocupados sem dados pessoais.
-- O schema inclui policies iniciais para `profiles`, `barbers`, `services` e `appointments`.
-- Para producao, o proximo passo e isolamento por barbearia/tenant e hardening completo das policies.
-
-Proximos passos: auth real, roles, link publico por barbearia, multi-tenant e hardening de RLS.
-
-## Screenshots
-
-As capturas oficiais do projeto devem ficar em [`docs/screenshots`](docs/screenshots).
-
-Checklist recomendado:
-
-- Dashboard diario com resumo financeiro.
-- Modal de novo atendimento.
-- Resumo mensal por barbeiro.
-- Exportacao de relatorio.
-- Configuracoes e backup.
-
-> Dica: mantenha screenshots sem dados reais de clientes.
-
-## Stack
-
-- React 19
-- TypeScript
-- Vite
-- Vitest
-- jsPDF + jspdf-autotable
-- lucide-react
-
-## Requisitos
-
-- Node.js 22 ou superior.
-- npm 10 ou superior.
-- Git instalado para clonar o repositorio.
-
-## Como Rodar Localmente
-
-```bash
-npm install
-npm run dev
-```
-
-A aplicacao abre por padrao em `http://localhost:3000`.
-
-## Fluxo Recomendado
-
-1. Instale as dependencias com `npm install`.
-2. Inicie o ambiente local com `npm run dev`.
-3. Faca a alteracao em uma branch pequena.
-4. Rode `npm run check` antes de abrir o pull request.
-5. Confira se o CI passou no GitHub.
-
-## Verificacao
-
-```bash
-npm run check
-```
-
-Esse comando executa:
-
-- `npm run test`
-- `npm run typecheck`
-- `npm run build`
-
-## Troubleshooting
-
-| Problema | Solucao |
-| --- | --- |
-| `vite` nao reconhecido | Rode `npm install` novamente |
-| Porta `3000` ocupada | Encerre o processo usando a porta ou ajuste `server.port` em `vite.config.ts` |
-| Build falha apos atualizar dependencias | Remova `node_modules`, rode `npm install` e execute `npm run check` |
-| Relatorios PDF nao baixam | Verifique bloqueio de pop-up/download do navegador |
-
-## Scripts
-
-| Comando | Descricao |
-| --- | --- |
-| `npm run dev` | Inicia o Vite em modo desenvolvimento |
-| `npm run test` | Executa testes unitarios com Vitest |
-| `npm run typecheck` | Valida TypeScript com `tsc --noEmit` |
-| `npm run build` | Gera build de producao |
-| `npm run check` | Roda o gate completo de verificacao |
-| `npm run preview` | Serve o build localmente |
-
-## Qualidade e Seguranca
-
-- CI configurado com GitHub Actions.
-- Testes cobrindo regras de comissao, datas locais e CSV.
-- Dependencias auditadas com `npm audit`.
-- Gerador de PDF carregado sob demanda para reduzir o bundle inicial.
-- Historico de versoes em [CHANGELOG.md](CHANGELOG.md).
-- Guia operacional de [backup e restauracao](docs/BACKUP_RESTORE.md).
-
-## Contribuindo
-
-Leia o [guia de contribuicao](CONTRIBUTING.md) antes de abrir uma issue ou pull request.
-
-## Roadmap
-
-Veja o [roadmap do produto](docs/ROADMAP.md) para proximas melhorias e prioridades.
-
-## Licenca
-
-MIT
+https://github.com/leorecoa
