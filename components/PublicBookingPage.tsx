@@ -22,9 +22,9 @@ interface PublicBookingPageProps {
   onCreateAppointment: (appointment: Appointment) => Promise<void> | void;
 }
 
-type PublicBarberOption = {
+export type PublicBarberOption = {
   value: string;
-  id?: string;
+  id: string;
   name: string;
   barbershopId?: string;
 };
@@ -97,48 +97,26 @@ const SummaryRow: React.FC<SummaryRowProps> = ({ label, value, highlight = false
   </div>
 );
 
-const normalizeBarberOptions = (
-  barbers: Array<BarberOption | string> = [],
-  ownerName?: string
+export const normalizePublicBarberOptions = (
+  barbers: Array<BarberOption | string> = []
 ): PublicBarberOption[] => {
   const byValue = new Map<string, PublicBarberOption>();
 
   barbers.forEach((barber) => {
-    if (typeof barber === 'string') {
-      const name = barber.trim();
-      if (!name) return;
+    if (!isBarberOption(barber)) return;
 
-      byValue.set(`name:${name}`, {
-        value: `name:${name}`,
-        name
-      });
+    const id = barber.id?.trim();
+    const name = barber.name?.trim();
 
-      return;
-    }
+    if (!id || !name) return;
 
-    if (isBarberOption(barber)) {
-      const id = barber.id?.trim();
-      const name = barber.name?.trim();
-
-      if (!name) return;
-
-      byValue.set(id ? `id:${id}` : `name:${name}`, {
-        value: id ? `id:${id}` : `name:${name}`,
-        id: id || undefined,
-        name,
-        barbershopId: barber.barbershopId
-      });
-    }
-  });
-
-  const owner = ownerName?.trim();
-
-  if (owner && byValue.size === 0) {
-    byValue.set(`name:${owner}`, {
-      value: `name:${owner}`,
-      name: owner
+    byValue.set(`id:${id}`, {
+      value: `id:${id}`,
+      id,
+      name,
+      barbershopId: barber.barbershopId
     });
-  }
+  });
 
   return Array.from(byValue.values());
 };
@@ -267,6 +245,59 @@ export const getPublicBookingSummary = (
   ready: Boolean(barber?.id && service?.id && slot)
 });
 
+export const buildPublicBookingInput = ({
+  barbershop,
+  selectedBarber,
+  selectedService,
+  selectedSlot,
+  clientName,
+  clientPhone,
+  notes
+}: {
+  barbershop: Barbershop | null;
+  selectedBarber: PublicBarberOption | null;
+  selectedService: Service | undefined;
+  selectedSlot: TimeSlot | null;
+  clientName: string;
+  clientPhone: string;
+  notes?: string;
+}): PublicBookingInput => {
+  if (!barbershop?.id) {
+    throw new Error('Barbearia nao encontrada ou indisponivel.');
+  }
+
+  if (!selectedBarber?.id) {
+    throw new Error('Selecione um barbeiro.');
+  }
+
+  if (!selectedService?.id) {
+    throw new Error('Selecione um servico.');
+  }
+
+  if (!selectedSlot) {
+    throw new Error('Selecione um horario.');
+  }
+
+  if (selectedBarber.barbershopId && selectedBarber.barbershopId !== barbershop.id) {
+    throw new Error('O barbeiro selecionado nao pertence a esta barbearia.');
+  }
+
+  if (selectedService.barbershopId && selectedService.barbershopId !== barbershop.id) {
+    throw new Error('O servico selecionado nao pertence a esta barbearia.');
+  }
+
+  return {
+    clientName,
+    clientPhone,
+    barberId: selectedBarber.id,
+    barbershopId: barbershop.id,
+    barberName: selectedBarber.name,
+    service: selectedService,
+    selectedSlot,
+    notes
+  };
+};
+
 const isLocalFallbackBarbershop = (barbershop: Barbershop): boolean => barbershop.id === 'local-barbershop';
 
 const belongsToPublicTenant = (
@@ -356,7 +387,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   };
 
   const barberOptions = useMemo(
-    () => normalizeBarberOptions(settings.barbers || []),
+    () => normalizePublicBarberOptions(settings.barbers || []),
     [settings.barbers]
   );
 
@@ -409,15 +440,36 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   }, [barbershopSlug]);
 
   useEffect(() => {
-    if (!selectedBarberValue && barberOptions[0]) {
+    const hasSelectedBarber = barberOptions.some((barber) => barber.value === selectedBarberValue);
+
+    if (!barberOptions.length) {
+      if (selectedBarberValue) {
+        setSelectedBarberValue('');
+      }
+      return;
+    }
+
+    if (!hasSelectedBarber) {
       setSelectedBarberValue(barberOptions[0].value);
+      setSelectedSlot(null);
     }
   }, [barberOptions, selectedBarberValue]);
+
   useEffect(() => {
-    if (!serviceId && services[0]) {
-      setServiceId(services[0].id);
+    const hasSelectedService = services.some((service) => service.id === serviceId);
+
+    if (!services.length) {
+      if (serviceId) {
+        setServiceId('');
+      }
+      return;
     }
-  }, [services, serviceId]);
+
+    if (!hasSelectedService) {
+      setServiceId(services[0].id);
+      setSelectedSlot(null);
+    }
+  }, [serviceId, services]);
 
   const selectedBarber = useMemo(
     () => barberOptions.find((barber) => barber.value === selectedBarberValue) || null,
@@ -521,16 +573,15 @@ const handleSubmit = async (event: React.FormEvent) => {
     return;
   }
 
-  const input: PublicBookingInput = {
+  const input = buildPublicBookingInput({
+    barbershop,
+    selectedBarber,
+    selectedService,
+    selectedSlot,
     clientName,
     clientPhone,
-    barberId: selectedBarber.id,
-    barbershopId: barbershop.id,
-    barberName: selectedBarber.name,
-    service: selectedService,
-    selectedSlot,
     notes
-  };
+  });
   const validation = validatePublicBookingInput(input, appointments);
 
   if (!validation.valid) {
