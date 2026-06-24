@@ -73,23 +73,34 @@ const BRANDING_MAX_BYTES: Record<BarbershopBrandingImageType, number> = {
 
 const normalizeWhitespace = (value: string): string => value.trim().replace(/\s+/g, ' ');
 
-const mapBarbershopRow = (row: DatabaseBarbershopRow | DatabaseBarbershopBrandingRow): Barbershop => ({
-  id: row.id,
-  name: row.name,
-  slug: row.slug,
-  phone: row.phone,
-  address: row.address,
-  logoUrl: 'logo_url' in row ? row.logo_url : null,
-  coverImageUrl: 'cover_image_url' in row ? row.cover_image_url : null,
-  description: 'description' in row ? row.description : null,
-  instagramUrl: 'instagram_url' in row ? row.instagram_url : null,
-  whatsapp: 'whatsapp' in row ? row.whatsapp : null,
-  primaryColor: 'primary_color' in row ? row.primary_color : null,
-  secondaryColor: 'secondary_color' in row ? row.secondary_color : null,
-  businessHours: normalizeBarbershopBusinessHours('business_hours' in row ? (row.business_hours as Partial<BarbershopBusinessHours> | null | undefined) : DEFAULT_BARBERSHOP_BUSINESS_HOURS),
-  slotStepMinutes: normalizeBarbershopSlotStepMinutes('slot_step_minutes' in row ? row.slot_step_minutes : DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES),
-  active: row.active
-});
+const mapBarbershopRow = (row: DatabaseBarbershopRow | DatabaseBarbershopBrandingRow): Barbershop => {
+  const hasConfiguredBusinessHours = 'business_hours' in row
+    ? row.business_hours !== null && row.business_hours !== undefined
+    : false;
+  const hasConfiguredSlotStepMinutes = 'slot_step_minutes' in row
+    ? row.slot_step_minutes !== null && row.slot_step_minutes !== undefined
+    : false;
+
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    phone: row.phone,
+    address: row.address,
+    logoUrl: 'logo_url' in row ? row.logo_url : null,
+    coverImageUrl: 'cover_image_url' in row ? row.cover_image_url : null,
+    description: 'description' in row ? row.description : null,
+    instagramUrl: 'instagram_url' in row ? row.instagram_url : null,
+    whatsapp: 'whatsapp' in row ? row.whatsapp : null,
+    primaryColor: 'primary_color' in row ? row.primary_color : null,
+    secondaryColor: 'secondary_color' in row ? row.secondary_color : null,
+    businessHours: normalizeBarbershopBusinessHours('business_hours' in row ? (row.business_hours as Partial<BarbershopBusinessHours> | null | undefined) : DEFAULT_BARBERSHOP_BUSINESS_HOURS),
+    hasConfiguredBusinessHours,
+    slotStepMinutes: normalizeBarbershopSlotStepMinutes('slot_step_minutes' in row ? row.slot_step_minutes : DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES),
+    hasConfiguredSlotStepMinutes,
+    active: row.active
+  };
+};
 
 const isMissingBrandingColumnError = (error: { message?: string; code?: string }): boolean => {
   const message = error.message || '';
@@ -111,7 +122,9 @@ const readLocalBarbershop = (): Barbershop => {
       primaryColor: null,
       secondaryColor: null,
       businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      hasConfiguredBusinessHours: true,
       slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
+      hasConfiguredSlotStepMinutes: true,
       active: true
     };
 

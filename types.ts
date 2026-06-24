@@ -50,7 +50,9 @@ export type Barbershop = {
   primaryColor?: string | null;
   secondaryColor?: string | null;
   businessHours?: BarbershopBusinessHours | null;
+  hasConfiguredBusinessHours?: boolean;
   slotStepMinutes?: number | null;
+  hasConfiguredSlotStepMinutes?: boolean;
   active: boolean;
 };
 

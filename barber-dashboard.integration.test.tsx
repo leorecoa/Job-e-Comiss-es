@@ -8,7 +8,7 @@ import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
 import { Appointment, DEFAULT_SETTINGS } from './types';
 import { getInitialAppSettings, getInitialUserProfile, getPublicBookingSlugFromPath, getResolvedDashboardShopName } from './App';
-import { buildPublicBookingInput, getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingScopedSettings, getPublicBookingSteps, getPublicBookingSummary, normalizePublicBarberOptions } from './components/PublicBookingPage';
+import { buildPublicBookingInput, getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingReadiness, getPublicBookingScopedSettings, getPublicBookingSteps, getPublicBookingSummary, isPublicBookingSubmitDisabled, normalizePublicBarberOptions } from './components/PublicBookingPage';
 import {
   BarbershopBrandingSettings,
   canManageBarbershopBranding,
@@ -474,6 +474,246 @@ describe('Public Booking Page Logic', () => {
     expect(payload.barberName).not.toBe('Barbearia Teste SaaS');
     expect(payload.service?.id).toBe('8b8a04ef-fd1d-40c9-98e1-c052345cf4b8');
     expect(payload.service?.name).toBe('corte');
+  });
+
+  it('/book/leo-do-leo with a complete tenant reports readiness and enables submit state', () => {
+    const readiness = getPublicBookingReadiness({
+      barbershop: {
+        id: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true,
+        businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        hasConfiguredBusinessHours: true,
+        slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
+        hasConfiguredSlotStepMinutes: true
+      },
+      barbers: [
+        {
+          value: 'id:6a1c35f2-deec-4528-82dc-10dccb601e56',
+          id: '6a1c35f2-deec-4528-82dc-10dccb601e56',
+          name: 'test',
+          barbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce'
+        }
+      ],
+      services: [
+        {
+          id: '8b8a04ef-fd1d-40c9-98e1-c052345cf4b8',
+          name: 'corte',
+          price: 60,
+          durationMinutes: 30,
+          barbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce'
+        }
+      ]
+    });
+
+    expect(readiness.ready).toBe(true);
+    expect(readiness.issues).toEqual([]);
+    expect(isPublicBookingSubmitDisabled({
+      readiness,
+      barbershop: {
+        id: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true
+      },
+      selectedBarber: {
+        value: 'id:6a1c35f2-deec-4528-82dc-10dccb601e56',
+        id: '6a1c35f2-deec-4528-82dc-10dccb601e56',
+        name: 'test'
+      },
+      selectedService: {
+        id: '8b8a04ef-fd1d-40c9-98e1-c052345cf4b8',
+        name: 'corte',
+        price: 60,
+        durationMinutes: 30
+      },
+      selectedSlot: {
+        startAt: '2026-06-23T12:00:00.000Z',
+        endAt: '2026-06-23T12:30:00.000Z',
+        label: '12:00',
+        available: true
+      },
+      isSubmitting: false
+    })).toBe(false);
+  });
+
+  it('/book/:slug without a resolved tenant reports a safe readiness error', () => {
+    const readiness = getPublicBookingReadiness({
+      barbershop: null,
+      barbers: [],
+      services: []
+    });
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.issues.some((issue) => issue.toLowerCase().includes('indispon'))).toBe(true);
+  });
+
+  it('public booking blocks readiness when business hours are not configured', () => {
+    const readiness = getPublicBookingReadiness({
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true,
+        businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        hasConfiguredBusinessHours: false,
+        slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
+        hasConfiguredSlotStepMinutes: true
+      },
+      barbers: [
+        { value: 'id:barber-1', id: 'barber-1', name: 'test', barbershopId: 'shop-leo' }
+      ],
+      services: [
+        { id: 'service-1', name: 'corte', price: 60, durationMinutes: 30, barbershopId: 'shop-leo' }
+      ]
+    });
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.issues.some((issue) => issue.toLowerCase().includes('configurad'))).toBe(true);
+  });
+
+  it('public booking blocks readiness when the barbershop is inactive', () => {
+    const readiness = getPublicBookingReadiness({
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: false,
+        businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        hasConfiguredBusinessHours: true,
+        slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
+        hasConfiguredSlotStepMinutes: true
+      },
+      barbers: [
+        { value: 'id:barber-1', id: 'barber-1', name: 'test', barbershopId: 'shop-leo' }
+      ],
+      services: [
+        { id: 'service-1', name: 'corte', price: 60, durationMinutes: 30, barbershopId: 'shop-leo' }
+      ]
+    });
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.issues).toContain('Barbearia inativa.');
+  });
+
+  it('public booking blocks readiness when slot step minutes are invalid', () => {
+    const readiness = getPublicBookingReadiness({
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true,
+        businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        hasConfiguredBusinessHours: true,
+        slotStepMinutes: 0,
+        hasConfiguredSlotStepMinutes: true
+      },
+      barbers: [
+        { value: 'id:barber-1', id: 'barber-1', name: 'test', barbershopId: 'shop-leo' }
+      ],
+      services: [
+        { id: 'service-1', name: 'corte', price: 60, durationMinutes: 30, barbershopId: 'shop-leo' }
+      ]
+    });
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.issues.some((issue) => issue.toLowerCase().includes('intervalo de agenda'))).toBe(true);
+  });
+
+  it('public booking blocks readiness when there is no active barber', () => {
+    const readiness = getPublicBookingReadiness({
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true,
+        businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        hasConfiguredBusinessHours: true,
+        slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
+        hasConfiguredSlotStepMinutes: true
+      },
+      barbers: [],
+      services: [
+        { id: 'service-1', name: 'corte', price: 60, durationMinutes: 30, barbershopId: 'shop-leo' }
+      ]
+    });
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.issues.some((issue) => issue.toLowerCase().includes('barbeiro'))).toBe(true);
+  });
+
+  it('public booking blocks readiness when there is no active service', () => {
+    const readiness = getPublicBookingReadiness({
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true,
+        businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        hasConfiguredBusinessHours: true,
+        slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
+        hasConfiguredSlotStepMinutes: true
+      },
+      barbers: [
+        { value: 'id:barber-1', id: 'barber-1', name: 'test', barbershopId: 'shop-leo' }
+      ],
+      services: []
+    });
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.issues.some((issue) => issue.toLowerCase().includes('servi'))).toBe(true);
+  });
+
+  it('submit stays disabled when tenant readiness fails even if form fields are filled', () => {
+    const readiness = getPublicBookingReadiness({
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true,
+        businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        hasConfiguredBusinessHours: false,
+        slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
+        hasConfiguredSlotStepMinutes: true
+      },
+      barbers: [
+        { value: 'id:barber-1', id: 'barber-1', name: 'test', barbershopId: 'shop-leo' }
+      ],
+      services: [
+        { id: 'service-1', name: 'corte', price: 60, durationMinutes: 30, barbershopId: 'shop-leo' }
+      ]
+    });
+
+    expect(isPublicBookingSubmitDisabled({
+      readiness,
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true
+      },
+      selectedBarber: {
+        value: 'id:barber-1',
+        id: 'barber-1',
+        name: 'test',
+        barbershopId: 'shop-leo'
+      },
+      selectedService: {
+        id: 'service-1',
+        name: 'corte',
+        price: 60,
+        durationMinutes: 30,
+        barbershopId: 'shop-leo'
+      },
+      selectedSlot: {
+        startAt: '2026-06-23T12:00:00.000Z',
+        endAt: '2026-06-23T12:30:00.000Z',
+        label: '12:00',
+        available: true
+      },
+      isSubmitting: false
+    })).toBe(true);
   });
 
   it('public booking ignores plain string barber fallbacks and keeps the real selected barber name', () => {
