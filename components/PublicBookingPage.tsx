@@ -74,10 +74,15 @@ const SectionTitle: React.FC<SectionTitleProps> = ({ step, title, description })
 
 type EmptyStateProps = {
   message: string;
+  tone?: 'default' | 'warning';
 };
 
-const EmptyState: React.FC<EmptyStateProps> = ({ message }) => (
-  <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-4 text-sm text-gray-400">
+const EmptyState: React.FC<EmptyStateProps> = ({ message, tone = 'default' }) => (
+  <div className={`rounded-2xl border p-4 text-sm ${
+    tone === 'warning'
+      ? 'border-amber-500/20 bg-amber-500/10 text-amber-100'
+      : 'border-gray-700 bg-gray-900/60 text-gray-400'
+  }`}>
     {message}
   </div>
 );
@@ -245,6 +250,111 @@ export const getPublicBookingSummary = (
   ready: Boolean(barber?.id && service?.id && slot)
 });
 
+export type PublicBookingReadiness = {
+  ready: boolean;
+  issues: string[];
+  hasResolvedBarbershop: boolean;
+  hasActiveBarbershop: boolean;
+  hasConfiguredBusinessHours: boolean;
+  hasValidSlotStepMinutes: boolean;
+  hasActiveBarbers: boolean;
+  hasActiveServices: boolean;
+};
+
+const hasAtLeastOneActiveBusinessDay = (businessHours?: Barbershop['businessHours'] | null): boolean => {
+  if (!businessHours) return false;
+
+  return Object.values(businessHours).some((day) => {
+    if (!day?.active) return false;
+    return getTimeValueInMinutes(day.open) < getTimeValueInMinutes(day.close);
+  });
+};
+
+export const isValidPublicBookingSlotStepMinutes = (value?: number | null): boolean => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 5;
+};
+
+export const getPublicBookingReadiness = ({
+  barbershop,
+  barbers,
+  services
+}: {
+  barbershop: Barbershop | null;
+  barbers: PublicBarberOption[];
+  services: Service[];
+}): PublicBookingReadiness => {
+  const issues: string[] = [];
+
+  const hasResolvedBarbershop = Boolean(barbershop);
+  const hasActiveBarbershop = Boolean(barbershop?.active);
+  const hasConfiguredBusinessHours = Boolean(
+    barbershop?.hasConfiguredBusinessHours
+    && hasAtLeastOneActiveBusinessDay(barbershop.businessHours)
+  );
+  const hasValidSlotStepMinutes = Boolean(
+    barbershop?.hasConfiguredSlotStepMinutes
+    && isValidPublicBookingSlotStepMinutes(barbershop.slotStepMinutes)
+  );
+  const hasActiveBarbers = barbers.length > 0;
+  const hasActiveServices = services.length > 0;
+
+  if (!hasResolvedBarbershop) {
+    issues.push('Barbearia não encontrada ou indisponível.');
+  } else {
+    if (!hasActiveBarbershop) {
+      issues.push('Barbearia inativa.');
+    }
+    if (!hasConfiguredBusinessHours) {
+      issues.push('Horários de funcionamento não configurados.');
+    }
+    if (!hasValidSlotStepMinutes) {
+      issues.push('Intervalo de agenda inválido.');
+    }
+    if (!hasActiveBarbers) {
+      issues.push('Nenhum barbeiro ativo.');
+    }
+    if (!hasActiveServices) {
+      issues.push('Nenhum serviço ativo.');
+    }
+  }
+
+  return {
+    ready: issues.length === 0,
+    issues,
+    hasResolvedBarbershop,
+    hasActiveBarbershop,
+    hasConfiguredBusinessHours,
+    hasValidSlotStepMinutes,
+    hasActiveBarbers,
+    hasActiveServices
+  };
+};
+
+export const isPublicBookingSubmitDisabled = ({
+  readiness,
+  barbershop,
+  selectedBarber,
+  selectedService,
+  selectedSlot,
+  isSubmitting
+}: {
+  readiness: PublicBookingReadiness;
+  barbershop: Barbershop | null;
+  selectedBarber: PublicBarberOption | null;
+  selectedService: Service | undefined;
+  selectedSlot: TimeSlot | null;
+  isSubmitting: boolean;
+}): boolean => (
+  isSubmitting
+  || !readiness.ready
+  || !barbershop?.id
+  || !selectedBarber?.id
+  || !selectedService?.id
+  || !selectedSlot?.startAt
+  || !selectedSlot?.endAt
+);
+
 export const buildPublicBookingInput = ({
   barbershop,
   selectedBarber,
@@ -392,6 +502,14 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   );
 
   const services = settings.services || [];
+  const bookingReadiness = useMemo(
+    () => getPublicBookingReadiness({
+      barbershop,
+      barbers: barberOptions,
+      services
+    }),
+    [barberOptions, barbershop, services]
+  );
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -500,11 +618,15 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     [selectedBarber, selectedService, selectedSlot]
   );
   const selectedWorkday = useMemo(
-    () => getPublicBookingWorkdayForDate(date, barbershop?.businessHours),
-    [date, barbershop?.businessHours]
+    () => bookingReadiness.hasConfiguredBusinessHours
+      ? getPublicBookingWorkdayForDate(date, barbershop?.businessHours)
+      : null,
+    [barbershop?.businessHours, bookingReadiness.hasConfiguredBusinessHours, date]
   );
 
-  const slotStepMinutes = barbershop?.slotStepMinutes || DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES;
+  const slotStepMinutes = bookingReadiness.hasValidSlotStepMinutes
+    ? barbershop?.slotStepMinutes || DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
+    : null;
   const workdayHasValidRange = selectedWorkday
     ? getTimeValueInMinutes(selectedWorkday.start) < getTimeValueInMinutes(selectedWorkday.end)
     : false;
@@ -517,16 +639,24 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     ? workdayHasValidRange
       ? `Expediente do dia selecionado · intervalos de ${slotStepMinutes} min`
       : 'Horario configurado de forma invalida para este dia'
-    : 'Sem atendimento neste dia';
+    : !bookingReadiness.hasConfiguredBusinessHours
+      ? 'Defina os horarios de funcionamento no painel interno.'
+      : !bookingReadiness.hasValidSlotStepMinutes
+        ? 'Intervalo de agenda invalido para esta barbearia.'
+        : 'Sem atendimento neste dia';
 
   const emptySlotsMessage = selectedWorkday
     ? workdayHasValidRange
       ? 'Nenhum horario disponivel para esta combinacao.'
       : 'Horario de funcionamento indisponivel neste dia.'
-    : 'A barbearia nao atende neste dia.';
+    : !bookingReadiness.hasConfiguredBusinessHours
+      ? 'Horarios de funcionamento nao configurados para esta barbearia.'
+      : !bookingReadiness.hasValidSlotStepMinutes
+        ? 'Intervalo de agenda invalido para esta barbearia.'
+        : 'A barbearia nao atende neste dia.';
   
   const availableSlots = useMemo(() => {
-    if (!selectedBarber || !selectedService || !date) return [];
+    if (!bookingReadiness.ready || !selectedBarber || !selectedService || !date) return [];
 
     return getAvailableTimeSlots({
       date,
@@ -537,7 +667,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
       businessHours: barbershop?.businessHours,
       slotStepMinutes: barbershop?.slotStepMinutes || undefined
     }).filter((slot) => slot.available);
-  }, [appointments, barbershop?.businessHours, barbershop?.slotStepMinutes, date, selectedBarber, selectedService]);
+  }, [appointments, barbershop?.businessHours, barbershop?.slotStepMinutes, bookingReadiness.ready, date, selectedBarber, selectedService]);
 
   const handleBarberChange = (value: string) => {
     setSelectedBarberValue(value);
@@ -551,6 +681,11 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
 
 const handleSubmit = async (event: React.FormEvent) => {
   event.preventDefault();
+
+  if (!bookingReadiness.ready) {
+    setErrors(bookingReadiness.issues);
+    return;
+  }
 
   if (!barbershop) {
     setErrors(['Barbearia não encontrada ou indisponível.']);
@@ -614,6 +749,15 @@ const handleSubmit = async (event: React.FormEvent) => {
     setSubmitting(false);
   }
 };
+
+  const isSubmitDisabled = isPublicBookingSubmitDisabled({
+    readiness: bookingReadiness,
+    barbershop,
+    selectedBarber,
+    selectedService,
+    selectedSlot,
+    isSubmitting
+  });
 
   const handleNewBooking = () => {
     setCreatedAppointment(null);
@@ -834,6 +978,13 @@ const handleSubmit = async (event: React.FormEvent) => {
           </section>
 
           <form onSubmit={handleSubmit} className="glass-card rounded-3xl p-5 md:p-6 space-y-5">
+            {!bookingReadiness.ready && (
+              <div className="bg-amber-500/10 border border-amber-400/20 text-amber-100 text-sm rounded-xl p-3 space-y-1">
+                <p className="font-semibold text-amber-200">Antes de agendar, esta barbearia precisa concluir a configuracao:</p>
+                {bookingReadiness.issues.map((issue) => <p key={issue}>{issue}</p>)}
+              </div>
+            )}
+
             {barberOptions.length === 0 && (
               <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-sm rounded-xl p-3">
                 A barbearia ainda precisa cadastrar pelo menos um barbeiro no painel interno.
@@ -1005,7 +1156,7 @@ const handleSubmit = async (event: React.FormEvent) => {
               </div>
             </div>
 
-            <button type="submit" disabled={!barbershop?.id || !selectedBarber?.id || !selectedService?.id || !selectedSlot || isSubmitting} style={primaryActionStyle} className="w-full disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-4 rounded-2xl shadow-lg">
+            <button type="submit" disabled={isSubmitDisabled} style={primaryActionStyle} className="w-full disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-4 rounded-2xl shadow-lg">
               {isSubmitting ? 'Confirmando...' : 'Reservar horario'}
             </button>
           </form>
