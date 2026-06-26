@@ -38,13 +38,17 @@ export const isUuid = (value?: string | null): value is string => {
 export const resolveOwnerScopedBarbershopId = ({
   authBarbershopId,
   fallbackBarbershopId,
-  supabaseConfigured
+  supabaseConfigured,
+  allowLocalFallback
 }: {
   authBarbershopId?: string;
   fallbackBarbershopId?: string;
   supabaseConfigured: boolean;
+  allowLocalFallback?: boolean;
 }): string | undefined => {
-  if (!supabaseConfigured) {
+  const canUseLocalFallback = allowLocalFallback ?? !supabaseConfigured;
+
+  if (canUseLocalFallback) {
     const localId = authBarbershopId?.trim() || fallbackBarbershopId?.trim();
     return localId || 'local-barbershop';
   }

@@ -1,5 +1,5 @@
 
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { assertOperationalSupabase, shouldUseLocalFallback, supabase } from '../lib/supabase';
 import { Appointment } from '../types';
 import { APPOINTMENT_STORAGE_KEY, getAppointmentDateInput, hasAppointmentConflict } from '../scheduling';
 
@@ -131,24 +131,27 @@ const countRemoteAppointmentsBy = async (
 
 export const countAppointmentsForBarber = async (barberId: string, barbershopId?: string): Promise<number> => {
   if (!barberId.trim()) return 0;
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     return countLocalAppointmentsBy('barberId', barberId, barbershopId);
   }
+  assertOperationalSupabase();
 
   return countRemoteAppointmentsBy('barber_id', barberId, barbershopId);
 };
 
 export const countAppointmentsForService = async (serviceId: string, barbershopId?: string): Promise<number> => {
   if (!serviceId.trim()) return 0;
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     return countLocalAppointmentsBy('serviceId', serviceId, barbershopId);
   }
+  assertOperationalSupabase();
 
   return countRemoteAppointmentsBy('service_id', serviceId, barbershopId);
 };
 
 export const listInternalAppointments = async (barbershopId?: string, barberId?: string): Promise<Appointment[]> => {
-  if (!isSupabaseConfigured || !supabase) return readLocalAppointments();
+  if (shouldUseLocalFallback) return readLocalAppointments();
+  assertOperationalSupabase();
 
   let query = supabase
     .from('appointments')
@@ -173,7 +176,8 @@ export const listInternalAppointments = async (barbershopId?: string, barberId?:
 };
 
 export const listPublicAppointmentSlots = async (barbershopId?: string): Promise<Appointment[]> => {
-  if (!isSupabaseConfigured || !supabase) return readLocalAppointments();
+  if (shouldUseLocalFallback) return readLocalAppointments();
+  assertOperationalSupabase();
 
   let query = supabase
     .from('public_appointment_slots')
@@ -215,7 +219,8 @@ export const listAppointmentsByDate = async (date: string): Promise<Appointment[
 const assertAppointmentTenantIntegrity = async (appointment: Appointment): Promise<void> => {
   const barbershopId = nullableUuid(appointment.barbershopId);
 
-  if (!isSupabaseConfigured || !supabase || !barbershopId) return;
+  if (shouldUseLocalFallback || !barbershopId) return;
+  assertOperationalSupabase();
 
   const checks: Array<Promise<void>> = [];
 
@@ -264,10 +269,11 @@ export const createAppointment = async ( // This function is used by both intern
     throw new Error('Horario indisponivel para este barbeiro.');
   }
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     writeLocalAppointments([appointment, ...appointments]);
     return appointment;
   }
+  assertOperationalSupabase();
 
   await assertAppointmentTenantIntegrity(appointment);
 
@@ -288,7 +294,7 @@ export const updateAppointment = async (
   id: string,
   patch: Partial<Appointment>
 ): Promise<Appointment> => {
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     const appointments = readLocalAppointments();
 
     const updated = appointments.map(appointment => (
@@ -304,6 +310,7 @@ export const updateAppointment = async (
 
     return result;
   }
+  assertOperationalSupabase();
 
   const current = (await listInternalAppointments()).find(appointment => appointment.id === id);
   if (!current) throw new Error('Agendamento nao encontrado.');
@@ -330,10 +337,11 @@ export const updateAppointment = async (
 };
 
 export const deleteAppointment = async (id: string): Promise<void> => {
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     writeLocalAppointments(readLocalAppointments().filter(appointment => appointment.id !== id));
     return;
   }
+  assertOperationalSupabase();
 
   const { error } = await supabase
     .from('appointments')

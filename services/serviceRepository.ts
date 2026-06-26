@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { assertOperationalSupabase, shouldUseLocalFallback, supabase } from '../lib/supabase';
 import { DEFAULT_SETTINGS, Service } from '../types';
 import { generateId, isUuid } from '../utils';
 import { countAppointmentsForService } from './appointmentRepository';
@@ -110,7 +110,8 @@ const listLocalServices = (barbershopId?: string, options?: ListServicesOptions)
 };
 
 export const listServices = async (barbershopId?: string, options?: ListServicesOptions): Promise<Service[]> => {
-  if (!isSupabaseConfigured || !supabase) return listLocalServices(barbershopId, options);
+  if (shouldUseLocalFallback) return listLocalServices(barbershopId, options);
+  assertOperationalSupabase();
 
   let query = supabase
     .from('services')
@@ -141,7 +142,7 @@ export const createService = async (service: CreateServiceInput): Promise<Servic
     throw new Error('Informe o nome do servico.');
   }
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     const created: Service = {
       id: service.id || generateId(),
       name,
@@ -155,6 +156,7 @@ export const createService = async (service: CreateServiceInput): Promise<Servic
     writeLocalServices([created, ...current.filter((item) => item.id !== created.id)]);
     return created;
   }
+  assertOperationalSupabase();
 
   if (!service.barbershopId) {
     throw new Error('Barbearia nao encontrada para criar servico.');
@@ -204,7 +206,7 @@ export const updateService = async (
     ...(typeof patch.active === 'boolean' ? { active: patch.active } : {})
   };
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     const current = listLocalServices(undefined, { includeInactive: true });
     const next = current.map((service) => (
       service.id === serviceId
@@ -223,6 +225,7 @@ export const updateService = async (
     if (!updated) throw new Error('Servico nao encontrado.');
     return updated;
   }
+  assertOperationalSupabase();
 
   if (barbershopId && !isUuid(barbershopId)) {
     throw new Error('Sua conta nao possui uma barbearia valida para atualizar servico.');
@@ -254,7 +257,7 @@ export const removeService = async (
     throw new Error('Servico nao encontrado.');
   }
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     const appointmentsCount = await countAppointmentsForService(serviceId, barbershopId);
     const current = listLocalServices(undefined, { includeInactive: true });
 
@@ -277,6 +280,7 @@ export const removeService = async (
       serviceId
     };
   }
+  assertOperationalSupabase();
 
   if (!barbershopId) {
     throw new Error('Barbearia nao encontrada para remover servico.');

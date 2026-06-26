@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { assertOperationalSupabase, shouldUseLocalFallback, supabase } from '../lib/supabase';
 import { getUserProfileName, upsertOwnerProfileForBarbershop } from './authRepository';
 import { Barbershop, BarbershopBusinessHours } from '../types';
 import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES, normalizeBarbershopBusinessHours, normalizeBarbershopSlotStepMinutes } from '../scheduling';
@@ -185,18 +185,20 @@ const getActiveBarbershopBy = async (column: 'id' | 'slug', value: string): Prom
 };
 
 export const getBarbershopBySlug = async (slug: string): Promise<Barbershop | null> => {
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     if (slug !== DEFAULT_LOCAL_BARBERSHOP_SLUG) return null;
     return readLocalBarbershop();
   }
+  assertOperationalSupabase();
 
   return getActiveBarbershopBy('slug', slug);
 };
 
 export const getBarbershopById = async (id: string): Promise<Barbershop | null> => {
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     return id === 'local-barbershop' ? readLocalBarbershop() : null;
   }
+  assertOperationalSupabase();
 
   return getActiveBarbershopBy('id', id);
 };
@@ -278,7 +280,7 @@ export const updateCurrentBarbershopBranding = async (
     throw new Error('Informe o nome da barbearia.');
   }
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     const updated = {
       ...readLocalBarbershop(),
       ...input,
@@ -301,6 +303,7 @@ export const updateCurrentBarbershopBranding = async (
     writeLocalBarbershop(updated);
     return updated;
   }
+  assertOperationalSupabase();
 
   const { data, error } = await supabase
     .from('barbershops')
@@ -328,9 +331,10 @@ export const createBarbershopForCurrentOwner = async (
     throw new Error('Informe um slug valido.');
   }
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     throw new Error('Onboarding automatico requer Supabase configurado.');
   }
+  assertOperationalSupabase();
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
 
@@ -397,9 +401,10 @@ export const uploadBarbershopBrandingImage = async ({
     throw new Error('Barbearia nao encontrada para upload.');
   }
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     throw new Error('Supabase Storage nao esta configurado para upload de imagens.');
   }
+  assertOperationalSupabase();
 
   const extension = validateBarbershopBrandingImageFile(file, type);
   const path = getBarbershopBrandingImagePath(barbershopId, type, extension);
