@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { assertOperationalSupabase, shouldUseLocalFallback, supabase } from '../lib/supabase';
 import { BarberOption } from '../types';
 import { generateId, isUuid } from '../utils';
 import { countAppointmentsForBarber } from './appointmentRepository';
@@ -80,7 +80,8 @@ const listLocalBarbers = (barbershopId?: string, options?: ListBarbersOptions): 
 };
 
 export const listBarbers = async (barbershopId?: string, options?: ListBarbersOptions): Promise<BarberOption[]> => {
-  if (!isSupabaseConfigured || !supabase) return listLocalBarbers(barbershopId, options);
+  if (shouldUseLocalFallback) return listLocalBarbers(barbershopId, options);
+  assertOperationalSupabase();
 
   let query = supabase
     .from('barbers')
@@ -114,7 +115,7 @@ export const createBarber = async ({ name, barbershopId, active = true }: Create
     throw new Error('Informe o nome do barbeiro.');
   }
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     const created: BarberOption = {
       id: generateId(),
       name: trimmedName,
@@ -125,6 +126,7 @@ export const createBarber = async ({ name, barbershopId, active = true }: Create
     writeLocalBarbers([created, ...current.filter((barber) => barber.id !== created.id)]);
     return created;
   }
+  assertOperationalSupabase();
 
   if (!barbershopId) {
     throw new Error('Barbearia nao encontrada para criar barbeiro.');
@@ -169,7 +171,7 @@ export const updateBarber = async (
     throw new Error('Informe o nome do barbeiro.');
   }
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     const current = listLocalBarbers(undefined, { includeInactive: true });
     const next = current.map((barber) => (
       barber.id === barberId
@@ -185,6 +187,7 @@ export const updateBarber = async (
     if (!updated) throw new Error('Barbeiro nao encontrado.');
     return updated;
   }
+  assertOperationalSupabase();
 
   if (barbershopId && !isUuid(barbershopId)) {
     throw new Error('Sua conta nao possui uma barbearia valida para atualizar barbeiro.');
@@ -224,7 +227,7 @@ export const removeBarber = async (
     throw new Error('Barbeiro nao encontrado.');
   }
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (shouldUseLocalFallback) {
     const appointmentsCount = await countAppointmentsForBarber(barberId, barbershopId);
     const current = listLocalBarbers(undefined, { includeInactive: true });
 
@@ -247,6 +250,7 @@ export const removeBarber = async (
       barberId
     };
   }
+  assertOperationalSupabase();
 
   if (!barbershopId) {
     throw new Error('Barbearia nao encontrada para remover barbeiro.');

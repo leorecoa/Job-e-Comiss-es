@@ -4,6 +4,9 @@ import { Appointment } from './types';
 
 vi.mock('./lib/supabase', () => ({
   isSupabaseConfigured: false,
+  isProductionWithoutSupabase: false,
+  shouldUseLocalFallback: true,
+  assertOperationalSupabase: vi.fn(),
   supabase: null
 }));
 

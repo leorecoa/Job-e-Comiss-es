@@ -45,6 +45,9 @@ vi.mock('./services/barberRepository');
 vi.mock('./services/serviceRepository');
 vi.mock('./lib/supabase', () => ({
   isSupabaseConfigured: true,
+  isProductionWithoutSupabase: false,
+  shouldUseLocalFallback: false,
+  assertOperationalSupabase: vi.fn(),
   supabase: {
     auth: {
       onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } }))
@@ -309,8 +312,8 @@ describe('Public Booking Page Logic', () => {
       })
     };
 
-    expect(getInitialUserProfile(storage, true)).toBeNull();
-    expect(getInitialAppSettings(storage, true)).toMatchObject({
+    expect(getInitialUserProfile(storage, false)).toBeNull();
+    expect(getInitialAppSettings(storage, false)).toMatchObject({
       shopName: 'Sua barbearia',
       barbers: [],
       services: []

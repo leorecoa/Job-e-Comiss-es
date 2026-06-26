@@ -7,6 +7,9 @@ const supabaseMock = vi.hoisted(() => ({
 
 vi.mock('./lib/supabase', () => ({
   isSupabaseConfigured: true,
+  isProductionWithoutSupabase: false,
+  shouldUseLocalFallback: false,
+  assertOperationalSupabase: vi.fn(),
   supabase: supabaseMock
 }));
 

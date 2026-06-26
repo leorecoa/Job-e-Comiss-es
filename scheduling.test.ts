@@ -560,6 +560,9 @@ describe('barbershop repository local fallback', () => {
     vi.resetModules();
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: false,
+      isProductionWithoutSupabase: false,
+      shouldUseLocalFallback: true,
+      assertOperationalSupabase: vi.fn(),
       supabase: null
     }));
 
@@ -584,6 +587,9 @@ describe('barbershop repository local fallback', () => {
     vi.resetModules();
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: false,
+      isProductionWithoutSupabase: false,
+      shouldUseLocalFallback: true,
+      assertOperationalSupabase: vi.fn(),
       supabase: null
     }));
 
@@ -624,6 +630,9 @@ describe('barbershop repository local fallback', () => {
 
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: true,
+      isProductionWithoutSupabase: false,
+      shouldUseLocalFallback: false,
+      assertOperationalSupabase: vi.fn(),
       supabase: { from }
     }));
 
@@ -653,6 +662,9 @@ describe('barbershop repository local fallback', () => {
     vi.resetModules();
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: false,
+      isProductionWithoutSupabase: false,
+      shouldUseLocalFallback: true,
+      assertOperationalSupabase: vi.fn(),
       supabase: null
     }));
 
@@ -693,6 +705,9 @@ describe('barbershop repository local fallback', () => {
     vi.resetModules();
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: false,
+      isProductionWithoutSupabase: false,
+      shouldUseLocalFallback: true,
+      assertOperationalSupabase: vi.fn(),
       supabase: null
     }));
 
@@ -711,6 +726,9 @@ describe('barbershop repository local fallback', () => {
     vi.resetModules();
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: false,
+      isProductionWithoutSupabase: false,
+      shouldUseLocalFallback: true,
+      assertOperationalSupabase: vi.fn(),
       supabase: null
     }));
 
@@ -740,6 +758,9 @@ describe('barbershop repository local fallback', () => {
 
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: true,
+      isProductionWithoutSupabase: false,
+      shouldUseLocalFallback: false,
+      assertOperationalSupabase: vi.fn(),
       supabase: {
         storage: {
           from: storageFrom
@@ -774,6 +795,9 @@ describe('barbershop repository local fallback', () => {
     vi.resetModules();
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: false,
+      isProductionWithoutSupabase: false,
+      shouldUseLocalFallback: true,
+      assertOperationalSupabase: vi.fn(),
       supabase: null
     }));
 
@@ -822,6 +846,9 @@ describe('barbershop repository local fallback', () => {
 
     vi.doMock('./lib/supabase', () => ({
       isSupabaseConfigured: true,
+      isProductionWithoutSupabase: false,
+      shouldUseLocalFallback: false,
+      assertOperationalSupabase: vi.fn(),
       supabase: { from }
     }));
 

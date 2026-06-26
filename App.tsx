@@ -29,7 +29,7 @@ import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { TourOverlay, TourStep } from './components/TourOverlay';
 import { ReportModal } from './components/ReportModal';
 import { DashboardCharts } from './components/DashboardCharts';
-import { isSupabaseConfigured } from './lib/supabase';
+import { isProductionWithoutSupabase, isSupabaseConfigured, PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE, shouldUseLocalFallback } from './lib/supabase';
 import { BarberDashboard } from './components/BarberDashboard';
 import { BarbershopBrandingSettings } from './components/BarbershopBrandingSettings';
 import { OwnerCatalogManager } from './components/OwnerCatalogManager';
@@ -99,11 +99,17 @@ const TRIAL_DAYS = 7;
 const SAFE_PUBLIC_BOOKING_SHOP_NAME = 'Escolha uma barbearia';
 const SAFE_INTERNAL_SHOP_NAME = 'Sua barbearia';
 
+export const getOperationalBlockingMessage = (blockInProductionWithoutSupabase: boolean): string | null => (
+  blockInProductionWithoutSupabase
+    ? PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE
+    : null
+);
+
 export const getInitialUserProfile = (
   storage: Pick<Storage, 'getItem'>,
-  supabaseConfigured: boolean
+  allowLocalFallback: boolean
 ): UserProfile | null => {
-  if (supabaseConfigured) {
+  if (!allowLocalFallback) {
     return null;
   }
 
@@ -117,9 +123,9 @@ export const getInitialUserProfile = (
 
 export const getInitialAppSettings = (
   storage: Pick<Storage, 'getItem'>,
-  supabaseConfigured: boolean
+  allowLocalFallback: boolean
 ): AppSettings => {
-  if (supabaseConfigured) {
+  if (!allowLocalFallback) {
     return normalizeSettings({
       ...DEFAULT_SETTINGS,
       shopName: SAFE_INTERNAL_SHOP_NAME,
@@ -200,11 +206,15 @@ const App: React.FC = () => {
 
   // -- Auth & Profile State --
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => (
-    getInitialUserProfile(localStorage, isSupabaseConfigured)
+    getInitialUserProfile(localStorage, shouldUseLocalFallback)
   ));
 
   // -- Data State --
   const [clients, setClients] = useState<Client[]>(() => {
+    if (!shouldUseLocalFallback) {
+      return [];
+    }
+
     try {
       const saved = localStorage.getItem('barbearia_clients');
       const parsed = saved ? JSON.parse(saved) : [];
@@ -222,6 +232,10 @@ const App: React.FC = () => {
   });
 
   const [vales, setVales] = useState<Vale[]>(() => {
+    if (!shouldUseLocalFallback) {
+      return [];
+    }
+
     try {
       const saved = localStorage.getItem('barbearia_vales');
       const parsed = saved ? JSON.parse(saved) : [];
@@ -233,6 +247,10 @@ const App: React.FC = () => {
   });
 
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
+    if (!shouldUseLocalFallback) {
+      return [];
+    }
+
     try {
       const saved = localStorage.getItem(APPOINTMENT_STORAGE_KEY);
       const parsed = saved ? JSON.parse(saved) : [];
@@ -244,7 +262,7 @@ const App: React.FC = () => {
   });
 
   const [settings, setSettings] = useState<AppSettings>(() => (
-    getInitialAppSettings(localStorage, isSupabaseConfigured)
+    getInitialAppSettings(localStorage, shouldUseLocalFallback)
   ));
 
   // -- View State --
@@ -307,7 +325,7 @@ const App: React.FC = () => {
 
   // -- Effects --
   useEffect(() => {
-    if (!isSupabaseConfigured) {
+    if (shouldUseLocalFallback) {
       localStorage.setItem('barbearia_profile', JSON.stringify(userProfile));
     }
   }, [userProfile]);
@@ -352,21 +370,25 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('barbearia_clients', JSON.stringify(clients));
+    if (shouldUseLocalFallback) {
+      localStorage.setItem('barbearia_clients', JSON.stringify(clients));
+    }
   }, [clients]);
 
   useEffect(() => {
-    localStorage.setItem('barbearia_vales', JSON.stringify(vales));
+    if (shouldUseLocalFallback) {
+      localStorage.setItem('barbearia_vales', JSON.stringify(vales));
+    }
   }, [vales]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
+    if (shouldUseLocalFallback) {
       localStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(appointments));
     }
   }, [appointments]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
+    if (shouldUseLocalFallback) {
       localStorage.setItem('barbearia_settings', JSON.stringify(settings));
     }
   }, [settings]);
@@ -380,7 +402,7 @@ const App: React.FC = () => {
         return;
       }
 
-      const barbershopId = authSession?.barbershopId || (!isSupabaseConfigured ? 'local-barbershop' : undefined);
+      const barbershopId = authSession?.barbershopId || (shouldUseLocalFallback ? 'local-barbershop' : undefined);
 
       if (!barbershopId) {
         setOwnerBarbershop(null);
@@ -436,7 +458,7 @@ const App: React.FC = () => {
       if (authSession?.role === 'barber') return;
       if (isSupabaseConfigured && (isAuthLoading || !authSession?.barbershopId)) return;
 
-      const catalogBarbershopId = authSession?.barbershopId || (!isSupabaseConfigured ? 'local-barbershop' : undefined);
+      const catalogBarbershopId = authSession?.barbershopId || (shouldUseLocalFallback ? 'local-barbershop' : undefined);
 
       if (!catalogBarbershopId) return;
 
@@ -848,7 +870,8 @@ const App: React.FC = () => {
     resolveOwnerScopedBarbershopId({
       authBarbershopId: authSession?.barbershopId,
       fallbackBarbershopId: ownerBarbershop?.id,
-      supabaseConfigured: isSupabaseConfigured
+      supabaseConfigured: isSupabaseConfigured,
+      allowLocalFallback: shouldUseLocalFallback
     })
   );
 
@@ -999,7 +1022,8 @@ const App: React.FC = () => {
     const barbershopId = resolveOwnerScopedBarbershopId({
       authBarbershopId: authSession?.barbershopId,
       fallbackBarbershopId: ownerBarbershop?.id,
-      supabaseConfigured: isSupabaseConfigured
+      supabaseConfigured: isSupabaseConfigured,
+      allowLocalFallback: shouldUseLocalFallback
     });
 
     if (!barbershopId) {
@@ -1036,7 +1060,8 @@ const App: React.FC = () => {
     const barbershopId = resolveOwnerScopedBarbershopId({
       authBarbershopId: authSession?.barbershopId,
       fallbackBarbershopId: ownerBarbershop?.id,
-      supabaseConfigured: isSupabaseConfigured
+      supabaseConfigured: isSupabaseConfigured,
+      allowLocalFallback: shouldUseLocalFallback
     });
 
     if (!barbershopId) {
@@ -1403,6 +1428,23 @@ const App: React.FC = () => {
   ];
 
   // Public Booking Route
+  const operationalBlockingMessage = getOperationalBlockingMessage(isProductionWithoutSupabase);
+
+  if (operationalBlockingMessage) {
+    return (
+      <>
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <div className="min-h-screen flex items-center justify-center bg-transparent px-4 text-gray-200">
+          <div className="max-w-xl rounded-3xl border border-red-500/20 bg-gray-900/85 p-8 text-center shadow-2xl">
+            <p className="mb-3 text-xs font-bold uppercase tracking-widest text-red-300">Configuracao indisponivel</p>
+            <h1 className="mb-3 text-2xl font-bold text-white">Supabase obrigatorio em producao</h1>
+            <p className="text-sm text-gray-300">{operationalBlockingMessage}</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   if (isPublicBookingRoute) {
     return (
       <>
