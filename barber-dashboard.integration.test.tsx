@@ -8,7 +8,7 @@ import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
 import { Appointment, DEFAULT_SETTINGS } from './types';
 import { getInitialAppSettings, getInitialUserProfile, getPublicBookingSlugFromPath, getResolvedDashboardShopName } from './App';
-import { buildPublicBookingInput, getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingReadiness, getPublicBookingScopedSettings, getPublicBookingSteps, getPublicBookingSummary, isPublicBookingSubmitDisabled, normalizePublicBarberOptions } from './components/PublicBookingPage';
+import { buildPublicBookingInput, getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingReadiness, getPublicBookingScopedSettings, getPublicBookingSteps, getPublicBookingSubmissionErrorMessage, getPublicBookingSummary, isPublicBookingSubmitDisabled, normalizePublicBarberOptions } from './components/PublicBookingPage';
 import {
   BarbershopBrandingSettings,
   canManageBarbershopBranding,
@@ -22,7 +22,9 @@ import {
   getOwnerBarbershopOnboardingPreview
 } from './components/OwnerBarbershopOnboarding';
 import { 
+  createAppointmentConflictError,
   createPublicAppointment, 
+  PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE,
   validatePublicBookingInput 
 } from './scheduling';
 import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES } from './scheduling';
@@ -931,6 +933,14 @@ describe('Public Booking Page Logic', () => {
     expect(summary.barberName).toBe('Selecione um barbeiro');
     expect(summary.serviceName).toBe('Selecione um servico');
     expect(summary.slotLabel).toBe('Selecione um horario');
+  });
+
+  it('public booking shows the friendly conflict message for duplicate slots', () => {
+    expect(
+      getPublicBookingSubmissionErrorMessage(
+        createAppointmentConflictError()
+      )
+    ).toBe(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
   });
 
   it('owner can see white label barbershop settings', () => {

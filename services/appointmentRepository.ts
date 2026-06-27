@@ -1,7 +1,13 @@
 
 import { assertOperationalSupabase, shouldUseLocalFallback, supabase } from '../lib/supabase';
 import { Appointment } from '../types';
-import { APPOINTMENT_STORAGE_KEY, getAppointmentDateInput, hasAppointmentConflict } from '../scheduling';
+import {
+  APPOINTMENT_STORAGE_KEY,
+  createAppointmentConflictError,
+  getAppointmentDateInput,
+  hasAppointmentConflict,
+  PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
+} from '../scheduling';
 
 export type DatabaseAppointmentRow = {
   id: string;
@@ -41,9 +47,29 @@ type DatabaseTenantEntityRow = {
   barbershop_id: string | null;
 };
 
+type DatabaseWriteError = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+};
+
+const ACTIVE_SLOT_UNIQUE_INDEX_NAME = 'appointments_unique_active_barbershop_barber_start';
+
 const nullableUuid = (value?: string | null): string | null => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+};
+
+const isActiveAppointmentConflictError = (error: DatabaseWriteError): boolean => {
+  const details = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`.toLowerCase();
+
+  return error.code === '23505' && (
+    details.includes(ACTIVE_SLOT_UNIQUE_INDEX_NAME)
+    || details.includes('barbershop_id')
+    || details.includes('barber_id')
+    || details.includes('start_at')
+  );
 };
 
 export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment => ({
@@ -266,7 +292,7 @@ export const createAppointment = async ( // This function is used by both intern
   const appointments = existingAppointments || await listPublicAppointmentSlots(appointment.barbershopId);
 
   if (hasAppointmentConflict(appointments, appointment)) {
-    throw new Error('Horario indisponivel para este barbeiro.');
+    throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
   }
 
   if (shouldUseLocalFallback) {
@@ -283,6 +309,10 @@ export const createAppointment = async ( // This function is used by both intern
     .insert(mapAppointmentToDb(appointment), { defaultToNull: true });
 
   if (error) {
+    if (isActiveAppointmentConflictError(error)) {
+      throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
+    }
+
     console.error('Failed to create appointment', error);
     throw error;
   }

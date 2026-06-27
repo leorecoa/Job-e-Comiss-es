@@ -50,6 +50,30 @@ export type PublicBookingWorkday = {
   end: string;
 };
 
+export const ACTIVE_APPOINTMENT_CONFLICT_STATUSES: Appointment['status'][] = [
+  'scheduled',
+  'confirmed',
+  'completed'
+];
+
+export const APPOINTMENT_CONFLICT_ERROR_CODE = 'APPOINTMENT_ACTIVE_SLOT_CONFLICT';
+export const PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE = 'Esse hor\u00E1rio acabou de ser reservado. Escolha outro hor\u00E1rio.';
+
+export const createAppointmentConflictError = (
+  message: string = PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
+): Error & { code: string } => {
+  const error = new Error(message) as Error & { code: string };
+  error.code = APPOINTMENT_CONFLICT_ERROR_CODE;
+  return error;
+};
+
+export const isAppointmentConflictError = (error: unknown): error is Error & { code: string } => (
+  typeof error === 'object'
+  && error !== null
+  && 'code' in error
+  && (error as { code?: string }).code === APPOINTMENT_CONFLICT_ERROR_CODE
+);
+
 const BUSINESS_DAY_KEYS: BarbershopBusinessDayKey[] = [
   'sunday',
   'monday',
@@ -182,20 +206,35 @@ export const getAppointmentDateInput = (appointment: Appointment): string => {
   return toLocalDateInputValue(new Date(appointment.startAt));
 };
 
+const hasActiveConflictStatus = (status: Appointment['status']): boolean => (
+  ACTIVE_APPOINTMENT_CONFLICT_STATUSES.includes(status)
+);
+
 const isSameBarberForConflict = (
-  existing: Pick<Appointment, 'barberId' | 'barberName'>,
-  candidate: Pick<Appointment, 'barberId' | 'barberName'>
+  existing: Pick<Appointment, 'barberId'>,
+  candidate: Pick<Appointment, 'barberId'>
 ): boolean => {
-  if (existing.barberId && candidate.barberId) {
-    return existing.barberId === candidate.barberId;
+  if (!existing.barberId || !candidate.barberId) {
+    return false;
   }
 
-  return existing.barberName === candidate.barberName;
+  return existing.barberId === candidate.barberId;
+};
+
+const isSameBarbershopForConflict = (
+  existing: Pick<Appointment, 'barbershopId'>,
+  candidate: Pick<Appointment, 'barbershopId'>
+): boolean => {
+  if (!existing.barbershopId || !candidate.barbershopId) {
+    return false;
+  }
+
+  return existing.barbershopId === candidate.barbershopId;
 };
 
 export const hasAppointmentConflict = (
   appointments: Appointment[],
-  candidate: Pick<Appointment, 'barberId' | 'barberName' | 'startAt' | 'endAt'>,
+  candidate: Pick<Appointment, 'barbershopId' | 'barberId' | 'startAt' | 'endAt'>,
   editingAppointmentId?: string
 ): boolean => {
   const newStart = new Date(candidate.startAt).getTime();
@@ -203,7 +242,8 @@ export const hasAppointmentConflict = (
 
   return appointments.some((existing) => {
     if (existing.id === editingAppointmentId) return false;
-    if (existing.status === 'cancelled') return false;
+    if (!hasActiveConflictStatus(existing.status)) return false;
+    if (!isSameBarbershopForConflict(existing, candidate)) return false;
     if (!isSameBarberForConflict(existing, candidate)) return false;
 
     const existingStart = new Date(existing.startAt).getTime();
@@ -215,6 +255,7 @@ export const hasAppointmentConflict = (
 
 export const getAvailableTimeSlots = (params: {
   date: string;
+  barbershopId?: string;
   barberId?: string;
   barberName: string;
   serviceDurationMinutes: number;
@@ -227,6 +268,7 @@ export const getAvailableTimeSlots = (params: {
 }): TimeSlot[] => {
   const {
     date,
+    barbershopId,
     barberId,
     barberName,
     serviceDurationMinutes,
@@ -277,8 +319,8 @@ export const getAvailableTimeSlots = (params: {
     }
 
     const available = !hasAppointmentConflict(appointments, {
+      barbershopId,
       barberId,
-      barberName,
       startAt,
       endAt
     });
@@ -312,14 +354,14 @@ export const validatePublicBookingInput = (
 
   if (input.selectedSlot && input.barberName) {
     const hasConflict = hasAppointmentConflict(appointments, {
+      barbershopId: input.barbershopId,
       barberId: input.barberId,
-      barberName: input.barberName,
       startAt: input.selectedSlot.startAt,
       endAt: input.selectedSlot.endAt
     });
 
     if (hasConflict) {
-      errors.push('Este horario acabou de ficar indisponivel.');
+      errors.push(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
     }
   }
 

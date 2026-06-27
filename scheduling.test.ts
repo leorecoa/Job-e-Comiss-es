@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Appointment, AppSettings, DEFAULT_SETTINGS } from './types';
 import {
+  ACTIVE_APPOINTMENT_CONFLICT_STATUSES,
   buildWhatsAppLink,
   completeAppointmentFinancialRecord,
   appointmentToClient,
@@ -10,6 +11,7 @@ import {
   getAvailableTimeSlots,
   getPublicBookingWorkdayForDate,
   hasAppointmentConflict,
+  PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE,
   normalizeBarbershopBusinessHours,
   TimeSlot,
   validatePublicBookingInput
@@ -17,6 +19,7 @@ import {
 
 const makeAppointment = (overrides: Partial<Appointment> = {}): Appointment => ({
   id: 'appointment-1',
+  barbershopId: 'shop-1',
   barberId: 'barber-1',
   serviceId: 'service-1',
   clientName: 'Joao',
@@ -104,24 +107,31 @@ describe('hasAppointmentConflict', () => {
     expect(hasAppointmentConflict([existing], candidate)).toBe(false);
   });
 
-  it('falls back to barberName when barberId is missing', () => {
+  it('does not detect conflict when barbershopId is different', () => {
     const existing = makeAppointment({
       id: 'appointment-1',
-      barberId: undefined,
-      barberName: 'Carlos'
+      barbershopId: 'shop-1',
+      barberId: 'barber-1'
     });
 
     const candidate = makeAppointment({
       id: 'appointment-2',
-      barberId: undefined,
-      barberName: 'Carlos'
+      barbershopId: 'shop-2',
+      barberId: 'barber-1'
     });
 
-    expect(hasAppointmentConflict([existing], candidate)).toBe(true);
+    expect(hasAppointmentConflict([existing], candidate)).toBe(false);
   });
 
   it('ignores cancelled appointments', () => {
     const existing = makeAppointment({ status: 'cancelled' });
+    const candidate = makeAppointment({ id: 'appointment-2' });
+
+    expect(hasAppointmentConflict([existing], candidate)).toBe(false);
+  });
+
+  it('ignores no_show appointments', () => {
+    const existing = makeAppointment({ status: 'no_show' });
     const candidate = makeAppointment({ id: 'appointment-2' });
 
     expect(hasAppointmentConflict([existing], candidate)).toBe(false);
@@ -201,9 +211,100 @@ describe('completeAppointmentFinancialRecord', () => {
 });
 
 describe('getAvailableTimeSlots', () => {
+  it.each(ACTIVE_APPOINTMENT_CONFLICT_STATUSES)('blocks duplicate slots when an active appointment is %s', (status) => {
+    const conflict = hasAppointmentConflict([
+      makeAppointment({
+        barbershopId: 'shop-1',
+        barberId: 'barber-1',
+        status,
+        startAt: new Date(2026, 5, 10, 9, 0).toISOString(),
+        endAt: new Date(2026, 5, 10, 9, 30).toISOString()
+      })
+    ], {
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      startAt: new Date(2026, 5, 10, 9, 0).toISOString(),
+      endAt: new Date(2026, 5, 10, 9, 30).toISOString()
+    });
+
+    expect(conflict).toBe(true);
+  });
+
+  it('allows a new appointment when the previous one is cancelled', () => {
+    const conflict = hasAppointmentConflict([
+      makeAppointment({
+        barbershopId: 'shop-1',
+        barberId: 'barber-1',
+        status: 'cancelled'
+      })
+    ], {
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      startAt: new Date(2026, 5, 10, 10, 0).toISOString(),
+      endAt: new Date(2026, 5, 10, 10, 30).toISOString()
+    });
+
+    expect(conflict).toBe(false);
+  });
+
+  it('allows a new appointment when the previous one is no_show', () => {
+    const conflict = hasAppointmentConflict([
+      makeAppointment({
+        barbershopId: 'shop-1',
+        barberId: 'barber-1',
+        status: 'no_show'
+      })
+    ], {
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      startAt: new Date(2026, 5, 10, 10, 0).toISOString(),
+      endAt: new Date(2026, 5, 10, 10, 30).toISOString()
+    });
+
+    expect(conflict).toBe(false);
+  });
+
+  it('uses barber_id instead of barber_name for conflict checks', () => {
+    const conflict = hasAppointmentConflict([
+      makeAppointment({
+        barbershopId: 'shop-1',
+        barberId: 'barber-1',
+        barberName: 'Carlos',
+        startAt: new Date(2026, 5, 10, 9, 0).toISOString(),
+        endAt: new Date(2026, 5, 10, 9, 30).toISOString()
+      })
+    ], {
+      barbershopId: 'shop-1',
+      barberId: 'barber-2',
+      startAt: new Date(2026, 5, 10, 9, 0).toISOString(),
+      endAt: new Date(2026, 5, 10, 9, 30).toISOString()
+    });
+
+    expect(conflict).toBe(false);
+  });
+
+  it('does not treat another tenant as a conflict for the same barber_id and start_at', () => {
+    const conflict = hasAppointmentConflict([
+      makeAppointment({
+        barbershopId: 'shop-gm',
+        barberId: 'barber-1',
+        startAt: new Date(2026, 5, 10, 9, 0).toISOString(),
+        endAt: new Date(2026, 5, 10, 9, 30).toISOString()
+      })
+    ], {
+      barbershopId: 'shop-leo',
+      barberId: 'barber-1',
+      startAt: new Date(2026, 5, 10, 9, 0).toISOString(),
+      endAt: new Date(2026, 5, 10, 9, 30).toISOString()
+    });
+
+    expect(conflict).toBe(false);
+  });
+
   it('generates slots inside the workday', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-10',
+      barbershopId: 'shop-1',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
       appointments: [],
@@ -220,6 +321,7 @@ describe('getAvailableTimeSlots', () => {
   it('marks occupied slots unavailable', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-10',
+      barbershopId: 'shop-1',
       barberId: 'barber-1',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
@@ -242,6 +344,7 @@ describe('getAvailableTimeSlots', () => {
   it('does not block slots with cancelled appointments', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-10',
+      barbershopId: 'shop-1',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
       appointments: [
@@ -263,6 +366,7 @@ describe('getAvailableTimeSlots', () => {
   it('does not block slots for another barber by barberId', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-10',
+      barbershopId: 'shop-1',
       barberId: 'barber-2',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
@@ -286,6 +390,7 @@ describe('getAvailableTimeSlots', () => {
   it('does not block slots for another barber by name fallback', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-10',
+      barbershopId: 'shop-1',
       barberName: 'Marcos',
       serviceDurationMinutes: 30,
       appointments: [
@@ -308,6 +413,8 @@ describe('getAvailableTimeSlots', () => {
   it('uses longer service duration to block overlapping slots', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-10',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
       barberName: 'Carlos',
       serviceDurationMinutes: 60,
       appointments: [
@@ -329,6 +436,7 @@ describe('getAvailableTimeSlots', () => {
   it('does not include past slots for today', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-06',
+      barbershopId: 'shop-1',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
       appointments: [],
@@ -371,6 +479,7 @@ describe('public booking business hours', () => {
   it('does not generate slots on monday', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-08',
+      barbershopId: 'shop-1',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
       appointments: [],
@@ -383,6 +492,7 @@ describe('public booking business hours', () => {
   it('generates sunday slots between 10:00 and 18:00', () => {
     const slots = getAvailableTimeSlots({
       date: '2026-06-14',
+      barbershopId: 'shop-1',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
       appointments: [],
@@ -418,6 +528,7 @@ describe('public booking business hours', () => {
 
     const slots = getAvailableTimeSlots({
       date: '2026-06-09',
+      barbershopId: 'shop-leo',
       barberName: 'Leo',
       serviceDurationMinutes: 30,
       appointments: [],
@@ -436,6 +547,7 @@ describe('public booking business hours', () => {
 
     const slots = getAvailableTimeSlots({
       date: '2026-06-09',
+      barbershopId: 'shop-gm',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
       appointments: [],
@@ -454,6 +566,7 @@ describe('public booking business hours', () => {
 
     const slots = getAvailableTimeSlots({
       date: '2026-06-09',
+      barbershopId: 'shop-leo',
       barberName: 'Leo',
       serviceDurationMinutes: 30,
       appointments: [],
@@ -552,6 +665,29 @@ describe('public booking helpers', () => {
     expect(result.errors).toContain('Escolha um horario disponivel.');
     expect(result.errors).toContain('Informe seu nome.');
     expect(result.errors).toContain('Informe um WhatsApp valido com DDD.');
+  });
+
+  it('returns the public booking conflict message when the slot is already taken', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, [
+      makeAppointment({
+        barbershopId: 'shop-1',
+        barberId: 'barber-1',
+        status: 'confirmed',
+        startAt: slot.startAt,
+        endAt: slot.endAt
+      })
+    ]);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
   });
 });
 

@@ -8,6 +8,8 @@ import {
   createPublicAppointment,
   getAvailableTimeSlots,
   getPublicBookingWorkdayForDate,
+  isAppointmentConflictError,
+  PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE,
   PublicBookingInput,
   TimeSlot,
   validatePublicBookingInput
@@ -355,6 +357,12 @@ export const isPublicBookingSubmitDisabled = ({
   || !selectedSlot?.endAt
 );
 
+export const getPublicBookingSubmissionErrorMessage = (error: unknown): string => (
+  isAppointmentConflictError(error)
+    ? PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
+    : 'Nao foi possivel confirmar este horario. Tente novamente.'
+);
+
 export const buildPublicBookingInput = ({
   barbershop,
   selectedBarber,
@@ -660,6 +668,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
 
     return getAvailableTimeSlots({
       date,
+      barbershopId: barbershop?.id,
       barberId: selectedBarber.id,
       barberName: selectedBarber.name,
       serviceDurationMinutes: selectedService.durationMinutes,
@@ -743,8 +752,8 @@ const handleSubmit = async (event: React.FormEvent) => {
     await onCreateAppointment(appointment);
     setCreatedAppointment(appointment);
     setErrors([]);
-  } catch {
-    setErrors(['Nao foi possivel confirmar este horario. Tente novamente.']);
+  } catch (error) {
+    setErrors([getPublicBookingSubmissionErrorMessage(error)]);
   } finally {
     setSubmitting(false);
   }
