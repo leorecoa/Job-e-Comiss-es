@@ -11,7 +11,10 @@ import {
   getAvailableTimeSlots,
   getPublicBookingWorkdayForDate,
   hasAppointmentConflict,
+  PUBLIC_BOOKING_NAME_MAX_LENGTH,
+  PUBLIC_BOOKING_NOTES_MAX_LENGTH,
   PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE,
+  validatePublicAppointmentRecord,
   normalizeBarbershopBusinessHours,
   TimeSlot,
   validatePublicBookingInput
@@ -667,6 +670,283 @@ describe('public booking helpers', () => {
     expect(result.errors).toContain('Informe um WhatsApp valido com DDD.');
   });
 
+  it('rejects client_name with spaces only', () => {
+    const result = validatePublicBookingInput({
+      clientName: '   ',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Informe seu nome.');
+  });
+
+  it('rejects client_name that is too long', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'a'.repeat(PUBLIC_BOOKING_NAME_MAX_LENGTH + 1),
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(`O nome deve ter no maximo ${PUBLIC_BOOKING_NAME_MAX_LENGTH} caracteres.`);
+  });
+
+  it('rejects empty client_phone', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '   ',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Informe um WhatsApp valido com DDD.');
+  });
+
+  it('rejects client_phone that is too short', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '8599',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('O WhatsApp deve ter 10 ou 11 digitos.');
+  });
+
+  it('rejects client_phone that is too long', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '558599999999999',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('O WhatsApp deve ter 10 ou 11 digitos.');
+  });
+
+  it('accepts a valid brazilian phone with a simple mask', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects notes that exceed the maximum length', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot,
+      notes: 'a'.repeat(PUBLIC_BOOKING_NOTES_MAX_LENGTH + 1)
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(`As observacoes devem ter no maximo ${PUBLIC_BOOKING_NOTES_MAX_LENGTH} caracteres.`);
+  });
+
+  it('rejects invalid start_at in the selected slot', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: {
+        ...slot,
+        startAt: 'invalid-date'
+      }
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Horario inicial invalido.');
+  });
+
+  it('rejects end_at that is not greater than start_at', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: {
+        ...slot,
+        endAt: slot.startAt
+      }
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('O horario final precisa ser maior que o horario inicial.');
+  });
+
+  it('rejects a selected slot that is not part of the available slot list', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: {
+        ...slot,
+        startAt: new Date(2026, 5, 10, 10, 0).toISOString(),
+        endAt: new Date(2026, 5, 10, 10, 30).toISOString(),
+        label: '10:00'
+      }
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Escolha um horario disponivel.');
+  });
+
+  it('rejects barber_id that does not belong to the tenant', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-gm',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('O barbeiro selecionado nao pertence a esta barbearia.');
+  });
+
+  it('rejects service_id that does not belong to the tenant', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: { ...settings.services[0], id: 'service-gm' },
+      selectedSlot: slot
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], id: 'service-1', barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('O servico selecionado nao pertence a esta barbearia.');
+  });
+
+  it('rejects an inactive barber', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: false }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: true }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('O barbeiro selecionado esta inativo.');
+  });
+
+  it('rejects an inactive service', () => {
+    const result = validatePublicBookingInput({
+      clientName: 'Maria',
+      clientPhone: '(85) 98888-7777',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
+      barberName: 'Carlos',
+      service: settings.services[0],
+      selectedSlot: slot
+    }, [], {
+      barbers: [{ id: 'barber-1', barbershopId: 'shop-1', active: true }],
+      services: [{ ...settings.services[0], barbershopId: 'shop-1', active: false }],
+      availableSlots: [slot]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('O servico selecionado esta inativo.');
+  });
+
   it('returns the public booking conflict message when the slot is already taken', () => {
     const result = validatePublicBookingInput({
       clientName: 'Maria',
@@ -688,6 +968,12 @@ describe('public booking helpers', () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
+  });
+
+  it('repository-facing public appointment validation rejects invalid dates', () => {
+    expect(validatePublicAppointmentRecord(makeAppointment({
+      startAt: 'invalid-date'
+    }))).toContain('Horario inicial invalido.');
   });
 });
 

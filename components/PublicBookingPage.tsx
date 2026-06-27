@@ -29,6 +29,7 @@ export type PublicBarberOption = {
   id: string;
   name: string;
   barbershopId?: string;
+  active?: boolean;
 };
 
 const getTodayString = (): string => {
@@ -119,7 +120,8 @@ export const normalizePublicBarberOptions = (
       value: `id:${id}`,
       id,
       name,
-      barbershopId: barber.barbershopId
+      barbershopId: barber.barbershopId,
+      active: barber.active !== false
     });
   });
 
@@ -339,6 +341,7 @@ export const isPublicBookingSubmitDisabled = ({
   selectedBarber,
   selectedService,
   selectedSlot,
+  formValid,
   isSubmitting
 }: {
   readiness: PublicBookingReadiness;
@@ -346,10 +349,12 @@ export const isPublicBookingSubmitDisabled = ({
   selectedBarber: PublicBarberOption | null;
   selectedService: Service | undefined;
   selectedSlot: TimeSlot | null;
+  formValid?: boolean;
   isSubmitting: boolean;
 }): boolean => (
   isSubmitting
   || !readiness.ready
+  || formValid === false
   || !barbershop?.id
   || !selectedBarber?.id
   || !selectedService?.id
@@ -678,6 +683,21 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     }).filter((slot) => slot.available);
   }, [appointments, barbershop?.businessHours, barbershop?.slotStepMinutes, bookingReadiness.ready, date, selectedBarber, selectedService]);
 
+  const bookingValidation = useMemo(() => validatePublicBookingInput({
+    clientName,
+    clientPhone,
+    barbershopId: barbershop?.id || '',
+    barberId: selectedBarber?.id,
+    barberName: selectedBarber?.name || '',
+    service: selectedService,
+    selectedSlot,
+    notes
+  }, appointments, {
+    barbers: barberOptions,
+    services,
+    availableSlots
+  }), [appointments, availableSlots, barberOptions, barbershop?.id, clientName, clientPhone, notes, selectedBarber?.id, selectedBarber?.name, selectedService, selectedSlot, services]);
+
   const handleBarberChange = (value: string) => {
     setSelectedBarberValue(value);
     setSelectedSlot(null);
@@ -735,7 +755,11 @@ const handleSubmit = async (event: React.FormEvent) => {
     clientPhone,
     notes
   });
-  const validation = validatePublicBookingInput(input, appointments);
+  const validation = validatePublicBookingInput(input, appointments, {
+    barbers: barberOptions,
+    services,
+    availableSlots
+  });
 
   if (!validation.valid) {
     setErrors(validation.errors);
@@ -765,6 +789,7 @@ const handleSubmit = async (event: React.FormEvent) => {
     selectedBarber,
     selectedService,
     selectedSlot,
+    formValid: bookingValidation.valid,
     isSubmitting
   });
 

@@ -736,10 +736,114 @@ describe('Public Booking Page Logic', () => {
         value: 'id:6a1c35f2-deec-4528-82dc-10dccb601e56',
         id: '6a1c35f2-deec-4528-82dc-10dccb601e56',
         name: 'test',
-        barbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce'
+        barbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce',
+        active: true
       }
     ]);
     expect(options.some((barber) => barber.name === 'Barbearia Teste SaaS')).toBe(false);
+  });
+
+  it('submit stays disabled when no slot is selected', () => {
+    const readiness = getPublicBookingReadiness({
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true,
+        businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        hasConfiguredBusinessHours: true,
+        slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
+        hasConfiguredSlotStepMinutes: true
+      },
+      barbers: [
+        { value: 'id:barber-1', id: 'barber-1', name: 'test', barbershopId: 'shop-leo', active: true }
+      ],
+      services: [
+        { id: 'service-1', name: 'corte', price: 60, durationMinutes: 30, barbershopId: 'shop-leo', active: true }
+      ]
+    });
+
+    expect(isPublicBookingSubmitDisabled({
+      readiness,
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true
+      },
+      selectedBarber: {
+        value: 'id:barber-1',
+        id: 'barber-1',
+        name: 'test',
+        barbershopId: 'shop-leo',
+        active: true
+      },
+      selectedService: {
+        id: 'service-1',
+        name: 'corte',
+        price: 60,
+        durationMinutes: 30,
+        barbershopId: 'shop-leo',
+        active: true
+      },
+      selectedSlot: null,
+      formValid: true,
+      isSubmitting: false
+    })).toBe(true);
+  });
+
+  it('submit stays disabled when the public booking form validation fails', () => {
+    const readiness = getPublicBookingReadiness({
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true,
+        businessHours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+        hasConfiguredBusinessHours: true,
+        slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
+        hasConfiguredSlotStepMinutes: true
+      },
+      barbers: [
+        { value: 'id:barber-1', id: 'barber-1', name: 'test', barbershopId: 'shop-leo', active: true }
+      ],
+      services: [
+        { id: 'service-1', name: 'corte', price: 60, durationMinutes: 30, barbershopId: 'shop-leo', active: true }
+      ]
+    });
+
+    expect(isPublicBookingSubmitDisabled({
+      readiness,
+      barbershop: {
+        id: 'shop-leo',
+        name: 'leo do leo',
+        slug: 'leo-do-leo',
+        active: true
+      },
+      selectedBarber: {
+        value: 'id:barber-1',
+        id: 'barber-1',
+        name: 'test',
+        barbershopId: 'shop-leo',
+        active: true
+      },
+      selectedService: {
+        id: 'service-1',
+        name: 'corte',
+        price: 60,
+        durationMinutes: 30,
+        barbershopId: 'shop-leo',
+        active: true
+      },
+      selectedSlot: {
+        startAt: '2026-06-23T12:00:00.000Z',
+        endAt: '2026-06-23T12:30:00.000Z',
+        label: '12:00',
+        available: true
+      },
+      formValid: false,
+      isSubmitting: false
+    })).toBe(true);
   });
 
   it('blocks public booking payload creation when barbershop_id is missing', () => {
