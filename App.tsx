@@ -12,7 +12,15 @@ import {
   updateCurrentBarbershopBranding,
   uploadBarbershopBrandingImage
 } from './services/barbershopRepository';
-import { APPOINTMENT_STORAGE_KEY, completeAppointmentFinancialRecord, getAppointmentDateInput, hasAppointmentConflict } from './scheduling';
+import {
+  APPOINTMENT_STORAGE_KEY,
+  completeAppointmentFinancialRecord,
+  createAppointmentConflictError,
+  getAppointmentDateInput,
+  hasAppointmentConflict,
+  isAppointmentConflictError,
+  PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
+} from './scheduling';
 import { StatsCard } from './components/StatsCard';
 import { AddClientModal } from './components/AddClientModal';
 import { AddValeModal } from './components/AddValeModal';
@@ -1199,8 +1207,7 @@ const App: React.FC = () => {
 
   const handleCreatePublicAppointment = async (appointment: Appointment) => {
     if (hasAppointmentConflict(appointments, appointment)) {
-      addToast('Horario indisponivel para este barbeiro.', 'error');
-      throw new Error('Horario indisponivel para este barbeiro.');
+      throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
     }
 
     try {
@@ -1208,7 +1215,11 @@ const App: React.FC = () => {
       setAppointments(prev => [savedAppointment, ...prev]);
     } catch (error) {
       console.error(error);
-      addToast('Erro ao confirmar agendamento.', 'error');
+      if (isAppointmentConflictError(error)) {
+        addToast(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE, 'error');
+      } else {
+        addToast('Erro ao confirmar agendamento.', 'error');
+      }
       throw error;
     }
   };

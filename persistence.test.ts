@@ -16,10 +16,15 @@ import {
   mapAppointmentToDb,
   updateAppointment
 } from './services/appointmentRepository';
-import { APPOINTMENT_STORAGE_KEY, getAvailableTimeSlots } from './scheduling';
+import {
+  APPOINTMENT_STORAGE_KEY,
+  getAvailableTimeSlots,
+  PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
+} from './scheduling';
 
 const makeAppointment = (overrides: Partial<Appointment> = {}): Appointment => ({
   id: 'appointment-1',
+  barbershopId: 'shop-1',
   barberId: 'barber-1',
   serviceId: 'service-1',
   clientName: 'Joao',
@@ -107,7 +112,7 @@ describe('appointment repository local fallback', () => {
 
     await expect(createAppointment(makeAppointment({ id: 'appointment-2' }), [existing]))
       .rejects
-      .toThrow('Horario indisponivel para este barbeiro.');
+      .toThrow(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
   });
 
   it('updates a completed appointment with financial record reference', async () => {
@@ -132,6 +137,8 @@ describe('appointment repository local fallback', () => {
 
     const slots = getAvailableTimeSlots({
       date: '2026-06-10',
+      barbershopId: 'shop-1',
+      barberId: 'barber-1',
       barberName: 'Carlos',
       serviceDurationMinutes: 30,
       appointments: [appointment],
