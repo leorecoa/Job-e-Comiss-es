@@ -14,7 +14,7 @@ vi.mock('./lib/supabase', () => ({
   supabase: supabaseMock
 }));
 
-import { createAppointment } from './services/appointmentRepository';
+import { createAppointment, listInternalAppointments, listPublicAppointmentSlots } from './services/appointmentRepository';
 import { listBarbers } from './services/barberRepository';
 import { listServices } from './services/serviceRepository';
 
@@ -63,6 +63,58 @@ const createTenantLookupQuery = (result: {
     maybeSingle: vi.fn().mockResolvedValue(result)
   };
   query.eq.mockReturnValue(query);
+  return query;
+};
+
+const createOrderedAppointmentsQuery = (result: {
+  data: Array<{
+    id: string;
+    barbershop_id: string | null;
+    client_name: string;
+    client_phone: string;
+    barber_id: string | null;
+    barber_name: string;
+    service_id: string | null;
+    service_type: string;
+    service_value: number;
+    start_at: string;
+    end_at: string;
+    status: Appointment['status'];
+    notes: string | null;
+    financial_record_id: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+  error: null;
+}) => {
+  const query = {
+    eq: vi.fn(),
+    order: vi.fn(),
+    then: undefined as unknown as Promise<{ data: unknown[]; error: null }>['then']
+  };
+  query.eq.mockReturnValue(query);
+  query.order.mockReturnValue(query);
+  query.then = Promise.resolve(result).then.bind(Promise.resolve(result));
+  return query;
+};
+
+const createOrderedPublicSlotsQuery = (result: {
+  data: Array<{
+    barbershop_id: string | null;
+    barber_id: string | null;
+    barber_name: string;
+    start_at: string;
+    end_at: string;
+    status: Appointment['status'];
+  }>;
+  error: null;
+}) => {
+  const query = {
+    eq: vi.fn(),
+    order: vi.fn()
+  };
+  query.eq.mockReturnValue(query);
+  query.order.mockResolvedValue(result);
   return query;
 };
 
@@ -183,6 +235,169 @@ describe('public booking tenant isolation repositories', () => {
         active: true
       }
     ]);
+  });
+
+  it('owner reads only appointments from the current barbershop_id', async () => {
+    const query = createOrderedAppointmentsQuery({
+      data: [
+        {
+          id: 'appointment-leo',
+          barbershop_id: 'shop-leo',
+          client_name: 'Cliente Leo',
+          client_phone: '85999990000',
+          barber_id: 'barber-leo',
+          barber_name: 'Leo',
+          service_id: 'service-leo',
+          service_type: 'Corte Leo',
+          service_value: 70,
+          start_at: '2026-06-22T15:00:00.000Z',
+          end_at: '2026-06-22T15:45:00.000Z',
+          status: 'scheduled',
+          notes: null,
+          financial_record_id: null,
+          created_at: '2026-06-22T10:00:00.000Z',
+          updated_at: '2026-06-22T10:00:00.000Z'
+        }
+      ],
+      error: null
+    });
+    const select = vi.fn().mockReturnValue(query);
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table !== 'appointments') throw new Error(`Unexpected table ${table}`);
+      return { select };
+    });
+
+    const appointments = await listInternalAppointments('shop-leo');
+
+    expect(supabaseMock.from).toHaveBeenCalledWith('appointments');
+    expect(select).toHaveBeenCalledWith('*');
+    expect(query.eq).toHaveBeenCalledTimes(1);
+    expect(query.eq).toHaveBeenCalledWith('barbershop_id', 'shop-leo');
+    expect(appointments).toHaveLength(1);
+    expect(appointments[0]?.barbershopId).toBe('shop-leo');
+  });
+
+  it('barber reads only appointments from the current barbershop_id and own barber_id', async () => {
+    const query = createOrderedAppointmentsQuery({
+      data: [
+        {
+          id: 'appointment-gabriel',
+          barbershop_id: 'shop-leo',
+          client_name: 'Cliente Gabriel',
+          client_phone: '85999990001',
+          barber_id: 'barber-gabriel',
+          barber_name: 'Gabriel',
+          service_id: 'service-leo',
+          service_type: 'Corte Leo',
+          service_value: 70,
+          start_at: '2026-06-22T16:00:00.000Z',
+          end_at: '2026-06-22T16:45:00.000Z',
+          status: 'scheduled',
+          notes: null,
+          financial_record_id: null,
+          created_at: '2026-06-22T10:00:00.000Z',
+          updated_at: '2026-06-22T10:00:00.000Z'
+        }
+      ],
+      error: null
+    });
+    const select = vi.fn().mockReturnValue(query);
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table !== 'appointments') throw new Error(`Unexpected table ${table}`);
+      return { select };
+    });
+
+    const appointments = await listInternalAppointments('shop-leo', 'barber-gabriel');
+
+    expect(supabaseMock.from).toHaveBeenCalledWith('appointments');
+    expect(select).toHaveBeenCalledWith('*');
+    expect(query.eq).toHaveBeenNthCalledWith(1, 'barbershop_id', 'shop-leo');
+    expect(query.eq).toHaveBeenNthCalledWith(2, 'barber_id', 'barber-gabriel');
+    expect(appointments).toHaveLength(1);
+    expect(appointments[0]?.barberId).toBe('barber-gabriel');
+    expect(appointments[0]?.barbershopId).toBe('shop-leo');
+  });
+
+  it('public booking reads occupied slots from public_appointment_slots instead of appointments', async () => {
+    const query = createOrderedPublicSlotsQuery({
+      data: [
+        {
+          barbershop_id: 'shop-leo',
+          barber_id: 'barber-leo',
+          barber_name: 'Leo',
+          start_at: '2026-06-22T15:00:00.000Z',
+          end_at: '2026-06-22T15:45:00.000Z',
+          status: 'scheduled'
+        }
+      ],
+      error: null
+    });
+    const select = vi.fn().mockReturnValue(query);
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table !== 'public_appointment_slots') throw new Error(`Unexpected table ${table}`);
+      return { select };
+    });
+
+    const slots = await listPublicAppointmentSlots('shop-leo');
+
+    expect(supabaseMock.from).toHaveBeenCalledWith('public_appointment_slots');
+    expect(select).toHaveBeenCalledWith('barbershop_id,barber_id,barber_name,start_at,end_at,status');
+    expect(query.eq).toHaveBeenCalledWith('barbershop_id', 'shop-leo');
+    expect(slots).toHaveLength(1);
+    expect(slots[0]?.barbershopId).toBe('shop-leo');
+  });
+
+  it('public booking create flow does not perform SELECT on appointments', async () => {
+    const publicSlotsQuery = createOrderedPublicSlotsQuery({
+      data: [],
+      error: null
+    });
+    const publicSlotsSelect = vi.fn().mockReturnValue(publicSlotsQuery);
+    const insert = vi.fn().mockResolvedValue({ error: null });
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'public_appointment_slots') {
+        return { select: publicSlotsSelect };
+      }
+
+      if (table === 'barbers') {
+        const query = createTenantLookupQuery({
+          data: { id: 'barber-leo', barbershop_id: 'shop-leo' },
+          error: null
+        });
+        return { select: vi.fn().mockReturnValue(query) };
+      }
+
+      if (table === 'services') {
+        const query = createTenantLookupQuery({
+          data: { id: 'service-leo', barbershop_id: 'shop-leo' },
+          error: null
+        });
+        return { select: vi.fn().mockReturnValue(query) };
+      }
+
+      if (table === 'appointments') {
+        return {
+          insert,
+          select: vi.fn(() => {
+            throw new Error('appointments SELECT must not be used in public booking');
+          })
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(createAppointment(makeAppointment())).resolves.toMatchObject({
+      id: 'appointment-1',
+      barbershopId: 'shop-leo'
+    });
+
+    expect(publicSlotsSelect).toHaveBeenCalled();
+    expect(insert).toHaveBeenCalledTimes(1);
   });
 
   it('creates the appointment with the current barbershop_id after validating barber and service tenant ownership', async () => {

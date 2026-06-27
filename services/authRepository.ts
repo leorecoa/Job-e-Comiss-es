@@ -52,7 +52,19 @@ export const canAccessInternalPanel = (
   supabaseConfigured: boolean
 ): boolean => {
   if (!supabaseConfigured) return true;
-  return authSession?.role === 'owner' || authSession?.role === 'barber';
+  if (!authSession) return false;
+
+  const hasBarbershopId = Boolean(authSession.barbershopId?.trim());
+
+  if (authSession.role === 'owner') {
+    return hasBarbershopId;
+  }
+
+  if (authSession.role === 'barber') {
+    return hasBarbershopId && Boolean(authSession.barberId?.trim());
+  }
+
+  return false;
 };
 
 const getAuthenticatedUserId = async (): Promise<string | null> => {
