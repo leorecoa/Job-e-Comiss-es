@@ -22,7 +22,8 @@ describe('auth role helpers', () => {
           userId: 'user-1',
           email: 'owner@example.com',
           displayName: 'Owner',
-          role: 'owner'
+          role: 'owner',
+          barbershopId: 'shop-1'
         },
         true
       )
@@ -35,11 +36,37 @@ describe('auth role helpers', () => {
           email: 'barber@example.com',
           displayName: 'Barber',
           role: 'barber',
+          barbershopId: 'shop-1',
           barberId: 'barber-1'
         },
         true
       )
     ).toBe(true);
+
+    expect(
+      canAccessInternalPanel(
+        {
+          userId: 'user-3',
+          email: 'owner-missing@example.com',
+          displayName: 'Owner Missing Shop',
+          role: 'owner'
+        },
+        true
+      )
+    ).toBe(false);
+
+    expect(
+      canAccessInternalPanel(
+        {
+          userId: 'user-4',
+          email: 'barber-missing@example.com',
+          displayName: 'Barber Missing Ids',
+          role: 'barber',
+          barbershopId: 'shop-1'
+        },
+        true
+      )
+    ).toBe(false);
   });
 
   it('maps Supabase session metadata into an app auth session', () => {
