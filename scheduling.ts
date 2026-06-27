@@ -1,4 +1,4 @@
-import { Appointment, AppSettings, BarbershopBusinessDay, BarbershopBusinessDayKey, BarbershopBusinessHours, Client, ClientType, Service, ServiceType } from './types';
+import { Appointment, AppSettings, BarberOption, BarbershopBusinessDay, BarbershopBusinessDayKey, BarbershopBusinessHours, Client, ClientType, Service, ServiceType } from './types';
 
 export const APPOINTMENT_STORAGE_KEY = 'barbearia_appointments';
 
@@ -45,6 +45,12 @@ export type PublicBookingValidationResult = {
   errors: string[];
 };
 
+export type PublicBookingValidationContext = {
+  barbers?: Array<Pick<BarberOption, 'id' | 'barbershopId' | 'active'>>;
+  services?: Array<Pick<Service, 'id' | 'barbershopId' | 'active'>>;
+  availableSlots?: TimeSlot[];
+};
+
 export type PublicBookingWorkday = {
   start: string;
   end: string;
@@ -58,6 +64,11 @@ export const ACTIVE_APPOINTMENT_CONFLICT_STATUSES: Appointment['status'][] = [
 
 export const APPOINTMENT_CONFLICT_ERROR_CODE = 'APPOINTMENT_ACTIVE_SLOT_CONFLICT';
 export const PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE = 'Esse hor\u00E1rio acabou de ser reservado. Escolha outro hor\u00E1rio.';
+export const PUBLIC_BOOKING_NAME_MIN_LENGTH = 2;
+export const PUBLIC_BOOKING_NAME_MAX_LENGTH = 80;
+export const PUBLIC_BOOKING_NOTES_MAX_LENGTH = 500;
+export const PUBLIC_BOOKING_PHONE_MIN_DIGITS = 10;
+export const PUBLIC_BOOKING_PHONE_MAX_DIGITS = 11;
 
 export const createAppointmentConflictError = (
   message: string = PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
@@ -98,6 +109,10 @@ export const normalizePhoneDigits = (phone?: string): string => {
   return (phone || '').replace(/\D/g, '');
 };
 
+export const trimPublicBookingText = (value?: string): string => {
+  return (value || '').trim();
+};
+
 export const toLocalDateInputValue = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -122,6 +137,11 @@ export const buildLocalDateTimeIso = (dateInput: string, timeInput: string): str
 
 export const addMinutesIso = (isoDate: string, minutes: number): string => {
   return new Date(new Date(isoDate).getTime() + minutes * 60 * 1000).toISOString();
+};
+
+export const isValidIsoDateTime = (value?: string | null): boolean => {
+  if (!value) return false;
+  return !Number.isNaN(new Date(value).getTime());
 };
 
 const getMinutesFromTimeInput = (timeInput: string): number => {
@@ -338,21 +358,100 @@ export const getAvailableTimeSlots = (params: {
 
 export const validatePublicBookingInput = (
   input: PublicBookingInput,
-  appointments: Appointment[]
+  appointments: Appointment[],
+  context: PublicBookingValidationContext = {}
 ): PublicBookingValidationResult => {
   const errors: string[] = [];
+  const clientName = trimPublicBookingText(input.clientName);
+  const clientPhone = trimPublicBookingText(input.clientPhone);
+  const notes = trimPublicBookingText(input.notes);
   const phoneDigits = normalizePhoneDigits(input.clientPhone);
-  if (!input.barberId) errors.push('Selecione um barbeiro.');
-  if (!input.service?.id) errors.push('Selecione um servico.');
+  const selectedBarber = input.barberId
+    ? context.barbers?.find((barber) => barber.id === input.barberId)
+    : undefined;
+  const selectedService = input.service?.id
+    ? context.services?.find((service) => service.id === input.service?.id)
+    : undefined;
 
   if (!input.barbershopId) errors.push('Barbearia nao encontrada ou indisponivel.');
+  if (!input.barberId) {
+    errors.push('Selecione um barbeiro.');
+  } else if (context.barbers && !selectedBarber) {
+    errors.push('O barbeiro selecionado nao pertence a esta barbearia.');
+  } else if (selectedBarber?.barbershopId && selectedBarber.barbershopId !== input.barbershopId) {
+    errors.push('O barbeiro selecionado nao pertence a esta barbearia.');
+  } else if (selectedBarber?.active === false) {
+    errors.push('O barbeiro selecionado esta inativo.');
+  }
+
+  if (!input.service?.id) {
+    errors.push('Selecione um servico.');
+  } else if (context.services && !selectedService) {
+    errors.push('O servico selecionado nao pertence a esta barbearia.');
+  } else if (selectedService?.barbershopId && selectedService.barbershopId !== input.barbershopId) {
+    errors.push('O servico selecionado nao pertence a esta barbearia.');
+  } else if (selectedService?.active === false) {
+    errors.push('O servico selecionado esta inativo.');
+  }
+
   if (!input.barberName) errors.push('Escolha um barbeiro.');
   if (!input.service) errors.push('Escolha um servico.');
-  if (!input.selectedSlot) errors.push('Escolha um horario disponivel.');
-  if (!input.clientName.trim()) errors.push('Informe seu nome.');
-  if (!phoneDigits || phoneDigits.length < 10) errors.push('Informe um WhatsApp valido com DDD.');
 
-  if (input.selectedSlot && input.barberName) {
+  if (!input.selectedSlot) {
+    errors.push('Escolha um horario disponivel.');
+  } else {
+    const startAt = input.selectedSlot.startAt;
+    const endAt = input.selectedSlot.endAt;
+
+    if (!isValidIsoDateTime(startAt)) {
+      errors.push('Horario inicial invalido.');
+    }
+
+    if (!isValidIsoDateTime(endAt)) {
+      errors.push('Horario final invalido.');
+    }
+
+    if (isValidIsoDateTime(startAt) && isValidIsoDateTime(endAt)) {
+      if (new Date(endAt).getTime() <= new Date(startAt).getTime()) {
+        errors.push('O horario final precisa ser maior que o horario inicial.');
+      }
+    }
+
+    if (context.availableSlots) {
+      const hasMatchingSlot = context.availableSlots.some((slot) => (
+        slot.available
+        && slot.startAt === input.selectedSlot?.startAt
+        && slot.endAt === input.selectedSlot?.endAt
+      ));
+
+      if (!hasMatchingSlot) {
+        errors.push('Escolha um horario disponivel.');
+      }
+    }
+  }
+
+  if (!clientName) {
+    errors.push('Informe seu nome.');
+  } else if (clientName.length < PUBLIC_BOOKING_NAME_MIN_LENGTH) {
+    errors.push(`Informe pelo menos ${PUBLIC_BOOKING_NAME_MIN_LENGTH} caracteres no nome.`);
+  } else if (clientName.length > PUBLIC_BOOKING_NAME_MAX_LENGTH) {
+    errors.push(`O nome deve ter no maximo ${PUBLIC_BOOKING_NAME_MAX_LENGTH} caracteres.`);
+  }
+
+  if (!clientPhone || !phoneDigits) {
+    errors.push('Informe um WhatsApp valido com DDD.');
+  } else if (
+    phoneDigits.length < PUBLIC_BOOKING_PHONE_MIN_DIGITS
+    || phoneDigits.length > PUBLIC_BOOKING_PHONE_MAX_DIGITS
+  ) {
+    errors.push(`O WhatsApp deve ter ${PUBLIC_BOOKING_PHONE_MIN_DIGITS} ou ${PUBLIC_BOOKING_PHONE_MAX_DIGITS} digitos.`);
+  }
+
+  if (notes.length > PUBLIC_BOOKING_NOTES_MAX_LENGTH) {
+    errors.push(`As observacoes devem ter no maximo ${PUBLIC_BOOKING_NOTES_MAX_LENGTH} caracteres.`);
+  }
+
+  if (input.selectedSlot && input.barberId) {
     const hasConflict = hasAppointmentConflict(appointments, {
       barbershopId: input.barbershopId,
       barberId: input.barberId,
@@ -376,10 +475,32 @@ export const createPublicAppointment = (
   id: string,
   now: Date = new Date()
 ): Appointment => {
+  const clientName = trimPublicBookingText(input.clientName);
+  const notes = trimPublicBookingText(input.notes);
+  const phoneDigits = normalizePhoneDigits(input.clientPhone);
+
   if (!input.barbershopId) throw new Error('Barbearia nao encontrada ou indisponivel.');
   if (!input.barberId) throw new Error('Selecione um barbeiro.');
   if (!input.service?.id) throw new Error('Selecione um servico.');
   if (!input.selectedSlot) throw new Error('Selecione um horario.');
+  if (!clientName) throw new Error('Informe seu nome.');
+  if (clientName.length < PUBLIC_BOOKING_NAME_MIN_LENGTH) {
+    throw new Error(`Informe pelo menos ${PUBLIC_BOOKING_NAME_MIN_LENGTH} caracteres no nome.`);
+  }
+  if (clientName.length > PUBLIC_BOOKING_NAME_MAX_LENGTH) {
+    throw new Error(`O nome deve ter no maximo ${PUBLIC_BOOKING_NAME_MAX_LENGTH} caracteres.`);
+  }
+  if (!phoneDigits || phoneDigits.length < PUBLIC_BOOKING_PHONE_MIN_DIGITS || phoneDigits.length > PUBLIC_BOOKING_PHONE_MAX_DIGITS) {
+    throw new Error(`O WhatsApp deve ter ${PUBLIC_BOOKING_PHONE_MIN_DIGITS} ou ${PUBLIC_BOOKING_PHONE_MAX_DIGITS} digitos.`);
+  }
+  if (!isValidIsoDateTime(input.selectedSlot.startAt)) throw new Error('Horario inicial invalido.');
+  if (!isValidIsoDateTime(input.selectedSlot.endAt)) throw new Error('Horario final invalido.');
+  if (new Date(input.selectedSlot.endAt).getTime() <= new Date(input.selectedSlot.startAt).getTime()) {
+    throw new Error('O horario final precisa ser maior que o horario inicial.');
+  }
+  if (notes.length > PUBLIC_BOOKING_NOTES_MAX_LENGTH) {
+    throw new Error(`As observacoes devem ter no maximo ${PUBLIC_BOOKING_NOTES_MAX_LENGTH} caracteres.`);
+  }
 
   const timestamp = now.toISOString();
 
@@ -388,8 +509,8 @@ export const createPublicAppointment = (
     barbershopId: input.barbershopId,
     barberId: input.barberId,
     serviceId: input.service.id,
-    clientName: input.clientName.trim(),
-    clientPhone: normalizePhoneDigits(input.clientPhone),
+    clientName,
+    clientPhone: phoneDigits,
     barberName: input.barberName,
     serviceType: input.service.name,
     serviceValue: input.service.price,
@@ -397,10 +518,66 @@ export const createPublicAppointment = (
     startAt: input.selectedSlot.startAt,
     endAt: input.selectedSlot.endAt,
     status: 'scheduled',
-    notes: input.notes?.trim() || undefined,
+    notes: notes || undefined,
     createdAt: timestamp,
     updatedAt: timestamp
   };
+};
+
+export const validatePublicAppointmentRecord = (appointment: Appointment): string[] => {
+  const errors: string[] = [];
+  const clientName = trimPublicBookingText(appointment.clientName);
+  const phoneDigits = normalizePhoneDigits(appointment.clientPhone);
+  const notes = trimPublicBookingText(appointment.notes);
+
+  if (!appointment.barbershopId?.trim()) {
+    errors.push('Barbearia nao encontrada ou indisponivel.');
+  }
+
+  if (!appointment.barberId?.trim()) {
+    errors.push('Selecione um barbeiro.');
+  }
+
+  if (!appointment.serviceId?.trim()) {
+    errors.push('Selecione um servico.');
+  }
+
+  if (!clientName) {
+    errors.push('Informe seu nome.');
+  } else if (clientName.length < PUBLIC_BOOKING_NAME_MIN_LENGTH) {
+    errors.push(`Informe pelo menos ${PUBLIC_BOOKING_NAME_MIN_LENGTH} caracteres no nome.`);
+  } else if (clientName.length > PUBLIC_BOOKING_NAME_MAX_LENGTH) {
+    errors.push(`O nome deve ter no maximo ${PUBLIC_BOOKING_NAME_MAX_LENGTH} caracteres.`);
+  }
+
+  if (!phoneDigits) {
+    errors.push('Informe um WhatsApp valido com DDD.');
+  } else if (
+    phoneDigits.length < PUBLIC_BOOKING_PHONE_MIN_DIGITS
+    || phoneDigits.length > PUBLIC_BOOKING_PHONE_MAX_DIGITS
+  ) {
+    errors.push(`O WhatsApp deve ter ${PUBLIC_BOOKING_PHONE_MIN_DIGITS} ou ${PUBLIC_BOOKING_PHONE_MAX_DIGITS} digitos.`);
+  }
+
+  if (!isValidIsoDateTime(appointment.startAt)) {
+    errors.push('Horario inicial invalido.');
+  }
+
+  if (!isValidIsoDateTime(appointment.endAt)) {
+    errors.push('Horario final invalido.');
+  }
+
+  if (isValidIsoDateTime(appointment.startAt) && isValidIsoDateTime(appointment.endAt)) {
+    if (new Date(appointment.endAt).getTime() <= new Date(appointment.startAt).getTime()) {
+      errors.push('O horario final precisa ser maior que o horario inicial.');
+    }
+  }
+
+  if (notes.length > PUBLIC_BOOKING_NOTES_MAX_LENGTH) {
+    errors.push(`As observacoes devem ter no maximo ${PUBLIC_BOOKING_NOTES_MAX_LENGTH} caracteres.`);
+  }
+
+  return errors;
 };
 
 export const buildWhatsAppLink = (appointment: Appointment): string | null => {

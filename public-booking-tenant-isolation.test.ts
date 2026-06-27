@@ -345,6 +345,37 @@ describe('public booking tenant isolation repositories', () => {
     );
   });
 
+  it('rejects a public appointment with an empty client name before Supabase', async () => {
+    await expect(
+      createAppointment(makeAppointment({
+        clientName: '   '
+      }), [])
+    ).rejects.toThrow('Informe seu nome.');
+
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
+  });
+
+  it('rejects a public appointment with an invalid phone before Supabase', async () => {
+    await expect(
+      createAppointment(makeAppointment({
+        clientPhone: '1234'
+      }), [])
+    ).rejects.toThrow('O WhatsApp deve ter 10 ou 11 digitos.');
+
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
+  });
+
+  it('rejects a public appointment with an invalid date range before Supabase', async () => {
+    await expect(
+      createAppointment(makeAppointment({
+        startAt: '2026-06-22T15:45:00.000Z',
+        endAt: '2026-06-22T15:00:00.000Z'
+      }), [])
+    ).rejects.toThrow('O horario final precisa ser maior que o horario inicial.');
+
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
+  });
+
   it('rejects a public appointment when the barber belongs to another barbershop', async () => {
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'barbers') {
@@ -373,5 +404,65 @@ describe('public booking tenant isolation repositories', () => {
     await expect(
       createAppointment(makeAppointment({ barberId: 'barber-gm', barberName: 'Barber GM' }), [])
     ).rejects.toThrow('Barbeiro invalido para esta barbearia.');
+  });
+
+  it('rejects a public appointment when the barber is inactive', async () => {
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'barbers') {
+        const query = createTenantLookupQuery({
+          data: null,
+          error: null
+        });
+        return { select: vi.fn().mockReturnValue(query) };
+      }
+
+      if (table === 'services') {
+        const query = createTenantLookupQuery({
+          data: { id: 'service-leo', barbershop_id: 'shop-leo' },
+          error: null
+        });
+        return { select: vi.fn().mockReturnValue(query) };
+      }
+
+      if (table === 'appointments') {
+        return { insert: vi.fn() };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(
+      createAppointment(makeAppointment(), [])
+    ).rejects.toThrow('Barbeiro invalido para esta barbearia.');
+  });
+
+  it('rejects a public appointment when the service is inactive', async () => {
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'barbers') {
+        const query = createTenantLookupQuery({
+          data: { id: 'barber-leo', barbershop_id: 'shop-leo' },
+          error: null
+        });
+        return { select: vi.fn().mockReturnValue(query) };
+      }
+
+      if (table === 'services') {
+        const query = createTenantLookupQuery({
+          data: null,
+          error: null
+        });
+        return { select: vi.fn().mockReturnValue(query) };
+      }
+
+      if (table === 'appointments') {
+        return { insert: vi.fn() };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(
+      createAppointment(makeAppointment(), [])
+    ).rejects.toThrow('Servico invalido para esta barbearia.');
   });
 });

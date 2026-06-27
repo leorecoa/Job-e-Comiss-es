@@ -6,7 +6,8 @@ import {
   createAppointmentConflictError,
   getAppointmentDateInput,
   hasAppointmentConflict,
-  PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
+  PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE,
+  validatePublicAppointmentRecord
 } from '../scheduling';
 
 export type DatabaseAppointmentRow = {
@@ -289,6 +290,12 @@ export const createAppointment = async ( // This function is used by both intern
   appointment: Appointment,
   existingAppointments?: Appointment[]
 ): Promise<Appointment> => {
+  const validationErrors = validatePublicAppointmentRecord(appointment);
+
+  if (validationErrors.length > 0) {
+    throw new Error(validationErrors[0]);
+  }
+
   const appointments = existingAppointments || await listPublicAppointmentSlots(appointment.barbershopId);
 
   if (hasAppointmentConflict(appointments, appointment)) {
