@@ -165,6 +165,8 @@ Real authorization depends on the combination of:
 
 Frontend role checks improve UX and reduce invalid actions, but they do not replace backend enforcement.
 
+Owner-to-barber profile linking by email should be mediated by a reviewed backend surface instead of direct frontend table access. See `docs/barber-profile-linking-rpc.md`.
+
 ## Current limits
 
 This document does not claim absolute security.
