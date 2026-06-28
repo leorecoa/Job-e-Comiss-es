@@ -42,6 +42,7 @@ import { BarberDashboard } from './components/BarberDashboard';
 import { BarbershopBrandingSettings } from './components/BarbershopBrandingSettings';
 import { OwnerCatalogManager } from './components/OwnerCatalogManager';
 import { OwnerBarbershopOnboarding } from './components/OwnerBarbershopOnboarding';
+import { OwnerSetupChecklist } from './components/OwnerSetupChecklist';
 import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
 import { createService, listServices, removeService, updateService } from './services/serviceRepository';
@@ -1641,6 +1642,14 @@ const App: React.FC = () => {
                 success={ownerBarbershopSuccess}
                 onSave={handleSaveOwnerBarbershopBranding}
                 onUploadImage={handleUploadOwnerBarbershopBrandingImage}
+             />
+
+             <OwnerSetupChecklist
+                role={authSession?.role || 'owner'}
+                authSession={authSession}
+                barbershop={ownerBarbershop}
+                barbers={ownerCatalogBarbers}
+                services={ownerCatalogServices}
              />
 
              <OwnerCatalogManager
