@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { Appointment, AppSettings } from '../types';
 import { AuthSession } from '../services/authRepository';
@@ -35,6 +34,8 @@ type BarberDashboardProps = {
   onLogout: () => void;
 };
 
+export const BARBER_PROFILE_INCOMPLETE_MESSAGE = 'Perfil de barbeiro incompleto. Peca ao owner para vincular sua conta novamente.';
+
 const getTodayString = (): string => {
   const d = new Date();
   const year = d.getFullYear();
@@ -50,6 +51,35 @@ const getCurrentMonthString = (): string => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
 
   return `${year}-${month}`;
+};
+
+export const buildBarberOwnedAppointment = ({
+  appointment,
+  authSession,
+  currentBarberName
+}: {
+  appointment: Appointment;
+  authSession: AuthSession;
+  currentBarberName?: string | null;
+}): Appointment => {
+  if (authSession.role !== 'barber') {
+    throw new Error(BARBER_PROFILE_INCOMPLETE_MESSAGE);
+  }
+
+  const barbershopId = authSession.barbershopId?.trim();
+  const barberId = authSession.barberId?.trim();
+  const barberName = currentBarberName?.trim();
+
+  if (!barbershopId || !barberId || !barberName) {
+    throw new Error(BARBER_PROFILE_INCOMPLETE_MESSAGE);
+  }
+
+  return {
+    ...appointment,
+    barbershopId,
+    barberId,
+    barberName
+  };
 };
 
 export const BarberDashboard: React.FC<BarberDashboardProps> = ({
@@ -68,13 +98,12 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
 
   const barberId = authSession.barberId;
 
-  const currentBarber = useMemo(() =>
-    settings.barbers?.find((item) => item.id === barberId),
-  [barberId, settings.barbers]);
+  const currentBarber = useMemo(
+    () => settings.barbers?.find((item) => item.id === barberId),
+    [barberId, settings.barbers]
+  );
 
-  const barberName = useMemo(() => {
-    return currentBarber?.name || 'Barbeiro';
-  }, [currentBarber]);
+  const barberName = useMemo(() => currentBarber?.name || 'Barbeiro', [currentBarber]);
 
   const barberAppointments = useMemo(() => {
     if (!barberId) return [];
@@ -82,11 +111,11 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
     return appointments.filter((appointment) => appointment.barberId === barberId);
   }, [appointments, barberId]);
 
-  const todayAppointments = useMemo(() => {
-    return barberAppointments
+  const todayAppointments = useMemo(() => (
+    barberAppointments
       .filter((appointment) => getAppointmentDateInput(appointment) === selectedDate)
-      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  }, [barberAppointments, selectedDate]);
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
+  ), [barberAppointments, selectedDate]);
 
   const upcomingAppointments = useMemo(() => {
     const now = new Date();
@@ -100,11 +129,11 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   }, [barberAppointments, selectedDate]);
 
-  const dailyCommission = useMemo(() => {
-    return todayAppointments
+  const dailyCommission = useMemo(() => (
+    todayAppointments
       .filter((appointment) => appointment.status === 'completed')
-      .reduce((sum, appointment) => sum + calculateEstimatedCommission(appointment, settings), 0);
-  }, [todayAppointments, settings]);
+      .reduce((sum, appointment) => sum + calculateEstimatedCommission(appointment, settings), 0)
+  ), [todayAppointments, settings]);
 
   const monthlyCommission = useMemo(() => {
     const currentMonth = getCurrentMonthString();
@@ -117,12 +146,10 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       .reduce((sum, appointment) => sum + calculateEstimatedCommission(appointment, settings), 0);
   }, [barberAppointments, settings]);
 
-  const barberScopedSettings = useMemo(() => {
-    return {
-      ...settings,
-      barbers: currentBarber ? [currentBarber] : []
-    };
-  }, [currentBarber, settings]);
+  const barberScopedSettings = useMemo(() => ({
+    ...settings,
+    barbers: currentBarber ? [currentBarber] : []
+  }), [currentBarber, settings]);
 
   const handleOpenNewAppointment = () => {
     setEditingAppointment(null);
@@ -135,16 +162,21 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   };
 
   const handleSaveAppointment = async (appointment: Appointment) => {
-    if (!barberId) {
-      addToast('Seu usuário ainda não está vinculado a um barbeiro.', 'error');
+    let appointmentForBarber: Appointment;
+
+    try {
+      appointmentForBarber = buildBarberOwnedAppointment({
+        appointment,
+        authSession,
+        currentBarberName: barberName
+      });
+    } catch (error) {
+      addToast(
+        error instanceof Error ? error.message : BARBER_PROFILE_INCOMPLETE_MESSAGE,
+        'error'
+      );
       return;
     }
-
-    const appointmentForBarber: Appointment = {
-      ...appointment,
-      barberId,
-      barberName
-    };
 
     if (editingAppointment) {
       await onUpdateAppointment(editingAppointment.id, {
@@ -168,7 +200,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       updatedAt: new Date().toISOString()
     });
 
-    addToast('Agendamento marcado como concluído!', 'success');
+    addToast('Agendamento marcado como concluido!', 'success');
   };
 
   const changeDate = (days: number) => {
@@ -189,19 +221,16 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
         <div className="glass-card w-full max-w-lg rounded-2xl p-7 text-center">
           <h1 className="text-white font-display text-2xl font-bold mb-3">
-            Vínculo pendente
+            Vinculo pendente
           </h1>
           <p className="text-gray-400 text-sm leading-relaxed">
-            Seu usuário ainda não está vinculado a um barbeiro. Peça ao administrador
-            para concluir o vínculo do seu perfil.
+            Seu usuario ainda nao esta vinculado a um barbeiro. Peca ao administrador
+            para concluir o vinculo do seu perfil.
           </p>
         </div>
       </div>
     );
   }
-
-  // TODO: aplicar RLS no Supabase para garantir que barbeiros só acessem os próprios appointments no banco.
-  // O filtro abaixo é apenas a proteção de interface.
 
   return (
     <div className="min-h-screen bg-transparent pb-24 font-sans selection:bg-gold-500/30">
@@ -272,7 +301,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="glass-card p-5 rounded-2xl flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Comissão do Dia</p>
+              <p className="text-sm text-gray-400">Comissao do Dia</p>
               <p className="text-2xl font-bold text-gold-500">
                 {formatCurrency(dailyCommission)}
               </p>
@@ -283,7 +312,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
 
           <div className="glass-card p-5 rounded-2xl flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Comissão do Mês</p>
+              <p className="text-sm text-gray-400">Comissao do Mes</p>
               <p className="text-2xl font-bold text-blue-400">
                 {formatCurrency(monthlyCommission)}
               </p>
@@ -327,7 +356,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                           type="button"
                           onClick={() => handleMarkAsCompleted(appointment)}
                           className="p-2 rounded-full bg-green-500/10 text-green-400 hover:bg-green-500/20"
-                          title="Marcar como Concluído"
+                          title="Marcar como Concluido"
                         >
                           <CheckCircle size={18} />
                         </button>
@@ -373,7 +402,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
         <section className="glass-card p-6 rounded-2xl">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <Clock size={20} />
-            Próximos Agendamentos
+            Proximos Agendamentos
           </h2>
 
           {upcomingAppointments.length === 0 ? (
@@ -394,7 +423,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                         {appointment.serviceType} · {formatCurrency(appointment.serviceValue)}
                       </p>
                       <p className="text-xs text-gold-400 font-mono">
-                        {new Date(appointment.startAt).toLocaleDateString('pt-BR')} às{' '}
+                        {new Date(appointment.startAt).toLocaleDateString('pt-BR')} as{' '}
                         {formatTime(new Date(appointment.startAt).getTime())}
                       </p>
                     </div>
