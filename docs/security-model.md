@@ -176,6 +176,8 @@ Known limits and recommended follow-up work:
 - dependencies should continue to be audited regularly
 - `npm audit --audit-level=moderate` remains part of the recurring project validation
 
+For the dependency audit and merge process, see `docs/dependency-audit.md`.
+
 ## Operational checklist
 
 Before deploying or changing tenant-sensitive behavior:
