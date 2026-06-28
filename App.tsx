@@ -43,8 +43,10 @@ import { BarbershopBrandingSettings } from './components/BarbershopBrandingSetti
 import { OwnerCatalogManager } from './components/OwnerCatalogManager';
 import { OwnerBarbershopOnboarding } from './components/OwnerBarbershopOnboarding';
 import { OwnerSetupChecklist } from './components/OwnerSetupChecklist';
+import { OwnerBarberProfileLinking } from './components/OwnerBarberProfileLinking';
 import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
+import { linkBarberProfileByEmail } from './services/profileLinkingRepository';
 import { createService, listServices, removeService, updateService } from './services/serviceRepository';
 import { AppRole, AuthSession, canAccessInternalPanel, getCurrentAuthSession, signInWithPassword, signOut as signOutAuth, signUpWithPassword } from './services/authRepository';
 import { 
@@ -1025,6 +1027,23 @@ const App: React.FC = () => {
     );
   };
 
+  const handleLinkOwnerBarberProfile = async ({
+    targetEmail,
+    targetBarberId
+  }: {
+    targetEmail: string;
+    targetBarberId: string;
+  }) => {
+    const barbershopId = getOwnerCatalogBarbershopId();
+
+    return linkBarberProfileByEmail({
+      targetEmail,
+      targetBarberId,
+      ownerBarbers: ownerCatalogBarbers,
+      ownerBarbershopId: barbershopId
+    });
+  };
+
   const handleSaveOwnerBarbershopBranding = async (input: BarbershopBrandingInput) => {
     if (authSession?.role === 'barber') return;
 
@@ -1650,6 +1669,12 @@ const App: React.FC = () => {
                 barbershop={ownerBarbershop}
                 barbers={ownerCatalogBarbers}
                 services={ownerCatalogServices}
+             />
+
+             <OwnerBarberProfileLinking
+                role={authSession?.role || 'owner'}
+                barbers={ownerCatalogBarbers}
+                onLinkProfile={handleLinkOwnerBarberProfile}
              />
 
              <OwnerCatalogManager
