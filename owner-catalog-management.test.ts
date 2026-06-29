@@ -445,6 +445,38 @@ describe('owner catalog management', () => {
     expect(supabaseMock.from).not.toHaveBeenCalled();
   });
 
+  it('does not update a service when the owner barbershop id is not a valid UUID', async () => {
+    await expect(updateService(SERVICE_UUID, {
+      name: 'Corte Premium'
+    }, INVALID_LOCAL_ID)).rejects.toThrow('Sua conta nao possui uma barbearia valida para atualizar servico.');
+
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+  });
+
+  it('does not update a barber when the owner barbershop id is not a valid UUID', async () => {
+    await expect(updateBarber(BARBER_UUID, {
+      name: 'Leo Premium'
+    }, INVALID_LOCAL_ID)).rejects.toThrow('Sua conta nao possui uma barbearia valida para atualizar barbeiro.');
+
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+  });
+
+  it('does not remove a service when the owner barbershop id is not a valid UUID', async () => {
+    await expect(removeService(SERVICE_UUID, INVALID_LOCAL_ID)).rejects.toThrow(
+      'Sua conta nao possui uma barbearia valida para remover servico.'
+    );
+
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+  });
+
+  it('does not remove a barber when the owner barbershop id is not a valid UUID', async () => {
+    await expect(removeBarber(BARBER_UUID, INVALID_LOCAL_ID)).rejects.toThrow(
+      'Sua conta nao possui uma barbearia valida para remover barbeiro.'
+    );
+
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+  });
+
   it('resolves the real authenticated UUID for owner catalog actions', () => {
     expect(resolveOwnerScopedBarbershopId({
       authBarbershopId: OWNER_BARBERSHOP_UUID,
