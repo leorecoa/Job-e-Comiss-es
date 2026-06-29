@@ -1,8 +1,8 @@
-# Job e Comissões
+# Job e Comissoes
 
-Sistema SaaS para barbearias controlarem agendamentos, comissões, serviços, barbeiros, relatórios financeiros e booking público por barbearia.
+SaaS multi-tenant para operacao de barbearias, com foco em agenda, booking publico, catalogo por tenant, barbeiros, servicos e controle operacional.
 
-O projeto nasceu como uma ferramenta de controle financeiro para barbearias e evoluiu para uma aplicação multi-tenant com Supabase, autenticação, roles, RLS, booking público e operação por barbearia.
+O projeto nasceu como uma ferramenta de controle interno e hoje opera como uma aplicacao React + Supabase com autenticacao, isolamento por `barbershop_id`, RLS tenant-aware e fluxos separados para owner, barber e cliente final.
 
 <p align="left">
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=111827" />
@@ -11,423 +11,403 @@ O projeto nasceu como uma ferramenta de controle financeiro para barbearias e ev
   <img src="https://img.shields.io/badge/TailwindCSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
   <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=111827" />
   <img src="https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" />
+  <img src="https://img.shields.io/badge/Playwright-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" />
 </p>
 
 ---
 
-## Visão geral
+## Visao geral
 
-O **Job e Comissões** é uma aplicação web para gestão operacional de barbearias.
+O **Job e Comissoes** e uma SPA para gestao de barbearias com modelo SaaS multi-tenant.
 
-A plataforma permite registrar atendimentos, calcular comissões, controlar vales, acompanhar vendas de produtos, organizar agenda interna e disponibilizar um booking público para clientes agendarem horários.
+O produto cobre tres frentes principais:
 
-Além do uso operacional diário, o projeto também explora conceitos importantes de produto SaaS, como autenticação, papéis de usuário, isolamento por barbearia, políticas RLS, rotas públicas por slug e configuração visual da barbearia.
+- operacao interna da barbearia;
+- booking publico por slug em `/book/:slug`;
+- isolamento de tenant por `barbershop_id`.
+
+Hoje o app ja suporta agenda interna, catalogo por tenant, onboarding de owner, vinculacao de barbeiro a usuario, painel proprio do barbeiro e configuracao operacional da barbearia.
 
 ---
 
 ## Problema que resolve
 
-Barbearias pequenas e médias costumam controlar agenda, comissões e fechamento financeiro por planilhas, cadernos ou mensagens de WhatsApp.
+Barbearias pequenas e medias costumam operar agenda, comissao, servicos e fechamento por planilha, caderno ou mensagens.
 
-Esse fluxo gera problemas como:
+Esse fluxo tende a gerar:
 
-- perda de histórico financeiro;
-- cálculo manual de comissão;
-- dificuldade para conferir atendimentos por barbeiro;
-- falta de visão diária, semanal ou mensal;
-- risco de agendamento duplicado;
-- pouca organização entre serviços, profissionais e clientes;
-- ausência de uma página pública simples para agendamento.
+- perda de historico operacional;
+- calculo manual de comissao;
+- agenda misturada entre profissionais;
+- dificuldade para abrir booking publico sem expor dados internos;
+- dependencia de ajustes manuais no banco para colocar uma nova barbearia em operacao;
+- risco de mistura de dados entre tenants em uma evolucao SaaS mal isolada.
 
-O Job e Comissões centraliza esse processo em uma aplicação web com foco em clareza operacional, segurança dos dados e evolução para uso comercial.
+O Job e Comissoes centraliza essa operacao em uma unica aplicacao, com tenant isolation e fluxos separados por papel.
 
 ---
 
 ## Funcionalidades principais
 
-- Cadastro e controle de atendimentos.
-- Cálculo de comissão por serviço.
-- Registro de vendas de produtos.
-- Controle de vales/adiantamentos.
-- Dashboard financeiro.
-- Agenda interna por barbeiro.
-- Status de agendamento.
-- Booking público para clientes.
-- Gestão de barbeiros.
-- Gestão de serviços.
-- Gestão de horários comerciais.
-- Configuração de identidade visual da barbearia.
-- Exportação de relatórios.
-- Backup e restauração para ambiente de demonstração/desenvolvimento.
-- Autenticação com Supabase Auth.
-- Controle de acesso por roles.
-- Isolamento multi-tenant por barbearia.
-- Policies RLS para proteção dos dados.
+- agenda interna com status de agendamento;
+- booking publico por slug;
+- catalogo de barbeiros por tenant;
+- catalogo de servicos por tenant;
+- configuracao de business hours e `slot_step_minutes` por barbearia;
+- onboarding de owner e checklist operacional;
+- branding publico da barbearia;
+- vinculacao de barbeiro a usuario por e-mail via RPC;
+- painel do barbeiro com agenda propria;
+- criacao manual de agendamento pelo barbeiro usando a sessao autenticada;
+- controle de comissoes, vales e relatorios;
+- persistencia em Supabase com fallback local apenas para dev/demo;
+- autenticacao com roles `owner` e `barber`;
+- isolamento multi-tenant por `barbershop_id`.
 
 ---
 
 ## Estado atual do produto
 
-- Controle financeiro de atendimentos, produtos, vales e comissões.
-- Agenda interna com status de agendamento.
-- Booking público por rota `/book`, `/agendar` e slug da barbearia.
-- Persistência via Supabase com fallback local para desenvolvimento.
-- Supabase Auth para painel interno.
-- Roles `owner` e `barber`.
-- Isolamento multi-tenant por `barbershop_id`.
-- Policies RLS aplicadas para reduzir risco de vazamento entre barbearias.
-- Gestão de catálogo, barbeiros, serviços, horários comerciais e branding.
+O estado atual real do app inclui:
 
-Sem variáveis Supabase configuradas, o app usa `localStorage` como fallback de desenvolvimento e demonstração. Em ambiente configurado, os fluxos principais usam Supabase.
+- multi-tenant por `barbershop_id`;
+- booking publico por `/book/:slug`;
+- onboarding de owner com criacao de barbearia;
+- checklist operacional do owner;
+- catalogo de barbeiros e servicos por tenant;
+- horarios e `slot_step_minutes` por barbearia;
+- branding publico por barbearia;
+- vinculacao owner -> barber por e-mail via RPC `link_barber_profile_by_email`;
+- painel do barbeiro com leitura da propria agenda;
+- criacao manual de agendamento pelo barbeiro usando `authSession.barbershopId` e `authSession.barberId`;
+- bloqueio de slug invalido no booking publico;
+- validacao robusta de payload no booking publico;
+- bloqueio de horarios duplicados ativos;
+- fail-closed em producao sem Supabase configurado;
+- cobertura automatizada com Vitest e Playwright.
+
+O fallback local existe para desenvolvimento e demonstracao. Em producao, o app nao deve operar dados reais sem Supabase configurado.
 
 ---
 
-## Demonstração
+## Demonstracao
 
-Deploy:
+Deploy atual:
 
 ```txt
 https://job-e-comiss-es.vercel.app
+```
 
 Rotas principais:
 
-/              Página inicial / painel conforme contexto da aplicação
-/book          Booking público
-/agendar       Booking público alternativo
-/login         Autenticação
-/dashboard     Painel interno
+```txt
+/                 painel interno ou fluxo publico conforme contexto
+/book/:slug       booking publico da barbearia
+/book             rota publica sem slug explicito
+/agendar          alias publico
+/onboarding       criacao inicial da barbearia do owner
+```
 
-Exemplo de fluxo público:
+Fluxo publico:
 
-Cliente acessa o link da barbearia
-→ escolhe serviço
-→ escolhe barbeiro
-→ seleciona horário disponível
-→ informa nome e telefone
-→ confirma o agendamento
+```txt
+Cliente acessa /book/:slug
+-> escolhe barbeiro
+-> escolhe servico
+-> escolhe data e horario
+-> informa nome e telefone
+-> confirma agendamento
+```
 
-Exemplo de fluxo interno:
+Fluxo owner:
 
-Owner ou barber acessa o painel
-→ visualiza agenda
-→ acompanha atendimentos
-→ altera status
-→ registra conclusão
-→ acompanha impacto financeiro e comissões
+```txt
+Owner entra no painel
+-> configura barbearia
+-> define dias/horarios
+-> cria barbeiros
+-> cria servicos
+-> verifica checklist
+-> usa o link /book/:slug
+```
+
+Fluxo barber:
+
+```txt
+Barber entra com conta vinculada
+-> ve apenas a propria agenda
+-> cria agendamento manual apenas para si
+-> atualiza status do proprio fluxo operacional
+```
 
 ---
 
-Arquitetura
+## Arquitetura
 
-A aplicação é organizada em camadas para separar interface, regras de negócio, persistência e integrações.
+A aplicacao separa interface, regras de negocio e persistencia por repositories.
 
+```txt
 Frontend React
-├── Páginas públicas
-│   └── Booking / agendamento público
-│
-├── Painel interno
-│   ├── Dashboard
-│   ├── Agenda
-│   ├── Serviços
-│   ├── Barbeiros
-│   ├── Configurações
-│   └── Relatórios
-│
-├── Camada de domínio
-│   ├── Atendimentos
-│   ├── Agendamentos
-│   ├── Comissões
-│   ├── Produtos
-│   ├── Vales
-│   └── Barbearias
-│
-├── Repositórios
-│   ├── Supabase
-│   └── Fallback local
-│
-└── Infraestrutura
-    ├── Supabase Auth
-    ├── Supabase Database
-    ├── Supabase RLS
-    └── Vercel
+|- rotas publicas
+|  \- booking publico por slug
+|
+|- painel interno
+|  |- owner
+|  \- barber
+|
+|- camada de dominio
+|  |- appointments
+|  |- barbers
+|  |- services
+|  |- barbershops
+|  \- finance
+|
+|- repositories
+|  |- Supabase
+|  \- fallback local para dev/demo
+|
+\- infraestrutura
+   |- Supabase Auth
+   |- Supabase Database
+   |- Supabase RLS
+   \- Vercel
+```
 
-Principais decisões arquiteturais:
+Decisoes importantes:
 
-- React + TypeScript para interface e regras client-side.
-- Supabase como backend gerenciado.
-- Repositories para separar acesso a dados da interface.
-- Fallback local para desenvolvimento e demonstração.
-- RLS para reforçar isolamento entre barbearias.
-- Rotas públicas separadas do painel autenticado.
-- Estrutura preparada para evolução SaaS.
+- React + TypeScript no frontend;
+- Supabase como backend gerenciado;
+- repositories para separar UI e persistencia;
+- fallback local apenas fora de producao;
+- booking publico desacoplado de `appointments` completos;
+- tenant isolation por `barbershop_id`.
 
 ---
 
-Stack
+## Stack
 
-Frontend
+### Frontend
 
 - React 19
 - TypeScript
 - Vite
 - TailwindCSS
 - Framer Motion
-- React Router
 - jsPDF
 
-Backend as a Service
+### Backend as a Service
 
 - Supabase Auth
 - Supabase Database
 - Supabase Row Level Security
-- Supabase Storage, quando aplicável para branding/imagens
+- Supabase Storage para branding
 
-Qualidade
+### Qualidade
 
 - Vitest
-- Testing Library
+- Playwright
 - TypeScript typecheck
-- ESLint
-- Build validation
 - GitHub Actions
 
-Deploy
+### Deploy
 
 - Vercel
 
 ---
 
-Segurança e multi-tenant
+## Seguranca e multi-tenant
 
-O projeto utiliza Supabase com políticas de segurança em nível de linha para reduzir o risco de acesso indevido entre barbearias.
+O app usa `barbershop_id` como chave principal de isolamento de tenant.
 
-Modelo principal de isolamento:
+Modelo base:
 
+```txt
 barbershops
-├── services
-├── barbers
-├── appointments
-├── profiles
-└── financial records
+|- profiles
+|- barbers
+|- services
+|- appointments
+\- financial records
+```
 
-Cada registro operacional relevante é associado a uma barbearia por meio de "barbershop_id".
+Pontos principais do modelo atual:
 
-Estratégia de acesso:
+- RLS tenant-aware no Supabase;
+- owner opera a propria barbearia;
+- barber opera apenas o proprio escopo autenticado;
+- booking publico nao faz `SELECT` publico em `appointments`;
+- disponibilidade publica usa `public_appointment_slots`;
+- payload publico e validado antes de chegar ao Supabase;
+- RPC dedicada para vinculo owner -> barber por e-mail;
+- regressao automatizada para mutations sensiveis entre tenants;
+- fallback/localStorage nao deve ser tratado como auth de producao.
 
-- "owner": acessa e gerencia dados da própria barbearia.
-- "barber": acessa dados relacionados à própria barbearia e ao próprio escopo operacional.
-- público: acessa apenas informações necessárias para booking público.
-- cliente público: consegue criar agendamento sem acessar dados internos da barbearia.
+Limites importantes:
 
-Pontos de segurança trabalhados:
+- isso nao significa seguranca absoluta;
+- persistencia de sessao em SPA ainda merece hardening continuo contra XSS;
+- CAPTCHA, rate limiting externo e observabilidade ainda podem evoluir.
 
-- isolamento por "barbershop_id";
-- uso de policies RLS;
-- separação entre rotas públicas e painel interno;
-- redução de exposição de dados sensíveis no booking público;
-- validação de payloads de agendamento;
-- controle de status dos agendamentos;
-- preservação do vínculo financeiro após conclusão de atendimento.
+Mais detalhes:
 
----
-
-Booking público
-
-O booking público permite que clientes agendem horários sem precisar acessar o painel interno.
-
-Fluxo esperado:
-
-Acessar link público
-→ selecionar serviço
-→ selecionar barbeiro
-→ escolher horário
-→ informar dados básicos
-→ confirmar agendamento
-
-Recursos do booking:
-
-- rota pública "/book";
-- rota alternativa "/agendar";
-- suporte a slug da barbearia;
-- listagem de serviços ativos;
-- listagem de barbeiros ativos;
-- horários disponíveis conforme configuração operacional;
-- criação de agendamento com status inicial;
-- integração com dados da barbearia;
-- preservação do isolamento multi-tenant.
-
-O booking público foi pensado para funcionar como porta de entrada comercial da barbearia, reduzindo dependência de mensagens manuais e melhorando a organização da agenda.
+- [docs/security-model.md](./docs/security-model.md)
+- [docs/barber-profile-linking-rpc.md](./docs/barber-profile-linking-rpc.md)
 
 ---
 
-Painel interno
+## Booking publico
 
-O painel interno concentra a operação da barbearia.
+O booking publico e tenant-aware e opera por slug.
 
-Áreas principais:
+Comportamento atual:
 
-- Dashboard financeiro.
-- Agenda por barbeiro.
-- Gestão de atendimentos.
-- Gestão de comissões.
-- Gestão de produtos.
-- Gestão de vales.
-- Gestão de barbeiros.
-- Gestão de serviços.
-- Configuração de horários comerciais.
-- Configuração de branding.
-- Relatórios e exportações.
+- carrega a barbearia por `/book/:slug`;
+- lista apenas barbeiros ativos da barbearia;
+- lista apenas servicos ativos da barbearia;
+- usa business hours e `slot_step_minutes` da barbearia do slug;
+- valida `barbershop_id`, `barber_id`, `service_id`, `start_at` e `end_at`;
+- cria appointment sem exigir `SELECT` publico em `appointments`;
+- bloqueia conflito de horario ativo para o mesmo barbeiro.
 
-O painel foi desenvolvido para apoiar o uso diário da barbearia, com foco em velocidade, clareza e controle financeiro.
+O booking publico nao deve assumir tenant padrao silencioso em producao.
 
 ---
 
-Como rodar localmente
+## Painel interno
 
-Clone o repositório:
+O painel interno hoje ja diferencia claramente owner e barber.
 
+### Owner
+
+- cria e configura a propria barbearia;
+- edita branding publico;
+- define dias e horarios de funcionamento;
+- define `slot_step_minutes`;
+- cria, edita, remove ou desativa barbeiros e servicos;
+- usa checklist operacional para readiness do booking;
+- vincula barbeiro a usuario por e-mail via RPC.
+
+### Barber
+
+- entra apenas com profile coerente;
+- ve somente a propria agenda;
+- cria agendamento manual apenas para o proprio `barberId`;
+- usa `barbershopId` e `barberId` da sessao, nao do formulario.
+
+Fluxo operacional completo:
+
+- [docs/owner-barber-operational-flow.md](./docs/owner-barber-operational-flow.md)
+
+---
+
+## Como rodar localmente
+
+Clone o repositorio:
+
+```bash
 git clone https://github.com/leorecoa/Job-e-Comiss-es.git
 cd Job-e-Comiss-es
+```
 
-Instale as dependências:
+Instale as dependencias:
 
+```bash
 npm install
+```
 
 Crie o arquivo de ambiente:
 
+```bash
 cp .env.example .env
+```
 
-Execute o projeto em desenvolvimento:
+Configure:
 
-npm run dev
-
-Acesse no navegador:
-
-http://localhost:5173
-
-Execute as verificações principais:
-
-npm run check
-
-Ou rode separadamente:
-
-npm run test
-npm run typecheck
-npm run build
-
----
-
-Configuração Supabase
-
-Para usar Supabase, configure as variáveis no ".env":
-
+```txt
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
+```
 
-A aplicação usa essas variáveis para conectar aos fluxos persistidos em Supabase.
+Rode em desenvolvimento:
 
-Sem variáveis Supabase configuradas, o app usa "localStorage" como fallback de desenvolvimento e demonstração. Em ambiente configurado, os fluxos principais usam Supabase.
+```bash
+npm run dev
+```
 
-Estrutura esperada
+Acesse:
 
-A estrutura de banco inclui entidades como:
+```txt
+http://localhost:5173
+```
 
-- "barbershops"
-- "profiles"
-- "barbers"
-- "services"
-- "appointments"
-- registros financeiros relacionados à operação
-
-Segurança
-
-Ao configurar Supabase, revise e aplique as policies RLS documentadas no projeto.
-
-A configuração correta de RLS é essencial para:
-
-- impedir vazamento de dados entre barbearias;
-- limitar acesso por role;
-- permitir booking público apenas com dados necessários;
-- proteger dados internos do painel administrativo.
+Sem Supabase configurado, o app pode usar fallback local apenas em dev/demo. Em producao, o comportamento esperado e fail-closed.
 
 ---
 
-Testes e qualidade
+## Testes e qualidade
 
-O projeto possui validações automatizadas para reduzir regressões em regras de negócio e fluxos principais.
+Cobertura atual:
 
-Comando principal:
+- Vitest para regras de dominio, repositories e regressao de seguranca;
+- Playwright E2E para booking publico;
+- Playwright E2E para painel do barbeiro;
+- Playwright E2E para fluxo operacional do owner;
+- testes de regressao para tenant isolation e mutations sensiveis;
+- validacao de fail-closed sem Supabase em producao.
 
-npm run check
+Comandos principais:
 
-Esse comando deve validar:
-
-- testes;
-- typecheck;
-- build de produção.
-
-Comandos individuais:
-
+```bash
 npm run test
 npm run typecheck
 npm run build
+npm run validate
+npm run check
+npm audit --audit-level=moderate
+npx playwright test
+```
 
-Áreas importantes cobertas ou esperadas nos testes:
+Documentacao relacionada:
 
-- cálculo de comissão;
-- controle de vales;
-- registros financeiros;
-- criação de agendamentos;
-- conflitos de horário;
-- mapeamento entre app e Supabase;
-- regras de status;
-- isolamento de dados;
-- fluxos públicos e internos.
-
----
-
-Roadmap
-
-Concluído ou em evolução avançada
-
-- Controle financeiro de atendimentos.
-- Gestão de comissões.
-- Controle de produtos.
-- Controle de vales.
-- Dashboard operacional.
-- Agenda interna.
-- Booking público.
-- Supabase Auth.
-- Persistência via Supabase.
-- Roles "owner" e "barber".
-- Isolamento por "barbershop_id".
-- Policies RLS.
-- Branding por barbearia.
-- Gestão de serviços.
-- Gestão de barbeiros.
-- Gestão de horários comerciais.
-
-Próximos passos
-
-- Refinar UX do booking público.
-- Melhorar visual das páginas públicas por barbearia.
-- Expandir relatórios gerenciais.
-- Adicionar filtros avançados por período, barbeiro e serviço.
-- Melhorar onboarding do owner.
-- Adicionar métricas de receita, ticket médio e recorrência.
-- Preparar fluxo de assinatura/plano.
-- Criar painel de administração SaaS.
-- Melhorar cobertura de testes end-to-end.
-- Documentar melhor setup Supabase em produção.
-- Criar seed/demo oficial para avaliação do projeto.
+- [docs/security-model.md](./docs/security-model.md)
+- [docs/dependency-audit.md](./docs/dependency-audit.md)
+- [docs/owner-barber-operational-flow.md](./docs/owner-barber-operational-flow.md)
+- [docs/barber-profile-linking-rpc.md](./docs/barber-profile-linking-rpc.md)
 
 ---
 
-Screenshots
+## Limites atuais
+
+O projeto ainda nao implementa:
+
+- billing ou assinatura;
+- convite formal por e-mail;
+- admin global ou suporte operacional multi-tenant;
+- observabilidade mais completa;
+- rate limit externo e CAPTCHA;
+- polimento final de UX em alguns estados vazios e fluxos de onboarding.
+
+---
+
+## Roadmap
+
+Proximos passos mais relevantes:
+
+- melhorar empty states de owner e barber;
+- evoluir onboarding comercial da barbearia;
+- implementar billing e assinatura;
+- criar convite de equipe mais formal;
+- ampliar observabilidade e auditoria operacional;
+- endurecer ainda mais sessao e superficie de XSS;
+- preparar release piloto com fluxo comercial mais completo.
+
+---
+
+## Screenshots
 
 Adicione aqui imagens reais do produto.
 
-Sugestão de organização:
+Sugestao de organizacao:
 
 ### Dashboard
 
@@ -437,35 +417,29 @@ Sugestão de organização:
 
 ![Agenda](./docs/screenshots/agenda.png)
 
-### Booking público
+### Booking publico
 
-![Booking público](./docs/screenshots/booking.png)
+![Booking publico](./docs/screenshots/booking.png)
 
-### Gestão de serviços
+### Gestao de servicos
 
-![Serviços](./docs/screenshots/services.png)
+![Servicos](./docs/screenshots/services.png)
 
 ### Branding da barbearia
 
 ![Branding](./docs/screenshots/branding.png)
 
-Caso as imagens estejam em outro caminho, ajuste os links conforme a estrutura do repositório.
+---
+
+## Licenca
+
+Consulte o arquivo [LICENSE](./LICENSE).
 
 ---
 
-Licença
+## Autor
 
-Este projeto está disponível sob os termos definidos no arquivo de licença do repositório.
-
-Consulte:
-
-LICENSE
-
----
-
-Autor
-
-Desenvolvido por Leandro Jessé.
+Desenvolvido por Leandro Jesse.
 
 GitHub:
 
