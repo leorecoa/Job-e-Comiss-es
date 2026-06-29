@@ -621,6 +621,43 @@ describe('public booking tenant isolation repositories', () => {
     ).rejects.toThrow('Barbeiro invalido para esta barbearia.');
   });
 
+  it('rejects a public appointment when the service belongs to another barbershop', async () => {
+    const appointmentsInsert = vi.fn();
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'barbers') {
+        const query = createTenantLookupQuery({
+          data: { id: 'barber-leo', barbershop_id: 'shop-leo' },
+          error: null
+        });
+        return { select: vi.fn().mockReturnValue(query) };
+      }
+
+      if (table === 'services') {
+        const query = createTenantLookupQuery({
+          data: { id: 'service-gm', barbershop_id: 'shop-gm' },
+          error: null
+        });
+        return { select: vi.fn().mockReturnValue(query) };
+      }
+
+      if (table === 'appointments') {
+        return { insert: appointmentsInsert };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(
+      createAppointment(makeAppointment({
+        serviceId: 'service-gm',
+        serviceType: 'Servico GM'
+      }), [])
+    ).rejects.toThrow('Servico invalido para esta barbearia.');
+
+    expect(appointmentsInsert).not.toHaveBeenCalled();
+  });
+
   it('rejects a public appointment when the barber is inactive', async () => {
     supabaseMock.from.mockImplementation((table: string) => {
       if (table === 'barbers') {

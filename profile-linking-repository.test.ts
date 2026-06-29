@@ -75,6 +75,32 @@ describe('profile linking repository', () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it('rejects linking when the owner barbershop id is not a valid UUID', async () => {
+    await expect(linkBarberProfileByEmail({
+      targetEmail: 'barber@example.com',
+      targetBarberId: 'barber-1',
+      ownerBarbers,
+      ownerBarbershopId: '57hs3s9tt'
+    })).rejects.toMatchObject({
+      code: 'OWNER_BARBERSHOP_REQUIRED'
+    });
+
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects linking when the target barber id is missing', async () => {
+    await expect(linkBarberProfileByEmail({
+      targetEmail: 'barber@example.com',
+      targetBarberId: '   ',
+      ownerBarbers,
+      ownerBarbershopId: '0aaf2f1b-6e5d-4a4a-a90d-fd2008d397ce'
+    })).rejects.toMatchObject({
+      code: 'TARGET_BARBER_REQUIRED'
+    });
+
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
   it('maps RPC and guard errors to friendly messages', () => {
     expect(getBarberProfileLinkingErrorMessage({ code: 'TARGET_USER_NOT_FOUND' })).toBe(
       'Usuario nao encontrado. Peca para o barbeiro criar uma conta primeiro.'
