@@ -21,7 +21,6 @@ create or replace function public.link_barber_profile_by_email(
 )
 returns table (
   profile_id uuid,
-  email text,
   display_name text,
   role text,
   active boolean,
@@ -30,7 +29,7 @@ returns table (
 )
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = public
 as $$
 declare
   v_owner_profile public.profiles%rowtype;
@@ -60,11 +59,11 @@ begin
             hint = 'Provide a barber id from the current tenant.';
   end if;
 
-  select *
+  select pr.*
   into v_owner_profile
-  from public.profiles
-  where id = auth.uid()
-    and active = true
+  from public.profiles pr
+  where pr.id = auth.uid()
+    and pr.active = true
   limit 1;
 
   if not found then
@@ -85,11 +84,11 @@ begin
             hint = 'The owner profile must have a valid barbershop_id.';
   end if;
 
-  select *
+  select br.*
   into v_target_barber
-  from public.barbers
-  where id = p_target_barber_id
-    and barbershop_id = v_owner_profile.barbershop_id
+  from public.barbers br
+  where br.id = p_target_barber_id
+    and br.barbershop_id = v_owner_profile.barbershop_id
   limit 1;
 
   if not found then
@@ -98,10 +97,10 @@ begin
             hint = 'The selected barber does not belong to the current owner tenant.';
   end if;
 
-  select *
+  select au.*
   into v_target_user
-  from auth.users
-  where lower(email) = v_normalized_email
+  from auth.users au
+  where lower(au.email) = v_normalized_email
   limit 1;
 
   if not found then
@@ -116,10 +115,10 @@ begin
             hint = 'Use a separate barber account instead of the current owner user.';
   end if;
 
-  select *
+  select pr.*
   into v_existing_profile
-  from public.profiles
-  where id = v_target_user.id
+  from public.profiles pr
+  where pr.id = v_target_user.id
   limit 1;
 
   if found then
@@ -170,15 +169,14 @@ begin
 
   return query
   select
-    p.id,
-    v_target_user.email,
-    p.display_name,
-    p.role,
-    p.active,
-    p.barbershop_id,
-    p.barber_id
-  from public.profiles p
-  where p.id = v_target_user.id;
+    pr.id as profile_id,
+    pr.display_name,
+    pr.role,
+    pr.active,
+    pr.barbershop_id,
+    pr.barber_id
+  from public.profiles pr
+  where pr.id = v_target_user.id;
 end;
 $$;
 

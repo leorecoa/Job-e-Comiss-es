@@ -86,8 +86,10 @@ The review-only SQL in [barber-profile-linking-rpc.sql](./barber-profile-linking
 - validates the selected barber belongs to the owner's tenant
 - reads `auth.users` internally to resolve the email
 - inserts or updates `public.profiles`
-- returns the final linked profile row
+- returns the final linked profile row without exposing `email`
 - grants execute only to `authenticated`
+
+The versioned SQL was later corrected to use explicit aliases such as `pr.active` and `select pr.*` to avoid PostgreSQL ambiguity with the `RETURNS TABLE (... active boolean, ...)` output column.
 
 It does **not**:
 
