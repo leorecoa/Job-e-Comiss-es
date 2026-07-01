@@ -803,12 +803,12 @@ const handleSubmit = async (event: React.FormEvent) => {
 
   if (loadingBarbershop) {
     return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
-        <div className="glass-card w-full max-w-lg rounded-3xl p-7 text-center">
-          <div className="mx-auto mb-5 h-16 w-16 animate-pulse rounded-2xl border border-gold-400/20 bg-gold-500/10" />
-              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-gold-300">Reserva publica</p>
-          <h1 className="font-display text-2xl font-bold text-white mb-3">Carregando barbearia...</h1>
-              <p className="text-sm text-gray-400">Estamos preparando a agenda da barbearia para voce.</p>
+      <div className="min-h-screen bg-transparent flex items-start justify-center p-4 pt-20 font-sans">
+        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-gray-900/55 p-5 text-center">
+          <div className="mx-auto mb-4 h-9 w-9 animate-pulse rounded-xl border border-gold-400/20 bg-gold-500/10" />
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-gold-300">Reserva publica</p>
+          <h1 className="font-display text-xl font-bold text-white mb-2">Carregando barbearia...</h1>
+          <p className="text-sm text-gray-400">Preparando a agenda.</p>
         </div>
       </div>
     );
@@ -875,7 +875,7 @@ const handleSubmit = async (event: React.FormEvent) => {
       <div className="max-w-5xl mx-auto">
         <header className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
-            <img src="/brand-mark.svg" alt={`Marca da ${branding.shopName}`} className="w-12 h-12" />
+            <img src="/brand-mark.svg" alt={`Marca da ${branding.shopName}`} className="w-12 h-12" decoding="async" />
             <div>
               <h1 className="text-white font-display font-bold text-lg">{branding.shopName}</h1>
               <p className="text-gold-400 text-[10px] uppercase tracking-widest font-bold">Reserva oficial</p>
@@ -896,6 +896,9 @@ const handleSubmit = async (event: React.FormEvent) => {
                 src={branding.coverImageUrl}
                 alt={`Capa da ${branding.shopName}`}
                 className="absolute inset-0 h-full w-full object-cover"
+                decoding="async"
+                fetchPriority="high"
+                loading="eager"
               />
             )}
             <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/62 to-gray-950/95" />
@@ -924,7 +927,7 @@ const handleSubmit = async (event: React.FormEvent) => {
               <div className="max-w-2xl">
                 <div className="mb-4 flex h-18 w-18 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-gray-950/75 text-gold-300 shadow-xl shadow-black/30 md:h-20 md:w-20">
                   {branding.logoUrl ? (
-                    <img src={branding.logoUrl} alt={`Logo da ${branding.shopName}`} className="h-full w-full object-cover" />
+                    <img src={branding.logoUrl} alt={`Logo da ${branding.shopName}`} className="h-full w-full object-cover" decoding="async" />
                   ) : (
                     <Scissors size={28} />
                   )}

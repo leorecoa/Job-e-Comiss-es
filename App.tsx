@@ -209,12 +209,25 @@ const App: React.FC = () => {
   useEffect(() => {
     const splash = document.getElementById('splash-screen');
     if (splash) {
-      setTimeout(() => {
+      let hidden = false;
+      const hideSplash = () => {
+        if (hidden) return;
+        hidden = true;
         splash.classList.add('splash-hidden');
         setTimeout(() => {
-            splash.remove();
-        }, 500);
-      }, 800);
+          splash.remove();
+        }, 240);
+      };
+
+      const fallbackTimeout = window.setTimeout(hideSplash, 320);
+      const firstFrame = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(hideSplash);
+      });
+
+      return () => {
+        window.clearTimeout(fallbackTimeout);
+        window.cancelAnimationFrame(firstFrame);
+      };
     }
   }, []);
 
