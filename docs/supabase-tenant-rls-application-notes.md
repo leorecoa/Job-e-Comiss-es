@@ -93,8 +93,8 @@ notify pgrst, 'reload schema';
 
 ### Public Booking
 
-- `/book` opens using the `gestao-maxima` fallback.
-- `/book/gestao-maxima` opens normally.
+- `/book/:slug` opens the barbershop resolved by the explicit slug.
+- `/book` does not assume a hardcoded production barbershop.
 - `/book/barbearia-inexistente` shows `Barbearia não encontrada ou indisponível.`
 - `/book/barbearia-inexistente` cannot submit or create an appointment.
 - Public booking lists only active barbers needed for booking.

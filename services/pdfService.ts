@@ -234,7 +234,7 @@ export const generateReportPDF = (
       
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text("Gerado via Gestão Máxima - Sistema Profissional", 105, pageHeight - 8, { align: 'center' });
+      doc.text("Gerado via Job e Comissoes", 105, pageHeight - 8, { align: 'center' });
       doc.text(`Página ${i} de ${pageCount}`, 195, pageHeight - 8, { align: 'right' });
   }
 

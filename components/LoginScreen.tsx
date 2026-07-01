@@ -17,15 +17,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     e.preventDefault();
     if (!shopName || !ownerName) return;
 
-    const isAdmin = false;
-
     const newProfile: UserProfile = {
       shopName,
       ownerName,
       email,
       startDate: Date.now(),
-      isPro: isAdmin, // Se a hash bater, entra como PRO (Vitalício)
-      planType: isAdmin ? 'admin_life' : 'trial'
+      isPro: true,
+      planType: 'trial'
     };
     
     onLogin(newProfile);
@@ -48,11 +46,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             transition={{ duration: 0.65, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
             className="bg-gray-900/50 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-gold-500 border border-gold-500/20 shadow-lg shadow-gold-500/10"
           >
-             <img src="/brand-mark.svg" alt="Gestao Maxima" className="w-14 h-14" />
+             <img src="/brand-mark.svg" alt="Job e Comissoes" className="w-14 h-14" />
           </motion.div>
           
-          <h1 className="text-2xl font-display font-bold text-white mb-1">Gestao Maxima</h1>
-          <p className="text-gold-500 font-bold text-[10px] uppercase tracking-widest mb-2">Sistema Profissional</p>
+          <h1 className="text-2xl font-display font-bold text-white mb-1">Job e Comissoes</h1>
+          <p className="text-gold-500 font-bold text-[10px] uppercase tracking-widest mb-2">Sistema operacional</p>
           <p className="text-gray-400 text-sm">Configure seu sistema para comecar</p>
         </div>
 
@@ -102,7 +100,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               Comecar Agora <ArrowRight size={20} />
             </motion.button>
             <p className="text-center text-xs text-gray-500 mt-4">
-              Ao continuar, voce inicia seu teste gratuito de 7 dias.
+              Modo local para desenvolvimento e demonstracao. Em producao, use Supabase configurado.
             </p>
             <p className="text-center text-xs text-gray-500 mt-3">
               <a href="/book" className="text-gold-400 hover:text-gold-300 font-bold">Abrir agendamento publico</a>

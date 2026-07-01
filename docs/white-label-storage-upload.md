@@ -89,6 +89,6 @@ using (bucket_id = 'barbershop-branding');
 ## Next Steps
 
 - Apply the bucket and policies manually in Supabase.
-- Validate upload for `/book/gestao-maxima` and `/book/barbearia-fake-rls`.
+- Validate upload for `/book/:slug` with at least two tenant slugs.
 - Consider image resizing/compression before upload.
 - Consider tenant-aware object path checks after the owner profile contract is fully stable.

@@ -171,7 +171,7 @@ export interface UserProfile {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  shopName: 'Gestão Máxima',
+  shopName: 'Sua barbearia',
   logoUrl: '',
   priceCut: 50,
   priceBeard: 30,

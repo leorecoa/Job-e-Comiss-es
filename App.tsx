@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, PlanType, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
+import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
 import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById, resolveOwnerScopedBarbershopId } from './utils';
 import {
   BarbershopBrandingImageType,
@@ -30,9 +30,7 @@ import { DailySchedule } from './components/DailySchedule';
 import { PublicBookingPage } from './components/PublicBookingPage';
 import { AuthScreen } from './components/AuthScreen';
 import { LoginScreen } from './components/LoginScreen';
-import { PaywallScreen } from './components/PaywallScreen';
 import { MonthlySummary } from './components/MonthlySummary';
-import { SubscriptionModal } from './components/SubscriptionModal';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import { TourOverlay, TourStep } from './components/TourOverlay';
 import { ReportModal } from './components/ReportModal';
@@ -64,15 +62,11 @@ import {
   User,
   LogOut,
   BarChart3,
-  Crown,
-  Sparkles,
-  UsersRound,
   ChevronLeft,
   ChevronRight,
   Filter,
   FileText,
-  Clock,
-  Tag
+  Clock
 } from 'lucide-react';
 
 const normalizeSettings = (settings: Partial<AppSettings> | null | undefined): AppSettings => {
@@ -106,7 +100,6 @@ const getCurrentMonthString = () => {
   return `${year}-${month}`;
 };
 
-const TRIAL_DAYS = 7;
 const SAFE_PUBLIC_BOOKING_SHOP_NAME = 'Escolha uma barbearia';
 const SAFE_INTERNAL_SHOP_NAME = 'Sua barbearia';
 
@@ -191,10 +184,6 @@ export const getPublicBookingSlugFromPath = (pathname: string): string | undefin
 };
 
 export const isOwnerOnboardingPath = (pathname: string): boolean => pathname === '/onboarding';
-
-const CODES_PRO = ["MENSAL", "PRO", "LIBERADO"];
-const CODES_VIP = ["VIP", "EQUIPE", "TIME", "VIP4"];
-const CODES_ADMIN: string[] = [];
 
 const App: React.FC = () => {
   const pathname = window.location.pathname;
@@ -291,7 +280,6 @@ const App: React.FC = () => {
   const [isAppointmentModalOpen, setAppointmentModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
-  const [isSubscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
   const [isReportModalOpen, setReportModalOpen] = useState(false);
   const [isAppointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
@@ -362,7 +350,7 @@ const App: React.FC = () => {
             email: session.email,
             startDate: prev?.startDate || Date.now(),
             isPro: true,
-            planType: session.role === 'owner' ? 'admin_life' : 'vip_monthly'
+            planType: 'trial'
           }));
         }
       } catch (error) {
@@ -603,36 +591,11 @@ const App: React.FC = () => {
   };
 
   // -- Derived State --
-  const trialStatus = useMemo(() => {
-    if (!userProfile) return { isExpired: false, daysLeft: 7, daysUsed: 0, expirationDate: Date.now() + (7 * 24 * 60 * 60 * 1000) };
-    if (userProfile.isPro) return { isExpired: false, daysLeft: 999, daysUsed: 0, expirationDate: Date.now() + (3650 * 24 * 60 * 60 * 1000) }; // 10 years
-
-    const now = Date.now();
-    const start = userProfile.startDate;
-    const diffTime = now - start;
-    const diffDays = diffTime / (1000 * 60 * 60 * 24);
-
-    // Calculate exact expiration date
-    const expirationDate = start + (TRIAL_DAYS * 24 * 60 * 60 * 1000);
-
-    return {
-      isExpired: diffDays > TRIAL_DAYS || diffDays < 0,
-      daysLeft: Math.max(0, Math.ceil(TRIAL_DAYS - diffDays)),
-      // Ensure daysUsed is not negative if startDate is in the future (e.g., due to clock sync issues)
-      daysUsed: Math.max(0, Math.floor(diffDays)),
-
-      expirationDate
-    };
-  }, [userProfile]);
-
-  const isAdmin = useMemo(() => userProfile?.planType === 'admin_life', [userProfile]);
-  const isVip = useMemo(() => userProfile?.planType === 'vip_monthly' || userProfile?.planType === 'admin_life', [userProfile]);
-  const planBadgeLabel = useMemo(() => {
-    if (isAdmin) return 'ADMIN';
-    if (isVip) return 'VIP';
-    if (userProfile?.isPro) return 'PRO';
-    return 'TRIAL ' + trialStatus.daysLeft + 'D';
-  }, [isAdmin, isVip, userProfile, trialStatus.daysLeft]);
+  const roleBadgeLabel = useMemo(() => {
+    if (authSession?.role === 'owner') return 'OWNER';
+    if (authSession?.role === 'barber') return 'BARBER';
+    return isSupabaseConfigured ? 'OPERACIONAL' : 'LOCAL';
+  }, [authSession?.role]);
 
   const activeShopName = useMemo(() => (
     getResolvedDashboardShopName({
@@ -770,7 +733,7 @@ const App: React.FC = () => {
       email: session.email,
       startDate: prev?.startDate || Date.now(), // Preserve existing startDate if available
       isPro: true,
-      planType: session.role === 'owner' ? 'admin_life' : 'vip_monthly',
+      planType: 'trial',
       barberId: session.barberId, // Propagate barberId from AuthSession to UserProfile
     }));
   };
@@ -808,28 +771,6 @@ const App: React.FC = () => {
       setAuthLoading(false);
     }
   };
-
-  const handleSubscribe = (codeInput: string): boolean => {
-    const cleanCode = codeInput.trim().toUpperCase();
-    if (!userProfile) return false;
-    if (CODES_ADMIN.includes(cleanCode)) {
-        setUserProfile({ ...userProfile, isPro: true, planType: 'admin_life' });
-        addToast('Modo Admin Vitalício Ativado!', 'success');
-        return true;
-    }
-    if (CODES_VIP.includes(cleanCode)) {
-        setUserProfile({ ...userProfile, isPro: true, planType: 'vip_monthly' });
-        addToast('Assinatura VIP Ativada!', 'success');
-        return true;
-    }
-    if (CODES_PRO.includes(cleanCode)) {
-        setUserProfile({ ...userProfile, isPro: true, planType: 'pro_monthly' });
-        addToast('Assinatura PRO Ativada!', 'success');
-        return true;
-    }
-    return false;
-  };
-
   const handleCreateOwnerBarbershop = async (input: {
     name: string;
     slug: string;
@@ -865,7 +806,7 @@ const App: React.FC = () => {
       email: refreshedSession?.email || authSession?.email || prev?.email || '',
       startDate: prev?.startDate || Date.now(),
       isPro: true,
-      planType: 'admin_life'
+      planType: 'trial'
     }));
 
     addToast(`Barbearia criada. Link publico: ${getBarbershopPublicBookingPath(createdBarbershop.slug)}`, 'success');
@@ -1553,9 +1494,8 @@ const App: React.FC = () => {
     );
   }
 
-  // If not authenticated (local storage mode) or trial expired, show respective screens
+  // If not authenticated (local storage mode), show the local setup screen.
   if (!userProfile) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><LoginScreen onLogin={handleLogin} /></>;
-  if (trialStatus.isExpired) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><PaywallScreen onSubscribe={handleSubscribe} daysUsed={trialStatus.daysUsed} expirationDate={trialStatus.expirationDate} /></>;
 
   return (
     <div className="min-h-screen bg-transparent pb-24 font-sans selection:bg-gold-500/30">
@@ -1577,11 +1517,7 @@ const App: React.FC = () => {
                  </div>
                  <div>
                     <h1 className="text-white font-bold">{activeShopName}</h1>
-                    <span className={`text-[10px] uppercase font-bold ${
-                      isAdmin ? 'text-red-400' :
-                      isVip ? 'text-gold-500' :
-                      userProfile.isPro ? 'text-blue-400' : 'text-gray-400'
-                    }`}>{planBadgeLabel}</span>
+                    <span className="text-[10px] uppercase font-bold text-blue-400">{roleBadgeLabel}</span>
                  </div>
             </div>
             <button onClick={handleLogout} className="text-gray-500 hover:text-red-400"><LogOut size={20}/></button>
@@ -1911,7 +1847,7 @@ const App: React.FC = () => {
         )}
 
         {viewMode === 'monthly' && (
-             <MonthlySummary clients={clients} vales={vales} settings={settings} onBack={() => setViewMode('daily')} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} isPro={userProfile.isPro} onSubscribeClick={() => setSubscriptionModalOpen(true)} />
+             <MonthlySummary clients={clients} vales={vales} settings={settings} onBack={() => setViewMode('daily')} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
         )}
       </main>
 
@@ -1926,8 +1862,7 @@ const App: React.FC = () => {
             ? { ...nextSettings, barbers: settings.barbers, services: settings.services }
             : nextSettings
         ))} 
-        userProfile={userProfile} 
-        onSubscribe={() => setSubscriptionModalOpen(true)} 
+        userProfile={userProfile}
         clients={clients}
         vales={vales}
         appointments={appointments}
@@ -1943,7 +1878,6 @@ const App: React.FC = () => {
         initialData={editingAppointment}
         createId={generateId}
       />
-      <SubscriptionModal isOpen={isSubscriptionModalOpen} onClose={() => setSubscriptionModalOpen(false)} onSubscribe={handleSubscribe} />
     </div>
   );
 };
