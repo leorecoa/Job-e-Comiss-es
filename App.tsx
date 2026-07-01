@@ -22,26 +22,10 @@ import {
   PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
 } from './scheduling';
 import { StatsCard } from './components/StatsCard';
-import { AddClientModal } from './components/AddClientModal';
-import { AddValeModal } from './components/AddValeModal';
-import { SettingsModal } from './components/SettingsModal';
-import { AppointmentModal } from './components/AppointmentModal';
-import { DailySchedule } from './components/DailySchedule';
 import { PublicBookingPage } from './components/PublicBookingPage';
-import { AuthScreen } from './components/AuthScreen';
-import { LoginScreen } from './components/LoginScreen';
-import { MonthlySummary } from './components/MonthlySummary';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
-import { TourOverlay, TourStep } from './components/TourOverlay';
-import { ReportModal } from './components/ReportModal';
-import { DashboardCharts } from './components/DashboardCharts';
+import { TourStep } from './components/TourOverlay';
 import { isProductionWithoutSupabase, isSupabaseConfigured, PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE, shouldUseLocalFallback } from './lib/supabase';
-import { BarberDashboard } from './components/BarberDashboard';
-import { BarbershopBrandingSettings } from './components/BarbershopBrandingSettings';
-import { OwnerCatalogManager } from './components/OwnerCatalogManager';
-import { OwnerBarbershopOnboarding } from './components/OwnerBarbershopOnboarding';
-import { OwnerSetupChecklist } from './components/OwnerSetupChecklist';
-import { OwnerBarberProfileLinking } from './components/OwnerBarberProfileLinking';
 import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
 import { linkBarberProfileByEmail } from './services/profileLinkingRepository';
@@ -68,6 +52,36 @@ import {
   FileText,
   Clock
 } from 'lucide-react';
+
+const AddClientModal = React.lazy(() => import('./components/AddClientModal').then((module) => ({ default: module.AddClientModal })));
+const AddValeModal = React.lazy(() => import('./components/AddValeModal').then((module) => ({ default: module.AddValeModal })));
+const AppointmentModal = React.lazy(() => import('./components/AppointmentModal').then((module) => ({ default: module.AppointmentModal })));
+const AuthScreen = React.lazy(() => import('./components/AuthScreen').then((module) => ({ default: module.AuthScreen })));
+const BarberDashboard = React.lazy(() => import('./components/BarberDashboard').then((module) => ({ default: module.BarberDashboard })));
+const BarbershopBrandingSettings = React.lazy(() => import('./components/BarbershopBrandingSettings').then((module) => ({ default: module.BarbershopBrandingSettings })));
+const DailySchedule = React.lazy(() => import('./components/DailySchedule').then((module) => ({ default: module.DailySchedule })));
+const DashboardCharts = React.lazy(() => import('./components/DashboardCharts').then((module) => ({ default: module.DashboardCharts })));
+const LoginScreen = React.lazy(() => import('./components/LoginScreen').then((module) => ({ default: module.LoginScreen })));
+const MonthlySummary = React.lazy(() => import('./components/MonthlySummary').then((module) => ({ default: module.MonthlySummary })));
+const OwnerBarberProfileLinking = React.lazy(() => import('./components/OwnerBarberProfileLinking').then((module) => ({ default: module.OwnerBarberProfileLinking })));
+const OwnerBarbershopOnboarding = React.lazy(() => import('./components/OwnerBarbershopOnboarding').then((module) => ({ default: module.OwnerBarbershopOnboarding })));
+const OwnerCatalogManager = React.lazy(() => import('./components/OwnerCatalogManager').then((module) => ({ default: module.OwnerCatalogManager })));
+const OwnerSetupChecklist = React.lazy(() => import('./components/OwnerSetupChecklist').then((module) => ({ default: module.OwnerSetupChecklist })));
+const ReportModal = React.lazy(() => import('./components/ReportModal').then((module) => ({ default: module.ReportModal })));
+const SettingsModal = React.lazy(() => import('./components/SettingsModal').then((module) => ({ default: module.SettingsModal })));
+const TourOverlay = React.lazy(() => import('./components/TourOverlay').then((module) => ({ default: module.TourOverlay })));
+
+const ViewFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-transparent text-gray-300">
+    Carregando...
+  </div>
+);
+
+const SectionFallback = () => (
+  <div className="mb-6 rounded-2xl border border-gray-800 bg-gray-900/40 p-4 text-sm text-gray-400">
+    Carregando...
+  </div>
+);
 
 const normalizeSettings = (settings: Partial<AppSettings> | null | undefined): AppSettings => {
   const merged = { ...DEFAULT_SETTINGS, ...(settings || {}) };
@@ -1448,12 +1462,14 @@ const App: React.FC = () => {
     return (
       <>
         <ToastContainer toasts={toasts} removeToast={removeToast} />
-        <AuthScreen
-          onSignIn={handleAuthSignIn}
-          onSignUp={handleAuthSignUp}
-          loading={isAuthLoading}
-          error={authError}
-        />
+        <React.Suspense fallback={<ViewFallback />}>
+          <AuthScreen
+            onSignIn={handleAuthSignIn}
+            onSignUp={handleAuthSignUp}
+            loading={isAuthLoading}
+            error={authError}
+          />
+        </React.Suspense>
       </>
     );
   }
@@ -1467,11 +1483,13 @@ const App: React.FC = () => {
     return (
       <>
         <ToastContainer toasts={toasts} removeToast={removeToast} />
-        <OwnerBarbershopOnboarding
-          authSession={authSession}
-          onCreate={handleCreateOwnerBarbershop}
-          onComplete={handleCompleteOwnerBarbershopOnboarding}
-        />
+        <React.Suspense fallback={<ViewFallback />}>
+          <OwnerBarbershopOnboarding
+            authSession={authSession}
+            onCreate={handleCreateOwnerBarbershop}
+            onComplete={handleCompleteOwnerBarbershopOnboarding}
+          />
+        </React.Suspense>
       </>
     );
   }
@@ -1480,29 +1498,46 @@ const App: React.FC = () => {
     return (
       <>
         <ToastContainer toasts={toasts} removeToast={removeToast} />
-        <BarberDashboard
-          authSession={authSession}
-          appointments={appointments}
-          settings={settings}
-          onCreateAppointment={handleCreateBarberAppointment}
-          onUpdateAppointment={handleUpdateAppointmentPatch}
-          onCancelAppointment={handleCancelAppointment}
-          addToast={addToast}
-          onLogout={handleLogout}
-        />
+        <React.Suspense fallback={<ViewFallback />}>
+          <BarberDashboard
+            authSession={authSession}
+            appointments={appointments}
+            settings={settings}
+            onCreateAppointment={handleCreateBarberAppointment}
+            onUpdateAppointment={handleUpdateAppointmentPatch}
+            onCancelAppointment={handleCancelAppointment}
+            addToast={addToast}
+            onLogout={handleLogout}
+          />
+        </React.Suspense>
       </>
     );
   }
 
   // If not authenticated (local storage mode), show the local setup screen.
-  if (!userProfile) return <><ToastContainer toasts={toasts} removeToast={removeToast} /><LoginScreen onLogin={handleLogin} /></>;
+  if (!userProfile) return (
+    <>
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <React.Suspense fallback={<ViewFallback />}>
+        <LoginScreen onLogin={handleLogin} />
+      </React.Suspense>
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-transparent pb-24 font-sans selection:bg-gold-500/30">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       
-      <TourOverlay steps={tourSteps} isOpen={isTourOpen} onComplete={handleTourComplete} />
-      <ReportModal isOpen={isReportModalOpen} onClose={() => setReportModalOpen(false)} onDownload={handleDownloadRange} initialDate={selectedDate} />
+      {isTourOpen && (
+        <React.Suspense fallback={null}>
+          <TourOverlay steps={tourSteps} isOpen={isTourOpen} onComplete={handleTourComplete} />
+        </React.Suspense>
+      )}
+      {isReportModalOpen && (
+        <React.Suspense fallback={null}>
+          <ReportModal isOpen={isReportModalOpen} onClose={() => setReportModalOpen(false)} onDownload={handleDownloadRange} initialDate={selectedDate} />
+        </React.Suspense>
+      )}
 
       {/* Header */}
       <header className="border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-gray-900/90">
@@ -1588,47 +1623,51 @@ const App: React.FC = () => {
                 </div>
              </div>
              
-             <BarbershopBrandingSettings
-                barbershop={ownerBarbershop}
-                role={authSession?.role || 'owner'}
-                loading={isOwnerBarbershopLoading}
-                saving={isSavingOwnerBarbershop}
-                error={ownerBarbershopError}
-                success={ownerBarbershopSuccess}
-                onSave={handleSaveOwnerBarbershopBranding}
-                onUploadImage={handleUploadOwnerBarbershopBrandingImage}
-             />
+             <React.Suspense fallback={<SectionFallback />}>
+               <BarbershopBrandingSettings
+                  barbershop={ownerBarbershop}
+                  role={authSession?.role || 'owner'}
+                  loading={isOwnerBarbershopLoading}
+                  saving={isSavingOwnerBarbershop}
+                  error={ownerBarbershopError}
+                  success={ownerBarbershopSuccess}
+                  onSave={handleSaveOwnerBarbershopBranding}
+                  onUploadImage={handleUploadOwnerBarbershopBrandingImage}
+               />
 
-             <OwnerSetupChecklist
-                role={authSession?.role || 'owner'}
-                authSession={authSession}
-                barbershop={ownerBarbershop}
-                barbers={ownerCatalogBarbers}
-                services={ownerCatalogServices}
-             />
+               <OwnerSetupChecklist
+                  role={authSession?.role || 'owner'}
+                  authSession={authSession}
+                  barbershop={ownerBarbershop}
+                  barbers={ownerCatalogBarbers}
+                  services={ownerCatalogServices}
+               />
 
-             <OwnerBarberProfileLinking
-                role={authSession?.role || 'owner'}
-                barbers={ownerCatalogBarbers}
-                onLinkProfile={handleLinkOwnerBarberProfile}
-             />
+               <OwnerBarberProfileLinking
+                  role={authSession?.role || 'owner'}
+                  barbers={ownerCatalogBarbers}
+                  onLinkProfile={handleLinkOwnerBarberProfile}
+               />
 
-             <OwnerCatalogManager
-                barbers={ownerCatalogBarbers}
-                services={ownerCatalogServices}
-                loading={isOwnerCatalogLoading}
-                error={ownerCatalogError}
-                onCreateBarber={handleCreateOwnerBarber}
-                onUpdateBarber={handleUpdateOwnerBarber}
-                onRemoveBarber={handleRemoveOwnerBarber}
-                onCreateService={handleCreateOwnerService}
-                onUpdateService={handleUpdateOwnerService}
-                onRemoveService={handleRemoveOwnerService}
-              />
+               <OwnerCatalogManager
+                  barbers={ownerCatalogBarbers}
+                  services={ownerCatalogServices}
+                  loading={isOwnerCatalogLoading}
+                  error={ownerCatalogError}
+                  onCreateBarber={handleCreateOwnerBarber}
+                  onUpdateBarber={handleUpdateOwnerBarber}
+                  onRemoveBarber={handleRemoveOwnerBarber}
+                  onCreateService={handleCreateOwnerService}
+                  onUpdateService={handleUpdateOwnerService}
+                  onRemoveService={handleRemoveOwnerService}
+                />
+             </React.Suspense>
 
              {/* New Dashboard Charts */}
              <div className="mb-6">
-                <DashboardCharts clients={chartClients} />
+                <React.Suspense fallback={<SectionFallback />}>
+                  <DashboardCharts clients={chartClients} />
+                </React.Suspense>
              </div>
 
              <div id="tour-stats" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -1657,6 +1696,7 @@ const App: React.FC = () => {
                  
                  <div className="min-h-[200px] bg-gray-900/30">
                     {activeTab === 'appointments' ? (
+                      <React.Suspense fallback={<SectionFallback />}>
                         <DailySchedule
                           appointments={filteredAppointments}
                           selectedDate={selectedDate}
@@ -1669,6 +1709,7 @@ const App: React.FC = () => {
                           onStatusChange={handleAppointmentStatusChange}
                           onCancel={handleCancelAppointment}
                         />
+                      </React.Suspense>
                     ) : activeTab === 'clients' ? (
                         <>
                            {filteredClients.length === 0 ? <p className="text-center py-8 text-gray-500">{selectedBarberFilter === 'TODOS' ? 'Sem registros.' : `Sem registros para ${selectedBarberFilter}.`}</p> : (
@@ -1847,37 +1888,49 @@ const App: React.FC = () => {
         )}
 
         {viewMode === 'monthly' && (
+          <React.Suspense fallback={<SectionFallback />}>
              <MonthlySummary clients={clients} vales={vales} settings={settings} onBack={() => setViewMode('daily')} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+          </React.Suspense>
         )}
       </main>
 
-      <AddClientModal isOpen={isClientModalOpen} onClose={() => setClientModalOpen(false)} settings={settings} onSave={handleSaveClient} initialData={editingClient} />
-      <AddValeModal isOpen={isValeModalOpen} onClose={() => setValeModalOpen(false)} onAdd={handleAddVale} settings={settings} />
-      <SettingsModal 
-        isOpen={isSettingsModalOpen} 
-        onClose={() => setSettingsModalOpen(false)} 
-        settings={settings} 
-        onSave={(nextSettings) => setSettings(normalizeSettings(
-          isSupabaseConfigured
-            ? { ...nextSettings, barbers: settings.barbers, services: settings.services }
-            : nextSettings
-        ))} 
-        userProfile={userProfile}
-        clients={clients}
-        vales={vales}
-        appointments={appointments}
-        manageCatalogRemotely={isSupabaseConfigured}
-      />
-      <AppointmentModal
-        isOpen={isAppointmentModalOpen}
-        onClose={() => { setAppointmentModalOpen(false); setEditingAppointment(null); }}
-        onSave={handleSaveAppointment}
-        settings={settings}
-        selectedDate={selectedDate}
-        selectedBarber={selectedScheduleBarber}
-        initialData={editingAppointment}
-        createId={generateId}
-      />
+      <React.Suspense fallback={null}>
+        {isClientModalOpen && (
+          <AddClientModal isOpen={isClientModalOpen} onClose={() => setClientModalOpen(false)} settings={settings} onSave={handleSaveClient} initialData={editingClient} />
+        )}
+        {isValeModalOpen && (
+          <AddValeModal isOpen={isValeModalOpen} onClose={() => setValeModalOpen(false)} onAdd={handleAddVale} settings={settings} />
+        )}
+        {isSettingsModalOpen && (
+          <SettingsModal
+            isOpen={isSettingsModalOpen}
+            onClose={() => setSettingsModalOpen(false)}
+            settings={settings}
+            onSave={(nextSettings) => setSettings(normalizeSettings(
+              isSupabaseConfigured
+                ? { ...nextSettings, barbers: settings.barbers, services: settings.services }
+                : nextSettings
+            ))}
+            userProfile={userProfile}
+            clients={clients}
+            vales={vales}
+            appointments={appointments}
+            manageCatalogRemotely={isSupabaseConfigured}
+          />
+        )}
+        {isAppointmentModalOpen && (
+          <AppointmentModal
+            isOpen={isAppointmentModalOpen}
+            onClose={() => { setAppointmentModalOpen(false); setEditingAppointment(null); }}
+            onSave={handleSaveAppointment}
+            settings={settings}
+            selectedDate={selectedDate}
+            selectedBarber={selectedScheduleBarber}
+            initialData={editingAppointment}
+            createId={generateId}
+          />
+        )}
+      </React.Suspense>
     </div>
   );
 };
