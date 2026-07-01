@@ -38,19 +38,19 @@ notify pgrst, 'reload schema';
 
 ## Example Update
 
-Example placeholder update for `gestao-maxima`:
+Example placeholder update for a tenant created by owner onboarding:
 
 ```sql
 update public.barbershops
 set
-  logo_url = 'https://example.com/gestao-maxima-logo.png',
-  cover_image_url = 'https://example.com/gestao-maxima-cover.jpg',
-  description = 'Agenda online da Gestao Maxima.',
-  instagram_url = 'https://instagram.com/gestao_maxima',
+  logo_url = 'https://example.com/minha-barbearia-logo.png',
+  cover_image_url = 'https://example.com/minha-barbearia-cover.jpg',
+  description = 'Agenda online da minha barbearia.',
+  instagram_url = 'https://instagram.com/minha_barbearia',
   whatsapp = '5585999999999',
   primary_color = '#f59e0b',
   secondary_color = '#0ea5e9'
-where slug = 'gestao-maxima';
+where slug = 'minha-barbearia';
 
 notify pgrst, 'reload schema';
 ```
@@ -73,14 +73,14 @@ secondary_color -> secondaryColor
 
 Public booking should continue to work if these fields are null.
 
-Invalid slugs must continue returning no barbershop and must not fall back to `gestao-maxima`.
+Invalid slugs must continue returning no barbershop and must not fall back to any hardcoded tenant.
 
 ## Validation Checklist
 
 After applying the SQL and filling branding data, validate:
 
-- `/book/gestao-maxima` opens with or without branding fields
-- `/book/barbearia-fake-rls` opens with its own branding when fields are configured
+- `/book/minha-barbearia` opens with or without branding fields
+- a second tenant slug opens with its own branding when fields are configured
 - `/book/barbearia-inexistente` remains blocked
 - public booking still creates appointments with `barbershop_id`, `barber_id`, and `service_id`
 - owner and barber login flows are unchanged

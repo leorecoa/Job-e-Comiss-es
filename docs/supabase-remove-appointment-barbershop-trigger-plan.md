@@ -157,9 +157,9 @@ commit;
 
 ## Rollback SQL
 
-Use this only as an emergency operational rollback if a production insert flow unexpectedly still depends on the fallback.
+Use this only as an emergency operational rollback if a legacy production insert flow unexpectedly still depends on the fallback.
 
-This rollback recreates a conservative fallback to the active `gestao-maxima` barbershop, matching the legacy migration intent. It should be removed again after the failing flow is fixed.
+This rollback intentionally uses a placeholder slug. Do not restore a hardcoded production default tenant. If this rollback is ever needed, explicitly choose the affected legacy tenant, document the incident, fix the failing insert flow, and remove the trigger again.
 
 ```sql
 begin;
@@ -180,12 +180,12 @@ begin
   select b.id
     into default_barbershop_id
   from public.barbershops b
-  where b.slug = 'gestao-maxima'
+  where b.slug = '<legacy-backfill-slug>'
     and b.active = true
   limit 1;
 
   if default_barbershop_id is null then
-    raise exception 'Default barbershop gestao-maxima was not found or is inactive';
+    raise exception 'Legacy fallback barbershop was not found or is inactive';
   end if;
 
   new.barbershop_id := default_barbershop_id;

@@ -4,7 +4,6 @@ import { AppSettings, UserProfile, ProductItem, Client, Vale, Appointment } from
 import {
   X,
   Save,
-  Crown,
   Users,
   Trash2,
   Plus,
@@ -23,7 +22,6 @@ interface SettingsModalProps {
   settings: AppSettings;
   onSave: (newSettings: AppSettings) => void;
   userProfile: UserProfile;
-  onSubscribe: () => void;
   clients: Client[];
   vales: Vale[];
   appointments: Appointment[];
@@ -36,7 +34,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onSave,
   userProfile,
-  onSubscribe,
   clients,
   vales,
   appointments,
@@ -59,17 +56,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [isOpen, settings]);
 
   if (!isOpen) return null;
-
-  const isVip = userProfile.planType === 'vip_monthly' || userProfile.planType === 'admin_life';
-
-  const planLabel = userProfile.planType === 'admin_life'
-    ? 'Admin Vitalício'
-    : isVip
-      ? 'VIP Multi-Barbeiros (Ativo)'
-      : userProfile.isPro
-        ? 'Assinatura PRO Standard'
-        : 'Versão de Teste';
-
   const handleChange = (field: keyof AppSettings, value: string | number) => {
     if (typeof formData[field] === 'number') {
       const numericValue = Number(value);
@@ -267,33 +253,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Plan Status Section */}
-          <div className={`p-4 rounded-xl border ${userProfile.isPro ? 'bg-gold-500/10 border-gold-500/20' : 'bg-gray-900 border-gray-700'}`}>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Seu Plano</p>
-                <p className={`font-bold text-sm ${userProfile.isPro ? 'text-gold-500' : 'text-white'}`}>
-                  {planLabel}
-                </p>
-              </div>
-
-              {userProfile.isPro ? (
-                <Crown className="text-gold-500" />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onSubscribe();
-                  }}
-                  className="bg-gold-500 hover:bg-gold-600 text-black text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-gold-500/20 animate-pulse"
-                >
-                  ASSINAR AGORA
-                </button>
-              )}
-            </div>
-          </div>
-
           <div>
             <label htmlFor="settings-shop-name" className="block text-sm font-medium text-gray-400 mb-1">
               Nome da Barbearia
@@ -493,12 +452,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* VIP Barber Management Section */}
-          {isVip && !manageCatalogRemotely && (
+          {/* Local barber management for development/demo fallback. Supabase tenants use OwnerCatalogManager. */}
+          {!manageCatalogRemotely && (
             <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-900/10 space-y-3">
               <div className="flex items-center gap-2 text-blue-400 mb-2">
                 <Users size={18} />
-                <h3 className="font-bold text-sm">Equipe (VIP)</h3>
+                <h3 className="font-bold text-sm">Equipe</h3>
               </div>
 
               <div className="space-y-2">

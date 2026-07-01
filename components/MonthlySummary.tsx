@@ -4,7 +4,7 @@ import { Client, Vale, AppSettings, ServiceType } from '../types';
 import { formatCurrency, calculateClientCommission } from '../utils';
 import { StatsCard } from './StatsCard';
 import { DashboardCharts } from './DashboardCharts';
-import { ArrowLeft, DollarSign, TrendingUp, Calendar, MinusCircle, Crown, Users } from 'lucide-react';
+import { ArrowLeft, DollarSign, TrendingUp, Calendar, MinusCircle, Users } from 'lucide-react';
 
 interface MonthlySummaryProps {
   clients: Client[];
@@ -13,8 +13,6 @@ interface MonthlySummaryProps {
   onBack: () => void;
   selectedMonth: string; // YYYY-MM
   onMonthChange: (month: string) => void;
-  isPro: boolean;
-  onSubscribeClick: () => void;
 }
 
 export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
@@ -23,9 +21,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
   settings,
   onBack,
   selectedMonth,
-  onMonthChange,
-  isPro,
-  onSubscribeClick
+  onMonthChange
 }) => {
   
   // Filtra e calcula dados baseados no mês selecionado
@@ -58,7 +54,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
 
     // Agrupar por dia
     const daysMap: Record<string, { sales: number; commission: number; vales: number; count: number }> = {};
-    // Agrupar por Barbeiro (Para VIP/Equipe)
+    // Agrupar por barbeiro.
     const barbersMap: Record<string, { sales: number; commission: number; vales: number; count: number }> = {};
 
     // Processar Clientes
@@ -137,15 +133,6 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
         </div>
 
         <div className="flex gap-3 w-full md:w-auto items-center justify-end">
-            {!isPro && (
-                <button 
-                    onClick={onSubscribeClick}
-                    className="flex items-center gap-1 bg-gold-500 hover:bg-gold-600 text-black text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-lg shadow-gold-500/20 animate-pulse"
-                >
-                    <Crown size={14} /> ASSINE AGORA
-                </button>
-            )}
-
             <div className="relative flex-grow md:flex-grow-0">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                     <Calendar size={16} />

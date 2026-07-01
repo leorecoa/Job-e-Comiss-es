@@ -1,4 +1,9 @@
 -- Migration Plan: Multi-Tenant Foundation
+-- LEGACY NOTE:
+-- This plan was created to backfill an existing single-tenant dataset into the
+-- multi-tenant model. Do not use the seeded tenant below as a default tenant for
+-- new SaaS environments. New barbershops should be created through owner
+-- onboarding and configured with their own slug, catalog, and business hours.
 -- Order of execution:
 -- 1. Infrastructure: Create barbershops table.
 -- 2. Seed: Create the initial default tenant.

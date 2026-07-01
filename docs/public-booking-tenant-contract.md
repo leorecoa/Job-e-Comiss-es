@@ -2,95 +2,80 @@
 
 ## Status
 
-The public booking flow is now tenant-aware.
+The public booking flow is tenant-aware and slug-based.
 
-This document records the current contract between the frontend, Supabase data model, and temporary database fallback behavior.
+This document records the current contract between the frontend and the Supabase data model. New tenants must be created and configured by their owner. The app must not assume a default production barbershop.
 
-## Current routes
+## Current Routes
 
 The application supports:
 
 ```txt
+/book/:slug
 /book
-/book/gestao-maxima
+/agendar
 ```
 
-## Route behavior
+## Route Behavior
 
-### `/book`
+### `/book/:slug`
 
-The generic public booking route remains available for compatibility.
+The slug-based route resolves the barbershop explicitly before loading catalog data or creating an appointment.
 
-It uses the default barbershop slug:
+Expected flow:
 
 ```txt
-gestao-maxima
+slug -> barbershop -> barbershopId -> tenant catalog -> appointment.barbershopId -> appointments.barbershop_id
 ```
 
-### `/book/gestao-maxima`
+If the slug is unknown or inactive, the page must show an error state and block submit.
 
-The slug-based public booking route resolves the barbershop explicitly before creating an appointment.
+### `/book` and `/agendar`
 
-The expected flow is:
+The generic public routes remain available for compatibility, but they must not silently assume any production tenant slug.
 
-```txt
-slug -> barbershop -> barbershopId -> appointment.barbershopId -> appointments.barbershop_id
-```
+If no tenant slug is resolved, the app should show a safe state, route the user to a tenant-specific link, or require explicit tenant selection. Operational booking still requires a resolved `barbershopId`.
 
-## Current Supabase state
+## Current Supabase Contract
 
-The following tenant foundation exists in Supabase:
+The tenant foundation uses:
 
-* `public.barbershops`
-* initial barbershop with slug `gestao-maxima`
-* `barbershop_id` on:
+- `public.barbershops`
+- `barbershop_id` on `profiles`
+- `barbershop_id` on `barbers`
+- `barbershop_id` on `services`
+- `barbershop_id` on `appointments`
 
-  * `profiles`
-  * `barbers`
-  * `services`
-  * `appointments`
+Each owner is expected to create or operate their own barbershop tenant. Existing barbershops used during migration or validation are not default tenants for new production usage.
 
-Current validation result:
+## Frontend Contract
 
-```txt
-profiles      0 missing barbershop_id
-barbers       0 missing barbershop_id
-services      0 missing barbershop_id
-appointments  0 missing barbershop_id
-```
-
-## Frontend contract
-
-The public booking frontend must not create an appointment without a resolved `barbershopId`.
+Public booking must not create an appointment without a resolved `barbershopId`.
 
 Current behavior:
 
-* `PublicBookingPage` resolves a barbershop by slug.
-* `/book` falls back to `gestao-maxima`.
-* `/book/gestao-maxima` resolves the explicit slug.
-* Invalid or inactive barbershop slugs show an error state.
-* Public booking submit is blocked when no barbershop is resolved.
-* `createPublicAppointment` preserves `barbershopId`.
-* Public appointment validation rejects missing `barbershopId`.
+- `PublicBookingPage` resolves a barbershop by slug.
+- `/book/:slug` uses exactly the slug from the URL.
+- invalid or inactive slugs show an error state.
+- public booking submit is blocked when no barbershop is resolved.
+- public booking submit is blocked without a selected active barber and active service from the same tenant.
+- public appointment validation rejects missing `barbershopId`, `barberId`, or `serviceId`.
+- public booking must not fall back to any hardcoded tenant.
 
-## Repository behavior
+## Repository Behavior
 
-The current public booking flow uses tenant-aware data where available:
+The public booking flow uses tenant-aware data:
 
-* barbers are associated with `barbershopId`
-* services are associated with `barbershopId`
-* appointments are created with `barbershopId`
-* public slots are filtered by `barbershopId`
+- barbers are filtered by `active = true` and `barbershop_id`
+- services are filtered by `active = true` and `barbershop_id`
+- public slots are filtered by `barbershop_id`
+- appointments are created with `barbershop_id`, `barber_id`, and `service_id`
 
-Repository-level tenant filtering is in place. RLS hardening should be reviewed and applied separately using `docs/supabase-tenant-rls-plan.sql`.
+Tenant-aware RLS has been applied manually in Supabase and validated in production. See `docs/supabase-tenant-rls-applied.md`.
 
-Tenant-aware RLS has since been applied manually in Supabase and validated in production. See `docs/supabase-tenant-rls-applied.md`.
+Public appointment inserts were hardened to require `barbershop_id`, `barber_id`, and `service_id`. See `docs/public-appointment-entity-id-hardening.md`.
 
-Isolation with a second fake barbershop was validated in Supabase. See `docs/supabase-tenant-isolation-validation.md`.
-
-Public appointment inserts were later hardened to require `barbershop_id`, `barber_id`, and `service_id`. See `docs/public-appointment-entity-id-hardening.md`.
-
-## Public slots view contract
+## Public Slots View Contract
 
 Public booking availability is calculated from `public.public_appointment_slots`, not from full `appointments` rows.
 
@@ -113,7 +98,7 @@ Keep `barbershop_id` at the end of the view. This preserves the existing Postgre
 cannot change name of view column "barber_id" to "barbershop_id"
 ```
 
-This is the expected reference definition:
+Expected reference definition:
 
 ```sql
 create or replace view public.public_appointment_slots
@@ -132,25 +117,7 @@ where a.status in ('scheduled', 'confirmed');
 
 This document records the expected state only; do not add a separate executable migration for this hotfix.
 
-## Production hotfix
-
-The production Supabase view was manually updated to add `barbershop_id` at the end of `public.public_appointment_slots`.
-
-That hotfix aligned production with the tenant-aware repository query, which includes `barbershop_id` when reading public slots:
-
-```txt
-public_appointment_slots?select=barbershop_id,barber_id,barber_name,start_at,end_at,status
-```
-
-The PostgREST select list can request fields in query order, but the PostgreSQL view definition must preserve `barbershop_id` as the final view column.
-
-Without this column, PostgREST returns:
-
-```txt
-column public_appointment_slots.barbershop_id does not exist
-```
-
-## Removed temporary database fallback
+## Removed Temporary Database Fallback
 
 Supabase previously had a temporary fallback trigger for public appointments:
 
@@ -165,37 +132,18 @@ The application must not depend on fallback assignment in the normal public book
 
 See `docs/supabase-appointment-barbershop-trigger-removal-applied.md`.
 
-## Current decision
+## Current Decision
 
-`barbershop_id NOT NULL` has since been applied and validated in production. See `docs/supabase-barbershop-id-not-null-applied.md`.
+`barbershop_id NOT NULL` has been applied and validated in production. See `docs/supabase-barbershop-id-not-null-applied.md`.
 
 Tenant-aware RLS has been applied manually in Supabase after review and production validation.
 
 Keep `docs/supabase-tenant-rls-plan.sql` as the reviewable reference for future environments or rollback analysis.
 
-## Next technical step
+## Later Hardening Steps
 
-Current hardening record:
-
-```txt
-docs: record applied tenant rls
-```
-
-Recorded state:
-
-* tenant-aware policies applied for barbershops, profiles, barbers, services and appointments
-* keep owner and barber dashboards working
-* keep public booking working
-* preserve `/book` fallback and invalid slug blocking
-* keep `barbershop_id NOT NULL` enforced in the main tenant tables
-* keep temporary fallback trigger removed
-
-## Later hardening steps
-
-After the applied tenant-aware RLS state remains stable:
-
-1. keep or repeat the fake second-barbershop validation before critical RLS changes
-2. keep the hardened public appointment `barber_id` and `service_id` checks validated before critical RLS changes
-3. clean fake validation data when it is no longer needed
-4. create a real second production barbershop only when there is a business flow for it
-5. evaluate multi-barbershop dashboards separately if needed
+1. Repeat second-tenant validation before critical RLS changes.
+2. Keep hardened public appointment `barber_id` and `service_id` checks validated before critical booking changes.
+3. Clean fake validation data when it is no longer needed.
+4. Create real production barbershops through owner onboarding, not SQL-only shortcuts.
+5. Evaluate multi-barbershop dashboards separately if needed.
