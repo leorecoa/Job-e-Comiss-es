@@ -197,7 +197,7 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
   };
 
   return (
-    <section className="glass-card rounded-2xl p-5 md:p-6 mb-6">
+    <section id="owner-barbershop-settings" className="glass-card rounded-2xl p-5 md:p-6 mb-6 scroll-mt-24">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
         <div>
           <div className="flex items-center gap-2 text-gold-400 mb-2">

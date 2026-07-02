@@ -28,6 +28,10 @@ export type OwnerSetupChecklistState = {
       | 'public-link';
     label: string;
     complete: boolean;
+    description: string;
+    nextStep: string;
+    actionLabel?: string;
+    actionHref?: string;
   }>;
 };
 
@@ -89,14 +93,70 @@ export const getOwnerSetupChecklistState = ({
     : null;
 
   const items: OwnerSetupChecklistState['items'] = [
-    { key: 'barbershop-loaded', label: 'Barbearia carregada', complete: hasLoadedBarbershop },
-    { key: 'barbershop-active', label: 'Barbearia ativa', complete: hasActiveBarbershop },
-    { key: 'slug', label: 'Slug publico disponivel', complete: hasPublicSlug },
-    { key: 'business-hours', label: 'Horario de funcionamento configurado', complete: hasConfiguredBusinessHours },
-    { key: 'slot-step', label: 'Intervalo de agenda valido', complete: hasValidSlotStepMinutes },
-    { key: 'active-barbers', label: 'Pelo menos 1 barbeiro ativo', complete: hasActiveBarbers },
-    { key: 'active-services', label: 'Pelo menos 1 servico ativo', complete: hasActiveServices },
-    { key: 'public-link', label: 'Link publico /book/:slug disponivel', complete: Boolean(publicBookingPath) }
+    {
+      key: 'barbershop-loaded',
+      label: 'Barbearia carregada',
+      complete: hasLoadedBarbershop,
+      description: 'Confirma que o painel esta usando a barbearia do owner autenticado.',
+      nextStep: 'Entre novamente ou conclua a criacao da barbearia se este item continuar pendente.'
+    },
+    {
+      key: 'barbershop-active',
+      label: 'Barbearia ativa',
+      complete: hasActiveBarbershop,
+      description: 'A barbearia precisa estar ativa para operar o booking publico.',
+      nextStep: 'Revise o cadastro da barbearia antes de divulgar o link.'
+    },
+    {
+      key: 'slug',
+      label: 'Slug publico disponivel',
+      complete: hasPublicSlug,
+      description: 'O slug define o endereco publico da barbearia em /book/:slug.',
+      nextStep: 'Defina um slug valido na criacao da barbearia ou revise o cadastro do tenant.'
+    },
+    {
+      key: 'business-hours',
+      label: 'Horario de funcionamento configurado',
+      complete: hasConfiguredBusinessHours,
+      description: 'O booking usa estes dias e horarios para gerar a agenda publica.',
+      nextStep: 'Configure pelo menos um dia aberto com abertura menor que fechamento.',
+      actionLabel: 'Configurar horarios',
+      actionHref: '#owner-barbershop-settings'
+    },
+    {
+      key: 'slot-step',
+      label: 'Intervalo de agenda valido',
+      complete: hasValidSlotStepMinutes,
+      description: 'O intervalo define de quantos em quantos minutos os horarios aparecem.',
+      nextStep: 'Escolha um intervalo valido de agenda.',
+      actionLabel: 'Configurar intervalo',
+      actionHref: '#owner-barbershop-settings'
+    },
+    {
+      key: 'active-barbers',
+      label: 'Pelo menos 1 barbeiro ativo',
+      complete: hasActiveBarbers,
+      description: 'O cliente precisa escolher um profissional no booking publico.',
+      nextStep: 'Cadastre ou ative pelo menos um barbeiro da sua barbearia.',
+      actionLabel: 'Configurar barbeiros',
+      actionHref: '#owner-catalog-manager'
+    },
+    {
+      key: 'active-services',
+      label: 'Pelo menos 1 servico ativo',
+      complete: hasActiveServices,
+      description: 'O cliente precisa escolher um servico com valor e duracao.',
+      nextStep: 'Cadastre ou ative pelo menos um servico.',
+      actionLabel: 'Configurar servicos',
+      actionHref: '#owner-catalog-manager'
+    },
+    {
+      key: 'public-link',
+      label: 'Link publico /book/:slug disponivel',
+      complete: Boolean(publicBookingPath),
+      description: 'O link publico deve apontar para o slug real desta barbearia.',
+      nextStep: 'Conclua o slug publico para gerar o link do booking.'
+    }
   ];
 
   const issues = items
@@ -161,6 +221,7 @@ export const OwnerSetupChecklist: React.FC<OwnerSetupChecklistProps> = ({
       setCopyFeedback('Nao foi possivel copiar o link.');
     }
   };
+  const nextPendingItem = checklist.items.find((item) => !item.complete);
 
   return (
     <section className="mb-6 rounded-3xl border border-gray-700 bg-gray-800/80 p-5 shadow-xl shadow-black/10">
@@ -206,14 +267,39 @@ export const OwnerSetupChecklist: React.FC<OwnerSetupChecklistProps> = ({
             <p className={`text-xs ${item.complete ? 'text-emerald-200/80' : 'text-gray-400'}`}>
               {item.complete ? 'OK' : 'Pendente'}
             </p>
+            <p className="mt-2 text-xs leading-relaxed text-gray-400">{item.description}</p>
+            {!item.complete && (
+              <p className="mt-2 text-xs leading-relaxed text-amber-100/90">{item.nextStep}</p>
+            )}
           </div>
         ))}
       </div>
+
+      {!checklist.ready && nextPendingItem && (
+        <div className="mt-5 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-200">Proximo passo</p>
+          <p className="mt-2 text-sm font-bold text-white">{nextPendingItem.label}</p>
+          <p className="mt-1 text-sm text-blue-100/90">{nextPendingItem.nextStep}</p>
+          {nextPendingItem.actionHref && nextPendingItem.actionLabel && (
+            <a
+              href={nextPendingItem.actionHref}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-sm font-bold text-blue-100"
+            >
+              {nextPendingItem.actionLabel}
+            </a>
+          )}
+        </div>
+      )}
 
       {checklist.publicBookingPath && (
         <div className="mt-5 rounded-2xl border border-gray-700 bg-gray-900/50 p-4">
           <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Link publico</p>
           <p className="mt-2 break-all font-mono text-sm text-gold-300">{checklist.publicBookingPath}</p>
+          {!checklist.ready && (
+            <p className="mt-2 text-sm text-amber-100/90">
+              O link ja existe, mas o booking ainda nao deve ser divulgado como operacional ate concluir as pendencias.
+            </p>
+          )}
           <div className="mt-3 flex flex-wrap gap-2">
             <a
               href={checklist.publicBookingPath}
