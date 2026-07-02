@@ -231,7 +231,10 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
         <div className="overflow-x-auto">
           {monthlyData.dailyBreakdown.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              Nenhum registro encontrado neste mes.
+              <p className="font-bold text-white">Nenhum registro encontrado neste mes.</p>
+              <p className="mx-auto mt-2 max-w-md text-sm">
+                Atendimentos concluidos, vendas e vales lancados no periodo aparecerao neste historico.
+              </p>
             </div>
           ) : (
             <table className="w-full text-left border-collapse">

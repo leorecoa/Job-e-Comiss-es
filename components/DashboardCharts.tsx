@@ -117,7 +117,13 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
          <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Mix de Serviços</h3>
          <div className="space-y-4 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
             {pieData.length === 0 ? (
+              <>
+                <div className="pt-4 text-center text-sm text-gray-500">
+                    <p className="font-bold text-white">Ainda sem mix de servicos.</p>
+                    <p className="mt-1">O grafico aparece depois que houver atendimentos registrados no periodo.</p>
+                </div>
                 <p className="text-gray-500 text-sm text-center py-4">Sem dados no período.</p>
+              </>
             ) : (
                 pieData.map((d) => (
                     <div key={d.name} className="group">

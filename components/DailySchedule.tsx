@@ -77,9 +77,21 @@ export const DailySchedule: React.FC<DailyScheduleProps> = ({
 
       <div className="p-4 md:p-5 bg-gray-900/30 min-h-[260px]">
         {orderedAppointments.length === 0 ? (
-          <div className="py-12 text-center text-gray-500">
+          <div className="py-12 px-4 text-center text-gray-500">
             <Clock size={32} className="mx-auto mb-3 text-gray-600" />
-            Nenhum horario para {selectedBarber} nesta data.
+            <p className="font-bold text-white">Nenhum agendamento nesta data.</p>
+            <p className="mx-auto mt-2 max-w-md text-sm">
+              {selectedBarber === 'TODOS'
+                ? 'Quando clientes agendarem pelo booking publico ou voce criar um agendamento manual, eles aparecerao aqui.'
+                : `Quando ${selectedBarber} tiver agendamentos nesta data, eles aparecerao aqui.`}
+            </p>
+            <button
+              type="button"
+              onClick={onNew}
+              className="mt-5 inline-flex items-center justify-center rounded-xl bg-gold-500 px-4 py-2.5 text-sm font-bold text-black hover:bg-gold-600"
+            >
+              Criar agendamento
+            </button>
           </div>
         ) : (
           <div className="space-y-3">

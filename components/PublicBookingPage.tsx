@@ -1024,7 +1024,7 @@ const handleSubmit = async (event: React.FormEvent) => {
 
             {barberOptions.length === 0 && (
               <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-sm rounded-xl p-3">
-                A barbearia ainda precisa cadastrar pelo menos um barbeiro no painel interno.
+                Esta barbearia ainda nao tem barbeiros ativos. O owner precisa cadastrar ou ativar um barbeiro no painel interno.
               </div>
             )}
 
@@ -1037,7 +1037,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             <div className="space-y-3">
               <SectionTitle step="01" title="Profissional" description="Escolha quem vai te atender." />
               {barberOptions.length === 0 ? (
-                <EmptyState message="Nenhum barbeiro disponivel para esta barbearia." />
+                <EmptyState message="Nenhum barbeiro ativo nesta barbearia. Assim que a equipe for configurada, os profissionais aparecerao aqui." />
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {barberOptions.map((barber) => {
@@ -1065,7 +1065,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             <div className="space-y-3">
               <SectionTitle step="02" title="Servico" description="Confira valor e duracao." />
               {services.length === 0 ? (
-                <EmptyState message="Nenhum servico disponivel para esta barbearia." />
+                <EmptyState message="Nenhum servico ativo nesta barbearia. O agendamento publico sera liberado quando houver pelo menos um servico cadastrado." />
               ) : (
                 <div className="grid gap-3">
                   {services.map((service: Service) => {
@@ -1141,7 +1141,7 @@ const handleSubmit = async (event: React.FormEvent) => {
               <label className="block text-sm font-medium text-gray-400 mb-2">Horarios disponiveis</label>
               {availableSlots.length === 0 ? (
                 <p className="text-sm text-gray-400 bg-gray-900/50 border border-gray-700 rounded-2xl p-4">
-  {emptySlotsMessage}
+  {emptySlotsMessage} Escolha outra data ou fale com a barbearia pelo WhatsApp, se o contato estiver disponivel.
 </p>
               ) : (
                 <div className="grid grid-cols-2 xs:grid-cols-3 md:grid-cols-4 gap-2">
