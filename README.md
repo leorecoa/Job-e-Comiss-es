@@ -373,6 +373,31 @@ Documentacao relacionada:
 - [docs/dependency-audit.md](./docs/dependency-audit.md)
 - [docs/owner-barber-operational-flow.md](./docs/owner-barber-operational-flow.md)
 - [docs/barber-profile-linking-rpc.md](./docs/barber-profile-linking-rpc.md)
+- [docs/performance-notes.md](./docs/performance-notes.md)
+
+---
+
+## Performance
+
+Apos a baseline `v0.9.0-pilot`, o app recebeu um passe de performance focado no carregamento inicial:
+
+- bundle inicial reduzido de aproximadamente 738 kB para 491 kB;
+- gzip do chunk principal reduzido de aproximadamente 203 kB para 138 kB;
+- warning do Vite sobre chunk maior que 500 kB deixou de aparecer;
+- lazy loading aplicado em dashboards, modais e superficies internas;
+- booking publico preservado como entrada direta para `/book/:slug`;
+- splash e loading inicial foram reduzidos para nao dominar a primeira renderizacao;
+- imagens do booking usam `decoding="async"` e a capa above-the-fold usa prioridade alta quando aplicavel.
+
+Ultima medicao registrada em Lighthouse mobile simulation:
+
+```txt
+FCP         ~2.1s
+LCP         ~3.3s
+Speed Index ~2.1s
+```
+
+Esses numeros variam conforme rede, dispositivo, cache e dados carregados no tenant. As mudancas nao alteraram booking publico, dashboard owner, dashboard barber ou isolamento por tenant.
 
 ---
 
