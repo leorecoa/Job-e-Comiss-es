@@ -314,7 +314,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="glass-card p-5 rounded-2xl flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Comissao do Dia</p>
+              <p className="text-sm text-gray-400">Comissao calculada do dia</p>
               <p className="text-2xl font-bold text-gold-500">
                 {formatCurrency(dailyCommission)}
               </p>
@@ -325,7 +325,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
 
           <div className="glass-card p-5 rounded-2xl flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Comissao do Mes</p>
+              <p className="text-sm text-gray-400">Comissao calculada do mes</p>
               <p className="text-2xl font-bold text-blue-400">
                 {formatCurrency(monthlyCommission)}
               </p>
@@ -333,6 +333,10 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
 
             <TrendingUp size={32} className="text-blue-400" />
           </div>
+        </div>
+
+        <div className="mb-6 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
+          Sua comissao e calculada com base nos atendimentos concluidos registrados no sistema. O painel nao confirma pagamento de repasse.
         </div>
 
         <section className="glass-card p-6 rounded-2xl mb-6">

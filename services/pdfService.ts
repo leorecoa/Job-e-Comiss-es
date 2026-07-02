@@ -106,11 +106,18 @@ export const generateReportPDF = (
   };
 
   drawCard(startX, "Atendimentos", stats.totalClients.toString());
-  drawCard(startX + cardWidth + gap, "Faturamento", formatCurrency(stats.totalSales));
+  drawCard(startX + cardWidth + gap, "Faturamento bruto", formatCurrency(stats.totalSales));
   drawCard(startX + (cardWidth + gap) * 2, "Vales / Despesas", formatCurrency(stats.totalVales));
-  drawCard(startX + (cardWidth + gap) * 3, "Líquido (Comissão)", formatCurrency(stats.netCommission), true);
+  drawCard(startX + (cardWidth + gap) * 3, "Saldo estimado", formatCurrency(stats.netCommission), true);
 
   currentY += 40;
+
+  doc.setFontSize(8);
+  doc.setTextColor(colorGray);
+  doc.setFont("helvetica", "normal");
+  doc.text("Comissoes sao valores calculados com base nos atendimentos registrados; este relatorio nao confirma pagamento de repasse.", 14, currentY);
+
+  currentY += 8;
 
   // --- CLIENT TABLE ---
   doc.setFontSize(12);

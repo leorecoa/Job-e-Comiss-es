@@ -1685,9 +1685,13 @@ const App: React.FC = () => {
 
              <div id="tour-stats" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <StatsCard title="Atendimentos" value={stats.totalClients.toString()} icon={<Users size={20} />} />
-                <StatsCard title="Faturamento" value={formatCurrency(stats.totalSales)} icon={<DollarSign size={20} />} colorClass="bg-gray-800 border-gray-700 text-green-400" />
-                <StatsCard title="Líquido" value={formatCurrency(stats.netCommission)} icon={<TrendingUp size={20} />} colorClass="bg-gray-800 border-gold-500/30 text-gold-500" />
+                <StatsCard title="Faturamento bruto" value={formatCurrency(stats.totalSales)} icon={<DollarSign size={20} />} colorClass="bg-gray-800 border-gray-700 text-green-400" />
+                <StatsCard title="Saldo estimado de comissao" value={formatCurrency(stats.netCommission)} subtitle="Comissao calculada menos vales" icon={<TrendingUp size={20} />} colorClass="bg-gray-800 border-gold-500/30 text-gold-500" />
              </div>
+
+              <div className="mb-6 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
+                Os valores de comissao sao calculados a partir dos atendimentos registrados. Este painel nao confirma pagamento de repasse.
+              </div>
 
               {/* Lists */}
               {isAppointmentsLoading && (
