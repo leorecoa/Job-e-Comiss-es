@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { CheckCircle2, CircleAlert, Link2, Mail, Scissors, UserRound } from 'lucide-react';
 import { AppRole } from '../services/authRepository';
 import {
-  BARBER_PROFILE_LINKING_SUCCESS_MESSAGE,
+  getBarberProfileLinkingSuccessMessage,
   getBarberProfileLinkingErrorMessage,
   normalizeBarberProfileLinkingEmail
 } from '../services/profileLinkingRepository';
@@ -60,7 +60,10 @@ export const submitOwnerBarberProfileLinking = async ({
 
     return {
       type: 'success',
-      message: BARBER_PROFILE_LINKING_SUCCESS_MESSAGE
+      message: getBarberProfileLinkingSuccessMessage({
+        barberName: barber.name,
+        email: normalizedEmail
+      })
     };
   } catch (error) {
     return {
@@ -127,12 +130,22 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
             <span className="text-xs font-bold uppercase tracking-widest">Acesso do barbeiro</span>
           </div>
           <h2 className="text-2xl font-bold text-white">Vincular barbeiro a usuario</h2>
-          <p className="mt-1 text-sm text-gray-400">Associe cada barbeiro da sua barbearia a uma conta existente para liberar o painel individual e a agenda correta.</p>
+          <p className="mt-1 text-sm text-gray-400">Conecte a conta de login do barbeiro ao profissional cadastrado. Depois do vinculo, ele acessa somente a propria agenda.</p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-gray-700 bg-gray-900/60 px-3 py-2 text-xs font-bold uppercase tracking-widest text-gray-400">
           <Mail size={14} />
           O barbeiro precisa criar conta antes
         </div>
+      </div>
+
+      <div className="mb-5 rounded-2xl border border-sky-500/20 bg-sky-500/10 p-4 text-sm text-sky-100">
+        <p className="font-bold text-white">Como funciona</p>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sky-100/90">
+          <li>O barbeiro cria uma conta usando o e-mail dele.</li>
+          <li>Voce informa aqui o mesmo e-mail usado no login.</li>
+          <li>Escolha o profissional correspondente e clique em vincular.</li>
+        </ol>
+        <p className="mt-3 text-xs text-sky-200/80">Este fluxo nao envia convite automatico por e-mail. Depois de vincular, avise o barbeiro para entrar novamente se a agenda ainda nao aparecer.</p>
       </div>
 
       {sortedBarbers.length === 0 ? (
@@ -167,7 +180,7 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
                         <CheckCircle2 size={11} />
                         {barber.active === false ? 'Inativo' : 'Ativo'}
                       </span>
-                      <span className="font-mono text-[11px] text-gray-500">{barber.id}</span>
+                      <span>Conta de usuario ainda precisa ser vinculada pelo e-mail de login.</span>
                     </div>
                   </div>
 
@@ -178,7 +191,8 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
                         type="email"
                         value={emailDrafts[barber.id] || ''}
                         onChange={(event) => setEmailDrafts((prev) => ({ ...prev, [barber.id]: event.target.value }))}
-                        placeholder="usuario@exemplo.com"
+                        placeholder="E-mail da conta do barbeiro"
+                        aria-label={`E-mail da conta do barbeiro ${barber.name}`}
                         className="w-full rounded-xl border border-gray-700 bg-gray-900 px-10 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-sky-500"
                       />
                     </div>

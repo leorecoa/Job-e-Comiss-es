@@ -520,13 +520,18 @@ test.describe('owner operational dashboard e2e', () => {
     await signInAsOwner(page);
 
     await expect(page.getByRole('heading', { name: /Vincular barbeiro a usuario/i })).toBeVisible();
-    await page.getByPlaceholder('usuario@exemplo.com').fill('  BARBER@EXAMPLE.COM  ');
+    await expect(page.getByText(/O barbeiro cria uma conta usando o e-mail dele/i)).toBeVisible();
+    await expect(page.getByText(/Este fluxo nao envia convite automatico por e-mail/i)).toBeVisible();
+    await expect(page.getByText(OWNER_BARBER_ID)).toHaveCount(0);
+    await page.getByPlaceholder('E-mail da conta do barbeiro').fill('  BARBER@EXAMPLE.COM  ');
     const linkButton = page.getByRole('button', { name: /Vincular usuario/i });
     await expect(linkButton).toBeEnabled();
     await linkButton.evaluate((button: HTMLButtonElement) => button.click());
 
     await expect.poll(() => network.rpcRequests.length).toBe(1);
-    await expect(page.getByText(/Barbeiro vinculado com sucesso\./i)).toBeVisible();
+    await expect(page.getByText(/Conta vinculada ao profissional Leo Barber/i)).toBeVisible();
+    await expect(page.getByText(/E-mail usado: barber@example\.com/i)).toBeVisible();
+    await expect(page.getByText(/sair e entrar novamente/i)).toBeVisible();
 
     const [{ method, body }] = network.rpcRequests;
     expect(method).toBe('POST');
@@ -539,23 +544,23 @@ test.describe('owner operational dashboard e2e', () => {
   for (const { code, message } of [
     {
       code: 'TARGET_USER_NOT_FOUND',
-      message: 'Usuario nao encontrado. Peca para o barbeiro criar uma conta primeiro.'
+      message: 'Nenhuma conta foi encontrada com este e-mail. Peca para o barbeiro criar a conta primeiro e tente novamente.'
     },
     {
       code: 'BARBER_NOT_IN_TENANT',
-      message: 'Este barbeiro nao pertence a sua barbearia.'
+      message: 'O profissional selecionado nao pertence a esta barbearia.'
     },
     {
       code: 'TARGET_PROFILE_BELONGS_TO_ANOTHER_TENANT',
-      message: 'Este usuario ja esta vinculado a outra barbearia.'
+      message: 'Esta conta ja esta vinculada a outra barbearia.'
     },
     {
       code: 'TARGET_PROFILE_IS_OWNER',
-      message: 'Este usuario ja e owner e nao pode ser vinculado como barbeiro.'
+      message: 'Esta conta e de owner e nao pode ser vinculada como barbeiro.'
     },
     {
       code: 'TARGET_USER_CANNOT_BE_OWNER',
-      message: 'Use uma conta separada para o barbeiro.'
+      message: 'Use uma conta separada para o barbeiro. Uma conta de owner nao deve ser usada como perfil de atendimento.'
     }
   ]) {
     test(`owner sees friendly linking error for ${code}`, async ({ page }) => {
@@ -571,7 +576,7 @@ test.describe('owner operational dashboard e2e', () => {
 
       await signInAsOwner(page);
 
-      await page.getByPlaceholder('usuario@exemplo.com').fill('barber@example.com');
+      await page.getByPlaceholder('E-mail da conta do barbeiro').fill('barber@example.com');
       const linkButton = page.getByRole('button', { name: /Vincular usuario/i });
       await expect(linkButton).toBeEnabled();
       await linkButton.evaluate((button: HTMLButtonElement) => button.click());

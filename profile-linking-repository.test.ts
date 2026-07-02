@@ -103,19 +103,19 @@ describe('profile linking repository', () => {
 
   it('maps RPC and guard errors to friendly messages', () => {
     expect(getBarberProfileLinkingErrorMessage({ code: 'TARGET_USER_NOT_FOUND' })).toBe(
-      'Usuario nao encontrado. Peca para o barbeiro criar uma conta primeiro.'
+      'Nenhuma conta foi encontrada com este e-mail. Peca para o barbeiro criar a conta primeiro e tente novamente.'
     );
     expect(getBarberProfileLinkingErrorMessage({ code: 'BARBER_NOT_IN_TENANT' })).toBe(
-      'Este barbeiro nao pertence a sua barbearia.'
+      'O profissional selecionado nao pertence a esta barbearia.'
     );
     expect(getBarberProfileLinkingErrorMessage({ code: 'TARGET_PROFILE_BELONGS_TO_ANOTHER_TENANT' })).toBe(
-      'Este usuario ja esta vinculado a outra barbearia.'
+      'Esta conta ja esta vinculada a outra barbearia.'
     );
     expect(getBarberProfileLinkingErrorMessage({ code: 'TARGET_PROFILE_IS_OWNER' })).toBe(
-      'Este usuario ja e owner e nao pode ser vinculado como barbeiro.'
+      'Esta conta e de owner e nao pode ser vinculada como barbeiro.'
     );
     expect(getBarberProfileLinkingErrorMessage({ code: 'TARGET_USER_CANNOT_BE_OWNER' })).toBe(
-      'Use uma conta separada para o barbeiro.'
+      'Use uma conta separada para o barbeiro. Uma conta de owner nao deve ser usada como perfil de atendimento.'
     );
     expect(getBarberProfileLinkingErrorMessage(new Error('unexpected'))).toBe(
       'Nao foi possivel vincular este usuario.'

@@ -390,6 +390,7 @@ test.describe('barber dashboard e2e', () => {
     await signInAsBarber(page);
 
     await expect(page.getByRole('heading', { name: /Leo Barber/i })).toBeVisible();
+    await expect(page.getByText(/Conta vinculada ao profissional Leo Barber/i)).toBeVisible();
     await expect(page.getByText(/Cliente do Leo/i)).toBeVisible();
     await expect(page.getByText(/Cliente do Outro/i)).toHaveCount(0);
     await expect(page.getByText(/Cliente Outro Tenant/i)).toHaveCount(0);
@@ -474,7 +475,8 @@ test.describe('barber dashboard e2e', () => {
     });
 
     await signInAsBarber(page);
-    await expect(page.getByText(/Perfil de barbeiro incompleto/i)).toBeVisible();
+    await expect(page.getByText(/Vinculo pendente/i)).toBeVisible();
+    await expect(page.getByText(/ainda nao esta vinculada a um profissional ativo/i)).toBeVisible();
   });
 
   test.fixme('barber without barbershopId should receive the incomplete profile message', async ({ page }) => {
@@ -490,6 +492,7 @@ test.describe('barber dashboard e2e', () => {
     });
 
     await signInAsBarber(page);
-    await expect(page.getByText(/Perfil de barbeiro incompleto/i)).toBeVisible();
+    await expect(page.getByText(/Vinculo pendente/i)).toBeVisible();
+    await expect(page.getByText(/sair e entrar novamente/i)).toBeVisible();
   });
 });

@@ -2,7 +2,7 @@ import { assertOperationalSupabase, shouldUseLocalFallback, supabase } from '../
 import { BarberOption } from '../types';
 import { isUuid } from '../utils';
 
-export const BARBER_PROFILE_LINKING_SUCCESS_MESSAGE = 'Barbeiro vinculado com sucesso.';
+export const BARBER_PROFILE_LINKING_SUCCESS_MESSAGE = 'Conta vinculada ao profissional.';
 export const BARBER_PROFILE_LINKING_GENERIC_ERROR_MESSAGE = 'Nao foi possivel vincular este usuario.';
 
 export type LinkedBarberProfile = {
@@ -54,6 +54,16 @@ const createBarberProfileLinkingError = (
 
 export const normalizeBarberProfileLinkingEmail = (value?: string): string => value?.trim().toLowerCase() || '';
 
+export const getBarberProfileLinkingSuccessMessage = ({
+  barberName,
+  email
+}: {
+  barberName: string;
+  email: string;
+}): string => (
+  `Conta vinculada ao profissional ${barberName}. E-mail usado: ${email}. Se a agenda ainda nao aparecer para o barbeiro, peca para ele sair e entrar novamente.`
+);
+
 export const isOwnerBarberEligibleForProfileLinking = (
   barber: BarberOption | undefined,
   ownerBarbershopId?: string | null
@@ -90,15 +100,15 @@ export const getBarberProfileLinkingErrorCode = (error: unknown): string | null 
 export const getBarberProfileLinkingErrorMessage = (error: unknown): string => {
   switch (getBarberProfileLinkingErrorCode(error)) {
     case 'TARGET_USER_NOT_FOUND':
-      return 'Usuario nao encontrado. Peca para o barbeiro criar uma conta primeiro.';
+      return 'Nenhuma conta foi encontrada com este e-mail. Peca para o barbeiro criar a conta primeiro e tente novamente.';
     case 'BARBER_NOT_IN_TENANT':
-      return 'Este barbeiro nao pertence a sua barbearia.';
+      return 'O profissional selecionado nao pertence a esta barbearia.';
     case 'TARGET_PROFILE_BELONGS_TO_ANOTHER_TENANT':
-      return 'Este usuario ja esta vinculado a outra barbearia.';
+      return 'Esta conta ja esta vinculada a outra barbearia.';
     case 'TARGET_PROFILE_IS_OWNER':
-      return 'Este usuario ja e owner e nao pode ser vinculado como barbeiro.';
+      return 'Esta conta e de owner e nao pode ser vinculada como barbeiro.';
     case 'TARGET_USER_CANNOT_BE_OWNER':
-      return 'Use uma conta separada para o barbeiro.';
+      return 'Use uma conta separada para o barbeiro. Uma conta de owner nao deve ser usada como perfil de atendimento.';
     default:
       return BARBER_PROFILE_LINKING_GENERIC_ERROR_MESSAGE;
   }
