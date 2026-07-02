@@ -19,7 +19,8 @@ import {
   XCircle,
   CheckCircle,
   Pencil,
-  Trash2
+  Trash2,
+  Scissors
 } from 'lucide-react';
 import { AppointmentModal } from './AppointmentModal';
 
@@ -34,7 +35,7 @@ type BarberDashboardProps = {
   onLogout: () => void;
 };
 
-export const BARBER_PROFILE_INCOMPLETE_MESSAGE = 'Perfil de barbeiro incompleto. Peca ao owner para vincular sua conta novamente.';
+export const BARBER_PROFILE_INCOMPLETE_MESSAGE = 'Seu perfil de barbeiro ainda nao esta vinculado a um profissional. Peca ao owner para revisar o vinculo da sua conta.';
 
 const getTodayString = (): string => {
   const d = new Date();
@@ -97,6 +98,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
 
   const barberId = authSession.barberId;
+  const hasBarbershopLink = Boolean(authSession.barbershopId?.trim());
 
   const currentBarber = useMemo(
     () => settings.barbers?.find((item) => item.id === barberId),
@@ -216,18 +218,24 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
     setSelectedDate(`${newYear}-${newMonth}-${newDay}`);
   };
 
-  if (!barberId || !currentBarber) {
+  if (!barberId || !hasBarbershopLink || !currentBarber) {
     return (
       <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
         <div className="glass-card w-full max-w-lg rounded-2xl p-7 text-center">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-500/10 text-amber-200">
+            <Scissors size={28} />
+          </div>
           <h1 className="text-white font-display text-2xl font-bold mb-3">
             Vinculo pendente
           </h1>
           <p className="text-gray-400 text-sm leading-relaxed">
-            Seu usuario ainda nao esta vinculado a um barbeiro ativo desta barbearia.
+            Sua conta existe, mas ainda nao esta vinculada a um profissional ativo desta barbearia.
           </p>
-          <p className="mt-3 text-sm text-gray-300">
-            Peca ao owner para vincular seu e-mail a um barbeiro no painel interno. Depois disso, sua agenda individual aparecera aqui.
+          <p className="mt-3 text-sm text-gray-300 leading-relaxed">
+            Envie ao owner o e-mail usado neste login. Ele deve selecionar o profissional correspondente no painel e vincular a sua conta.
+          </p>
+          <p className="mt-3 rounded-2xl border border-gray-700 bg-gray-900/60 p-3 text-xs leading-relaxed text-gray-400">
+            Se o owner acabou de concluir o vinculo, saia e entre novamente para atualizar a sessao.
           </p>
         </div>
       </div>
@@ -246,6 +254,9 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
               <span className="text-[10px] uppercase font-bold text-blue-400">
                 Barbeiro
               </span>
+              <p className="mt-0.5 text-[11px] text-gray-400">
+                Conta vinculada ao profissional {barberName}
+              </p>
             </div>
           </div>
 

@@ -27,7 +27,10 @@ describe('owner barber profile linking', () => {
     );
 
     expect(html).toContain('Vincular barbeiro a usuario');
-    expect(html).toContain('usuario@exemplo.com');
+    expect(html).toContain('Como funciona');
+    expect(html).toContain('O barbeiro cria uma conta usando o e-mail dele.');
+    expect(html).toContain('E-mail da conta do barbeiro');
+    expect(html).not.toContain('barber-1');
   });
 
   it('barber does not see the linking UI', () => {
@@ -75,7 +78,7 @@ describe('owner barber profile linking', () => {
     });
     expect(result).toEqual({
       type: 'success',
-      message: 'Barbeiro vinculado com sucesso.'
+      message: 'Conta vinculada ao profissional Leo. E-mail usado: barber@example.com. Se a agenda ainda nao aparecer para o barbeiro, peca para ele sair e entrar novamente.'
     });
   });
 
@@ -88,7 +91,7 @@ describe('owner barber profile linking', () => {
 
     expect(result).toEqual({
       type: 'error',
-      message: 'Usuario nao encontrado. Peca para o barbeiro criar uma conta primeiro.'
+      message: 'Nenhuma conta foi encontrada com este e-mail. Peca para o barbeiro criar a conta primeiro e tente novamente.'
     });
   });
 
@@ -101,7 +104,7 @@ describe('owner barber profile linking', () => {
 
     expect(result).toEqual({
       type: 'error',
-      message: 'Este barbeiro nao pertence a sua barbearia.'
+      message: 'O profissional selecionado nao pertence a esta barbearia.'
     });
   });
 
@@ -114,7 +117,7 @@ describe('owner barber profile linking', () => {
 
     expect(result).toEqual({
       type: 'error',
-      message: 'Este usuario ja esta vinculado a outra barbearia.'
+      message: 'Esta conta ja esta vinculada a outra barbearia.'
     });
   });
 
@@ -127,7 +130,7 @@ describe('owner barber profile linking', () => {
 
     expect(result).toEqual({
       type: 'error',
-      message: 'Este usuario ja e owner e nao pode ser vinculado como barbeiro.'
+      message: 'Esta conta e de owner e nao pode ser vinculada como barbeiro.'
     });
   });
 
@@ -140,7 +143,7 @@ describe('owner barber profile linking', () => {
 
     expect(result).toEqual({
       type: 'error',
-      message: 'Use uma conta separada para o barbeiro.'
+      message: 'Use uma conta separada para o barbeiro. Uma conta de owner nao deve ser usada como perfil de atendimento.'
     });
   });
 
