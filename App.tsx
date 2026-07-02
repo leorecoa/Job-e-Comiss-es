@@ -1725,7 +1725,17 @@ const App: React.FC = () => {
                       </React.Suspense>
                     ) : activeTab === 'clients' ? (
                         <>
-                           {filteredClients.length === 0 ? <p className="text-center py-8 text-gray-500">{selectedBarberFilter === 'TODOS' ? 'Sem registros.' : `Sem registros para ${selectedBarberFilter}.`}</p> : (
+                           {filteredClients.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500">
+                              <p className="font-bold text-white">
+                                {selectedBarberFilter === 'TODOS' ? 'Nenhum atendimento registrado ainda.' : `Nenhum atendimento para ${selectedBarberFilter}.`}
+                              </p>
+                              <p className="mx-auto mt-2 max-w-md text-sm">
+                                Quando voce registrar um atendimento manual ou concluir agendamentos, o historico de clientes aparecera aqui.
+                              </p>
+                              <p className="mt-3 text-xs font-bold uppercase tracking-widest text-gold-300">Use o botao Atendimento para lancar o primeiro registro.</p>
+                            </div>
+                           ) : (
                                 <>
                                     {/* Mobile View: Cards */}
                                     <div className="md:hidden p-4 space-y-3">
@@ -1831,7 +1841,17 @@ const App: React.FC = () => {
                         </>
                     ) : (
                         <>
-                           {filteredVales.length === 0 ? <p className="text-center py-8 text-gray-500">{selectedBarberFilter === 'TODOS' ? 'Sem vales.' : `Sem vales para ${selectedBarberFilter}.`}</p> : (
+                           {filteredVales.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500">
+                              <p className="font-bold text-white">
+                                {selectedBarberFilter === 'TODOS' ? 'Nenhum vale registrado ainda.' : `Nenhum vale para ${selectedBarberFilter}.`}
+                              </p>
+                              <p className="mx-auto mt-2 max-w-md text-sm">
+                                Vales lancados para barbeiros aparecem aqui e entram no resumo financeiro do periodo.
+                              </p>
+                              <p className="mt-3 text-xs font-bold uppercase tracking-widest text-gold-300">Use o botao Vale quando precisar registrar o primeiro desconto.</p>
+                            </div>
+                           ) : (
                                 <>
                                     {/* Mobile View: Cards for Vales */}
                                     <div className="md:hidden p-4 space-y-3">

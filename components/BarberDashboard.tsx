@@ -224,8 +224,10 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
             Vinculo pendente
           </h1>
           <p className="text-gray-400 text-sm leading-relaxed">
-            Seu usuario ainda nao esta vinculado a um barbeiro. Peca ao administrador
-            para concluir o vinculo do seu perfil.
+            Seu usuario ainda nao esta vinculado a um barbeiro ativo desta barbearia.
+          </p>
+          <p className="mt-3 text-sm text-gray-300">
+            Peca ao owner para vincular seu e-mail a um barbeiro no painel interno. Depois disso, sua agenda individual aparecera aqui.
           </p>
         </div>
       </div>
@@ -329,7 +331,10 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
           </h2>
 
           {todayAppointments.length === 0 ? (
-            <p className="text-gray-400">Nenhum agendamento para hoje.</p>
+            <div className="rounded-2xl border border-gray-700 bg-gray-900/50 p-5 text-sm text-gray-400">
+              <p className="font-bold text-white">Nenhum agendamento para hoje.</p>
+              <p className="mt-1">Quando clientes reservarem pelo booking publico ou voce criar um agendamento manual, eles aparecerao nesta lista.</p>
+            </div>
           ) : (
             <div className="space-y-4">
               {todayAppointments.map((appointment) => {
@@ -406,7 +411,10 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
           </h2>
 
           {upcomingAppointments.length === 0 ? (
-            <p className="text-gray-400">Nenhum agendamento futuro.</p>
+            <div className="rounded-2xl border border-gray-700 bg-gray-900/50 p-5 text-sm text-gray-400">
+              <p className="font-bold text-white">Nenhum agendamento futuro.</p>
+              <p className="mt-1">Proximas reservas feitas pelos clientes ou criadas manualmente aparecerao aqui.</p>
+            </div>
           ) : (
             <div className="space-y-4">
               {upcomingAppointments.map((appointment) => {

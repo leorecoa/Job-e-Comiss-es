@@ -151,7 +151,11 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
 
             <div className="space-y-3">
               {barbers.length === 0 ? (
-                <EmptyState message="Nenhum barbeiro cadastrado para esta barbearia." />
+                <EmptyState
+                  title="Nenhum barbeiro cadastrado ainda."
+                  description="Cadastre pelo menos um barbeiro para liberar profissionais no booking publico."
+                  nextStep="Use o campo acima para adicionar o primeiro barbeiro."
+                />
               ) : (
                 barbers.map((barber) => (
                   <div key={barber.id} className="rounded-2xl border border-gray-700 bg-gray-950/70 p-3">
@@ -276,7 +280,11 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
 
             <div className="space-y-3">
               {services.length === 0 ? (
-                <EmptyState message="Nenhum servico cadastrado para esta barbearia." />
+                <EmptyState
+                  title="Nenhum servico cadastrado ainda."
+                  description="Cadastre pelo menos um servico com valor e duracao para permitir agendamentos."
+                  nextStep="Use os campos acima para criar o primeiro servico."
+                />
               ) : (
                 services.map((service) => {
                   const draft = serviceDrafts[service.id] || {
@@ -426,8 +434,10 @@ const StatusBadge: React.FC<{ active: boolean }> = ({ active }) => (
   </span>
 );
 
-const EmptyState: React.FC<{ message: string }> = ({ message }) => (
+const EmptyState: React.FC<{ title: string; description: string; nextStep?: string }> = ({ title, description, nextStep }) => (
   <div className="rounded-2xl border border-gray-700 bg-gray-950/70 px-4 py-5 text-sm text-gray-400">
-    {message}
+    <p className="font-bold text-white">{title}</p>
+    <p className="mt-1">{description}</p>
+    {nextStep && <p className="mt-2 text-xs font-bold uppercase tracking-widest text-gold-300">{nextStep}</p>}
   </div>
 );
