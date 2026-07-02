@@ -4,6 +4,7 @@ import { Barbershop, BarbershopBusinessDayKey, BarbershopBusinessHours } from '.
 import { AppRole } from '../services/authRepository';
 import { BarbershopBrandingImageType, BarbershopBrandingInput } from '../services/barbershopRepository';
 import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES, normalizeBarbershopBusinessHours, normalizeBarbershopSlotStepMinutes } from '../scheduling';
+import { getOperationalErrorMessage, logOperationalError } from '../utils/errorHandling';
 
 export type BarbershopBrandingFormData = {
   name: string;
@@ -173,7 +174,20 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
       handleChange(getBarbershopBrandingImageField(type), publicUrl);
       setUploadSuccess(type === 'logo' ? 'Logo enviada. Salve a aparencia para publicar.' : 'Capa enviada. Salve a aparencia para publicar.');
     } catch (uploadFailure) {
-      setUploadError(uploadFailure instanceof Error ? uploadFailure.message : 'Nao foi possivel enviar a imagem.');
+      logOperationalError('owner:upload-branding-image', uploadFailure);
+      const uploadMessage = uploadFailure instanceof Error ? uploadFailure.message : '';
+      setUploadError(
+        /^Use uma imagem|deve ter no maximo/i.test(uploadMessage)
+          ? uploadMessage
+          : getOperationalErrorMessage(
+            uploadFailure,
+            'Nao foi possivel enviar a imagem. Tente novamente.',
+            {
+              authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de enviar a imagem.',
+              networkMessage: 'Nao foi possivel conectar ao Supabase para enviar a imagem.'
+            }
+          )
+      );
     } finally {
       setUploadingType(null);
       input.value = '';
