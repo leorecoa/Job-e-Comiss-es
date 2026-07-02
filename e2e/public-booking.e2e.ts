@@ -324,6 +324,10 @@ test.describe('public booking /book/:slug', () => {
     await expect(page.getByText(/Gest[aã]o M[aá]xima/i)).toHaveCount(0);
     await expect(page.getByRole('button', { name: /test/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /corte/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Barbeiro selecionado: test/i })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /Servico selecionado: corte/i })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByText(/R\$\s*60,00/i).first()).toBeVisible();
+    await expect(page.getByText(/30 min/i).first()).toBeVisible();
     await expect(page.getByText(/Leo Inativo/i)).toHaveCount(0);
     await expect(page.getByText(/Barbeiro Gestao/i)).toHaveCount(0);
     await expect(page.getByText(/Servico Inativo/i)).toHaveCount(0);
@@ -343,9 +347,20 @@ test.describe('public booking /book/:slug', () => {
     await page.goto('/book/leo-do-leo');
     await fillValidPublicBookingForm(page);
 
+    await expect(page.getByText(/Confira sua reserva/i)).toBeVisible();
+    await expect(page.getByText(/Pronto para reservar/i)).toBeVisible();
+    await expect(page.getByText(/pedro/i)).toBeVisible();
+    await expect(page.getByText(/Revise os dados antes de confirmar/i)).toBeVisible();
+
     await page.getByRole('button', { name: /Reservar horario/i }).click();
 
     await expect(page.getByRole('heading', { name: /Horario reservado com sucesso/i })).toBeVisible();
+    await expect(page.getByText(/Resumo confirmado/i)).toBeVisible();
+    await expect(page.getByText(/leo do leo/i)).toBeVisible();
+    await expect(page.getByText(/corte/i)).toBeVisible();
+    await expect(page.getByText(/test/i)).toBeVisible();
+    await expect(page.getByText(/pagamento.*combinado diretamente/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /Falar com a barbearia/i })).toBeVisible();
     expect(network.appointmentRequests).toHaveLength(1);
     expect(network.appointmentReadRequests).toHaveLength(0);
 
