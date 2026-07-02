@@ -14,6 +14,7 @@ import {
   validatePublicBookingInput
 } from '../scheduling';
 import { formatCurrency, generateId } from '../utils';
+import { getOperationalErrorMessage, logOperationalError } from '../utils/errorHandling';
 
 interface PublicBookingPageProps {
   settings: AppSettings;
@@ -593,9 +594,13 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
         setBarbershop(resolvedBarbershop);
       } catch (error) {
         if (!active) return;
-        console.error(error);
+        logOperationalError('public-booking:load-barbershop', error);
         setBarbershop(null);
-        setBarbershopError('Nao foi possivel carregar esta barbearia.');
+        setBarbershopError(getOperationalErrorMessage(
+          error,
+          'Nao foi possivel carregar esta barbearia. Tente novamente.',
+          { networkMessage: 'Nao foi possivel conectar ao sistema de agendamento. Tente novamente.' }
+        ));
       } finally {
         if (active) setLoadingBarbershop(false);
       }
@@ -814,6 +819,7 @@ const handleSubmit = async (event: React.FormEvent) => {
     setCreatedAppointment(appointment);
     setErrors([]);
   } catch (error) {
+    logOperationalError('public-booking:submit', error);
     setErrors([getPublicBookingSubmissionErrorMessage(error)]);
   } finally {
     setSubmitting(false);

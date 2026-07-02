@@ -1,6 +1,7 @@
 
 import { assertOperationalSupabase, shouldUseLocalFallback, supabase } from '../lib/supabase';
 import { Appointment } from '../types';
+import { logOperationalError } from '../utils/errorHandling';
 import {
   APPOINTMENT_STORAGE_KEY,
   createAppointmentConflictError,
@@ -320,7 +321,7 @@ export const createAppointment = async ( // This function is used by both intern
       throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
     }
 
-    console.error('Failed to create appointment', error);
+    logOperationalError('appointment-repository:create', error);
     throw error;
   }
 
@@ -366,7 +367,7 @@ export const updateAppointment = async (
     .single();
 
   if (error) {
-    console.error('Failed to update appointment', error);
+    logOperationalError('appointment-repository:update', error);
     throw error;
   }
 
@@ -386,7 +387,7 @@ export const deleteAppointment = async (id: string): Promise<void> => {
     .eq('id', id);
 
   if (error) {
-    console.error('Failed to delete appointment', error);
+    logOperationalError('appointment-repository:delete', error);
     throw error;
   }
 };

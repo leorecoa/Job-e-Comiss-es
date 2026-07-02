@@ -14,6 +14,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { generateId } from '../utils';
+import { logOperationalError } from '../utils/errorHandling';
 import { APPOINTMENT_STORAGE_KEY } from '../scheduling';
 
 interface SettingsModalProps {
@@ -229,7 +230,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         window.location.reload();
       } catch (error) {
         alert('Erro ao ler arquivo de backup. Verifique se é um arquivo válido.');
-        console.error(error);
+        logOperationalError('settings:restore-backup', error);
       }
     };
 

@@ -7,6 +7,7 @@ import {
   normalizeBarberProfileLinkingEmail
 } from '../services/profileLinkingRepository';
 import { BarberOption } from '../types';
+import { logOperationalError } from '../utils/errorHandling';
 
 type OwnerBarberProfileLinkingProps = {
   role?: AppRole | null;
@@ -66,6 +67,7 @@ export const submitOwnerBarberProfileLinking = async ({
       })
     };
   } catch (error) {
+    logOperationalError('owner:link-barber-profile', error);
     return {
       type: 'error',
       message: getBarberProfileLinkingErrorMessage(error)

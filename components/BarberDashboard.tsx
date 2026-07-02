@@ -8,6 +8,7 @@ import {
   generateId
 } from '../utils';
 import { buildWhatsAppLink, getAppointmentDateInput } from '../scheduling';
+import { getOperationalErrorMessage, logOperationalError } from '../utils/errorHandling';
 import {
   Calendar,
   Clock,
@@ -180,29 +181,53 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       return;
     }
 
-    if (editingAppointment) {
-      await onUpdateAppointment(editingAppointment.id, {
-        ...appointmentForBarber,
-        updatedAt: new Date().toISOString()
-      });
+    try {
+      if (editingAppointment) {
+        await onUpdateAppointment(editingAppointment.id, {
+          ...appointmentForBarber,
+          updatedAt: new Date().toISOString()
+        });
 
-      addToast('Agendamento atualizado!', 'success');
-    } else {
-      await onCreateAppointment(appointmentForBarber);
-      addToast('Agendamento criado!', 'success');
+        addToast('Agendamento atualizado!', 'success');
+      } else {
+        await onCreateAppointment(appointmentForBarber);
+        addToast('Agendamento criado!', 'success');
+      }
+
+      setAppointmentModalOpen(false);
+      setEditingAppointment(null);
+    } catch (error) {
+      logOperationalError('barber-dashboard:save-appointment', error);
+      addToast(getOperationalErrorMessage(
+        error,
+        'Nao foi possivel salvar o agendamento. Tente novamente.',
+        {
+          authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de salvar.',
+          networkMessage: 'Nao foi possivel conectar ao Supabase para salvar o agendamento.'
+        }
+      ), 'error');
     }
-
-    setAppointmentModalOpen(false);
-    setEditingAppointment(null);
   };
 
   const handleMarkAsCompleted = async (appointment: Appointment) => {
-    await onUpdateAppointment(appointment.id, {
-      status: 'completed',
-      updatedAt: new Date().toISOString()
-    });
+    try {
+      await onUpdateAppointment(appointment.id, {
+        status: 'completed',
+        updatedAt: new Date().toISOString()
+      });
 
-    addToast('Agendamento marcado como concluido!', 'success');
+      addToast('Agendamento marcado como concluido!', 'success');
+    } catch (error) {
+      logOperationalError('barber-dashboard:complete-appointment', error);
+      addToast(getOperationalErrorMessage(
+        error,
+        'Nao foi possivel atualizar o status do agendamento.',
+        {
+          authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de atualizar.',
+          networkMessage: 'Nao foi possivel conectar ao Supabase para atualizar o agendamento.'
+        }
+      ), 'error');
+    }
   };
 
   const changeDate = (days: number) => {

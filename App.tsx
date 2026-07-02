@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
 import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById, resolveOwnerScopedBarbershopId } from './utils';
-import {
+import { 
   BarbershopBrandingImageType,
   BarbershopBrandingInput,
   createBarbershopForCurrentOwner,
@@ -52,6 +52,7 @@ import {
   FileText,
   Clock
 } from 'lucide-react';
+import { getOperationalErrorMessage, logOperationalError } from './utils/errorHandling';
 
 const AddClientModal = React.lazy(() => import('./components/AddClientModal').then((module) => ({ default: module.AddClientModal })));
 const AddValeModal = React.lazy(() => import('./components/AddValeModal').then((module) => ({ default: module.AddValeModal })));
@@ -253,7 +254,7 @@ const App: React.FC = () => {
           commissionValue: c.commissionValue // Keep existing or undefined
       }));
     } catch (e) {
-      console.error("Error loading clients", e);
+      logOperationalError('local-storage:load-clients', e);
       return [];
     }
   });
@@ -268,7 +269,7 @@ const App: React.FC = () => {
       const parsed = saved ? JSON.parse(saved) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
-      console.error("Error loading vales", e);
+      logOperationalError('local-storage:load-vales', e);
       return [];
     }
   });
@@ -283,7 +284,7 @@ const App: React.FC = () => {
       const parsed = saved ? JSON.parse(saved) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
-      console.error("Error loading appointments", e);
+      logOperationalError('local-storage:load-appointments', e);
       return [];
     }
   });
@@ -382,8 +383,15 @@ const App: React.FC = () => {
         }
       } catch (error) {
         if (!active) return;
-        console.error(error);
-        setAuthError('Nao foi possivel validar sua sessao.');
+        logOperationalError('auth:load-session', error);
+        setAuthError(getOperationalErrorMessage(
+          error,
+          'Nao foi possivel validar sua sessao. Entre novamente.',
+          {
+            authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente.',
+            networkMessage: 'Nao foi possivel conectar ao Supabase para validar sua sessao.'
+          }
+        ));
       } finally {
         if (active) setAuthLoading(false);
       }
@@ -444,8 +452,12 @@ const App: React.FC = () => {
         setOwnerBarbershop(currentBarbershop);
       } catch (error) {
         if (!active) return;
-        console.error(error);
-        setOwnerBarbershopError('Nao foi possivel carregar a identidade da barbearia.');
+        logOperationalError('owner:load-barbershop', error);
+        setOwnerBarbershopError(getOperationalErrorMessage(
+          error,
+          'Nao foi possivel carregar os dados da sua barbearia. Tente novamente.',
+          { networkMessage: 'Nao foi possivel conectar ao Supabase para carregar sua barbearia.' }
+        ));
       } finally {
         if (active) setOwnerBarbershopLoading(false);
       }
@@ -503,8 +515,12 @@ const App: React.FC = () => {
         syncActiveCatalogIntoSettings(catalogBarbers, catalogServices);
       } catch (error) {
         if (!active) return;
-        console.error(error);
-        setOwnerCatalogError('Nao foi possivel carregar o catalogo operacional.');
+        logOperationalError('owner:load-catalog', error);
+        setOwnerCatalogError(getOperationalErrorMessage(
+          error,
+          'Nao foi possivel carregar barbeiros e servicos. Tente novamente.',
+          { networkMessage: 'Nao foi possivel conectar ao Supabase para carregar o catalogo.' }
+        ));
       } finally {
         if (active) setOwnerCatalogLoading(false);
       }
@@ -589,8 +605,14 @@ const App: React.FC = () => {
         }));
       } catch (error) {
         if (!active) return;
-        console.error(error);
-        setAppointmentsError('Erro ao carregar dados online. Verifique o Supabase.');
+        logOperationalError(isPublicBookingRoute ? 'public-booking:load-data' : 'dashboard:load-appointments', error);
+        setAppointmentsError(getOperationalErrorMessage(
+          error,
+          isPublicBookingRoute
+            ? 'Nao foi possivel carregar a disponibilidade da barbearia. Tente novamente.'
+            : 'Nao foi possivel carregar os agendamentos. Tente novamente.',
+          { networkMessage: 'Nao foi possivel conectar ao Supabase para carregar os agendamentos.' }
+        ));
       } finally {
         if (active) setAppointmentsLoading(false);
       }
@@ -773,8 +795,15 @@ const App: React.FC = () => {
       handleAuthProfile(session);
       addToast(`Bem-vindo, ${session.displayName}!`, 'success');
     } catch (error) {
-      console.error(error);
-      setAuthError('Email ou senha invalidos.');
+      logOperationalError('auth:sign-in', error);
+      setAuthError(getOperationalErrorMessage(
+        error,
+        'Email ou senha invalidos.',
+        {
+          authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente.',
+          networkMessage: 'Nao foi possivel conectar ao Supabase para entrar.'
+        }
+      ));
     } finally {
       setAuthLoading(false);
     }
@@ -792,8 +821,12 @@ const App: React.FC = () => {
         setAuthError('Cadastro criado. Confirme seu email antes de entrar.');
       }
     } catch (error) {
-      console.error(error);
-      setAuthError('Nao foi possivel criar o acesso.');
+      logOperationalError('auth:sign-up', error);
+      setAuthError(getOperationalErrorMessage(
+        error,
+        'Nao foi possivel criar o acesso. Revise os dados e tente novamente.',
+        { networkMessage: 'Nao foi possivel conectar ao Supabase para criar o acesso.' }
+      ));
     } finally {
       setAuthLoading(false);
     }
@@ -854,6 +887,20 @@ const App: React.FC = () => {
     })
   );
 
+  const handleOwnerCatalogOperationError = (
+    context: string,
+    error: unknown,
+    fallbackMessage: string
+  ) => {
+    logOperationalError(context, error);
+    const message = getOperationalErrorMessage(error, fallbackMessage, {
+      authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente.',
+      networkMessage: 'Nao foi possivel conectar ao Supabase para atualizar o catalogo.'
+    });
+    setOwnerCatalogError(message);
+    addToast(message, 'error');
+  };
+
   const handleCreateOwnerBarber = async (name: string) => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
@@ -863,12 +910,16 @@ const App: React.FC = () => {
     }
 
     setOwnerCatalogError(null);
-    const created = await createBarber({ name, barbershopId, active: true });
-    const nextBarbers = [...ownerCatalogBarbers.filter((barber) => barber.id !== created.id), created]
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-    setOwnerCatalogBarbers(nextBarbers);
-    syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
-    addToast('Barbeiro cadastrado!', 'success');
+    try {
+      const created = await createBarber({ name, barbershopId, active: true });
+      const nextBarbers = [...ownerCatalogBarbers.filter((barber) => barber.id !== created.id), created]
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      setOwnerCatalogBarbers(nextBarbers);
+      syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
+      addToast('Barbeiro cadastrado!', 'success');
+    } catch (error) {
+      handleOwnerCatalogOperationError('owner-catalog:create-barber', error, 'Nao foi possivel cadastrar o barbeiro. Tente novamente.');
+    }
   };
 
   const handleUpdateOwnerBarber = async (
@@ -883,13 +934,17 @@ const App: React.FC = () => {
     }
 
     setOwnerCatalogError(null);
-    const updated = await updateBarber(barberId, patch, barbershopId);
-    const nextBarbers = ownerCatalogBarbers
-      .map((barber) => (barber.id === barberId ? updated : barber))
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-    setOwnerCatalogBarbers(nextBarbers);
-    syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
-    addToast(updated.active === false ? 'Barbeiro desativado.' : 'Barbeiro atualizado.', 'success');
+    try {
+      const updated = await updateBarber(barberId, patch, barbershopId);
+      const nextBarbers = ownerCatalogBarbers
+        .map((barber) => (barber.id === barberId ? updated : barber))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      setOwnerCatalogBarbers(nextBarbers);
+      syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
+      addToast(updated.active === false ? 'Barbeiro desativado.' : 'Barbeiro atualizado.', 'success');
+    } catch (error) {
+      handleOwnerCatalogOperationError('owner-catalog:update-barber', error, 'Nao foi possivel atualizar o barbeiro. Tente novamente.');
+    }
   };
 
   const handleRemoveOwnerBarber = async (barberId: string) => {
@@ -901,23 +956,27 @@ const App: React.FC = () => {
     }
 
     setOwnerCatalogError(null);
-    const result = await removeBarber(barberId, barbershopId);
-    const nextBarbers = result.action === 'deleted'
-      ? ownerCatalogBarbers.filter((barber) => barber.id !== barberId)
-      : ownerCatalogBarbers.map((barber) => (
-          barber.id === barberId
-            ? { ...barber, active: false }
-            : barber
-        ));
+    try {
+      const result = await removeBarber(barberId, barbershopId);
+      const nextBarbers = result.action === 'deleted'
+        ? ownerCatalogBarbers.filter((barber) => barber.id !== barberId)
+        : ownerCatalogBarbers.map((barber) => (
+            barber.id === barberId
+              ? { ...barber, active: false }
+              : barber
+          ));
 
-    setOwnerCatalogBarbers(nextBarbers);
-    syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
-    addToast(
-      result.action === 'deleted'
-        ? 'Barbeiro removido.'
-        : 'Barbeiro com historico foi desativado para preservar a agenda.',
-      'success'
-    );
+      setOwnerCatalogBarbers(nextBarbers);
+      syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
+      addToast(
+        result.action === 'deleted'
+          ? 'Barbeiro removido.'
+          : 'Barbeiro com historico foi desativado para preservar a agenda.',
+        'success'
+      );
+    } catch (error) {
+      handleOwnerCatalogOperationError('owner-catalog:remove-barber', error, 'Nao foi possivel remover ou desativar o barbeiro. Tente novamente.');
+    }
   };
 
   const handleCreateOwnerService = async (input: {
@@ -934,16 +993,20 @@ const App: React.FC = () => {
     }
 
     setOwnerCatalogError(null);
-    const created = await createService({
-      ...input,
-      barbershopId,
-      active: true
-    });
-    const nextServices = [...ownerCatalogServices.filter((service) => service.id !== created.id), created]
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-    setOwnerCatalogServices(nextServices);
-    syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
-    addToast('Servico cadastrado!', 'success');
+    try {
+      const created = await createService({
+        ...input,
+        barbershopId,
+        active: true
+      });
+      const nextServices = [...ownerCatalogServices.filter((service) => service.id !== created.id), created]
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      setOwnerCatalogServices(nextServices);
+      syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
+      addToast('Servico cadastrado!', 'success');
+    } catch (error) {
+      handleOwnerCatalogOperationError('owner-catalog:create-service', error, 'Nao foi possivel cadastrar o servico. Tente novamente.');
+    }
   };
 
   const handleUpdateOwnerService = async (
@@ -958,13 +1021,17 @@ const App: React.FC = () => {
     }
 
     setOwnerCatalogError(null);
-    const updated = await updateService(serviceId, patch, barbershopId);
-    const nextServices = ownerCatalogServices
-      .map((service) => (service.id === serviceId ? updated : service))
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-    setOwnerCatalogServices(nextServices);
-    syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
-    addToast(updated.active === false ? 'Servico desativado.' : 'Servico atualizado.', 'success');
+    try {
+      const updated = await updateService(serviceId, patch, barbershopId);
+      const nextServices = ownerCatalogServices
+        .map((service) => (service.id === serviceId ? updated : service))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      setOwnerCatalogServices(nextServices);
+      syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
+      addToast(updated.active === false ? 'Servico desativado.' : 'Servico atualizado.', 'success');
+    } catch (error) {
+      handleOwnerCatalogOperationError('owner-catalog:update-service', error, 'Nao foi possivel atualizar o servico. Tente novamente.');
+    }
   };
 
   const handleRemoveOwnerService = async (serviceId: string) => {
@@ -976,23 +1043,27 @@ const App: React.FC = () => {
     }
 
     setOwnerCatalogError(null);
-    const result = await removeService(serviceId, barbershopId);
-    const nextServices = result.action === 'deleted'
-      ? ownerCatalogServices.filter((service) => service.id !== serviceId)
-      : ownerCatalogServices.map((service) => (
-          service.id === serviceId
-            ? { ...service, active: false }
-            : service
-        ));
+    try {
+      const result = await removeService(serviceId, barbershopId);
+      const nextServices = result.action === 'deleted'
+        ? ownerCatalogServices.filter((service) => service.id !== serviceId)
+        : ownerCatalogServices.map((service) => (
+            service.id === serviceId
+              ? { ...service, active: false }
+              : service
+          ));
 
-    setOwnerCatalogServices(nextServices);
-    syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
-    addToast(
-      result.action === 'deleted'
-        ? 'Servico removido.'
-        : 'Servico com historico foi desativado para preservar os agendamentos.',
-      'success'
-    );
+      setOwnerCatalogServices(nextServices);
+      syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
+      addToast(
+        result.action === 'deleted'
+          ? 'Servico removido.'
+          : 'Servico com historico foi desativado para preservar os agendamentos.',
+        'success'
+      );
+    } catch (error) {
+      handleOwnerCatalogOperationError('owner-catalog:remove-service', error, 'Nao foi possivel remover ou desativar o servico. Tente novamente.');
+    }
   };
 
   const handleLinkOwnerBarberProfile = async ({
@@ -1041,8 +1112,15 @@ const App: React.FC = () => {
       setOwnerBarbershopSuccess('Aparencia publica salva com sucesso.');
       addToast('Aparencia publica salva.', 'success');
     } catch (error) {
-      console.error(error);
-      setOwnerBarbershopError('Nao foi possivel salvar a identidade da barbearia.');
+      logOperationalError('owner:save-barbershop-settings', error);
+      setOwnerBarbershopError(getOperationalErrorMessage(
+        error,
+        'Nao foi possivel salvar as configuracoes da barbearia.',
+        {
+          authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de salvar.',
+          networkMessage: 'Nao foi possivel conectar ao Supabase para salvar as configuracoes.'
+        }
+      ));
     } finally {
       setSavingOwnerBarbershop(false);
     }
@@ -1127,8 +1205,15 @@ const App: React.FC = () => {
       setEditingAppointment(null);
       addToast(editingId ? 'Agendamento atualizado!' : 'Agendamento criado!', 'success');
     } catch (error) {
-      console.error(error);
-      addToast('Erro ao salvar agendamento.', 'error');
+      logOperationalError('dashboard:save-appointment', error);
+      addToast(getOperationalErrorMessage(
+        error,
+        'Nao foi possivel salvar o agendamento. Tente novamente.',
+        {
+          authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de salvar.',
+          networkMessage: 'Nao foi possivel conectar ao Supabase para salvar o agendamento.'
+        }
+      ), 'error');
     }
   };
 
@@ -1148,8 +1233,15 @@ const App: React.FC = () => {
 
       addToast('Agendamento criado!', 'success');
     } catch (error) {
-      console.error(error);
-      addToast('Erro ao salvar agendamento.', 'error');
+      logOperationalError('barber-dashboard:create-appointment', error);
+      addToast(getOperationalErrorMessage(
+        error,
+        'Nao foi possivel criar o agendamento. Tente novamente.',
+        {
+          authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de criar o agendamento.',
+          networkMessage: 'Nao foi possivel conectar ao Supabase para criar o agendamento.'
+        }
+      ), 'error');
     }
   };
 
@@ -1202,11 +1294,15 @@ const App: React.FC = () => {
       const savedAppointment = await createAppointmentRecord(appointment, appointments); //
       setAppointments(prev => [savedAppointment, ...prev]);
     } catch (error) {
-      console.error(error);
+      logOperationalError('public-booking:create-appointment', error);
       if (isAppointmentConflictError(error)) {
         addToast(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE, 'error');
       } else {
-        addToast('Erro ao confirmar agendamento.', 'error');
+        addToast(getOperationalErrorMessage(
+          error,
+          'Nao foi possivel confirmar este horario. Tente novamente.',
+          { networkMessage: 'Nao foi possivel conectar ao Supabase para confirmar o agendamento.' }
+        ), 'error');
       }
       throw error;
     }
@@ -1251,8 +1347,15 @@ const App: React.FC = () => {
 
       addToast('Status do agendamento atualizado.', 'success');
     } catch (error) {
-      console.error(error);
-      addToast('Erro ao atualizar agendamento.', 'error');
+      logOperationalError('dashboard:update-appointment-status', error);
+      addToast(getOperationalErrorMessage(
+        error,
+        'Nao foi possivel atualizar o status do agendamento.',
+        {
+          authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de atualizar.',
+          networkMessage: 'Nao foi possivel conectar ao Supabase para atualizar o agendamento.'
+        }
+      ), 'error');
     }
   };
 
@@ -1352,8 +1455,8 @@ const App: React.FC = () => {
         );
         addToast('Relatório PDF gerado!', 'success');
     } catch (e) {
-        console.error(e);
-        addToast('Erro ao gerar relatório.', 'error');
+        logOperationalError('reports:download-range', e);
+        addToast('Nao foi possivel gerar o relatorio do periodo. Tente novamente.', 'error');
     }
   };
 
@@ -1369,8 +1472,8 @@ const App: React.FC = () => {
       );
       addToast('Relatório do dia baixado!', 'success');
     } catch (e) {
-      console.error(e);
-      addToast('Erro ao gerar relatório.', 'error');
+      logOperationalError('reports:download-daily', e);
+      addToast('Nao foi possivel gerar o relatorio do dia. Tente novamente.', 'error');
     }
   };
 
@@ -1385,7 +1488,7 @@ const App: React.FC = () => {
          try {
            await signOutAuth();
          } catch (error) {
-           console.error(error);
+           logOperationalError('auth:sign-out', error);
          }
        }
        setAuthSession(null);
