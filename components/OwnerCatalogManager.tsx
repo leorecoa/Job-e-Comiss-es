@@ -100,7 +100,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
   };
 
   return (
-    <section className="mb-6 rounded-3xl border border-gray-700 bg-gray-800/80 p-5 shadow-xl shadow-black/10">
+    <section id="owner-catalog-manager" className="mb-6 rounded-3xl border border-gray-700 bg-gray-800/80 p-5 shadow-xl shadow-black/10 scroll-mt-24">
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-gold-300">Operacao</p>

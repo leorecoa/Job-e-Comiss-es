@@ -70,6 +70,7 @@ describe('Owner setup checklist', () => {
 
     expect(html).toContain('Booking pronto para receber agendamentos.');
     expect(html).toContain('/book/leo-do-leo');
+    expect(html).not.toContain('Proximo passo');
   });
 
   it('shows a pending state when there is no active barber for the current tenant', () => {
@@ -86,6 +87,21 @@ describe('Owner setup checklist', () => {
     expect(state.ready).toBe(false);
     expect(state.issues).toContain('Nenhum barbeiro ativo.');
     expect(state.items.find((item) => item.key === 'active-barbers')?.complete).toBe(false);
+    expect(state.items.find((item) => item.key === 'active-barbers')?.actionHref).toBe('#owner-catalog-manager');
+
+    const html = renderToStaticMarkup(
+      <OwnerSetupChecklist
+        role="owner"
+        authSession={makeAuthSession()}
+        barbershop={makeBarbershop()}
+        barbers={[makeBarber({ active: false })]}
+        services={[makeService()]}
+      />
+    );
+
+    expect(html).toContain('Proximo passo');
+    expect(html).toContain('Cadastre ou ative pelo menos um barbeiro da sua barbearia.');
+    expect(html).toContain('#owner-catalog-manager');
   });
 
   it('shows a pending state when there is no active service for the current tenant', () => {
@@ -102,6 +118,7 @@ describe('Owner setup checklist', () => {
     expect(state.ready).toBe(false);
     expect(state.issues).toContain('Nenhum servico ativo.');
     expect(state.items.find((item) => item.key === 'active-services')?.complete).toBe(false);
+    expect(state.items.find((item) => item.key === 'active-services')?.actionLabel).toBe('Configurar servicos');
   });
 
   it('shows a pending state when business hours are not configured', () => {
@@ -117,6 +134,7 @@ describe('Owner setup checklist', () => {
 
     expect(state.ready).toBe(false);
     expect(state.issues).toContain('Horarios de funcionamento nao configurados.');
+    expect(state.items.find((item) => item.key === 'business-hours')?.actionHref).toBe('#owner-barbershop-settings');
   });
 
   it('shows a pending state when slot step minutes are invalid', () => {
@@ -132,6 +150,7 @@ describe('Owner setup checklist', () => {
 
     expect(state.ready).toBe(false);
     expect(state.issues).toContain('Intervalo de agenda invalido.');
+    expect(state.items.find((item) => item.key === 'slot-step')?.nextStep).toBe('Escolha um intervalo valido de agenda.');
   });
 
   it('shows a pending state when the public slug is missing', () => {
@@ -146,6 +165,21 @@ describe('Owner setup checklist', () => {
     expect(state.publicBookingPath).toBeNull();
     expect(state.issues).toContain('Slug publico indisponivel.');
     expect(state.issues).toContain('Link publico de agendamento indisponivel.');
+  });
+
+  it('shows that an existing public link should not be promoted before setup is complete', () => {
+    const html = renderToStaticMarkup(
+      <OwnerSetupChecklist
+        role="owner"
+        authSession={makeAuthSession()}
+        barbershop={makeBarbershop()}
+        barbers={[]}
+        services={[makeService()]}
+      />
+    );
+
+    expect(html).toContain('/book/leo-do-leo');
+    expect(html).toContain('O link ja existe, mas o booking ainda nao deve ser divulgado como operacional ate concluir as pendencias.');
   });
 
   it('does not render the checklist for barbers', () => {
