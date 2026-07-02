@@ -1003,7 +1003,7 @@ describe('Public Booking Page Logic', () => {
       hasClient: false
     });
 
-    expect(steps.map((step) => step.label)).toEqual(['Barbeiro', 'Servico', 'Horario', 'Dados']);
+    expect(steps.map((step) => step.label)).toEqual(['Barbeiro', 'Servico', 'Horario', 'Dados', 'Confirmar']);
     expect(steps.find((step) => step.key === 'slot')?.active).toBe(true);
     expect(steps.find((step) => step.key === 'barber')?.complete).toBe(true);
   });

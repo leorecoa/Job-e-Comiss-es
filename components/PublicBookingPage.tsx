@@ -3,7 +3,6 @@ import { CalendarCheck, CheckCircle, Clock, MapPin, MessageCircle, Phone, Scisso
 import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfile } from '../types';
 import { getBarbershopBySlug } from '../services/barbershopRepository';
 import {
-  buildWhatsAppLink,
   DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
   createPublicAppointment,
   getAvailableTimeSlots,
@@ -207,7 +206,7 @@ const isSafeHexColor = (value: string | null): value is string => {
   return Boolean(value && /^#[0-9a-f]{6}$/i.test(value));
 };
 
-export type PublicBookingStepKey = 'barber' | 'service' | 'slot' | 'client';
+export type PublicBookingStepKey = 'barber' | 'service' | 'slot' | 'client' | 'confirm';
 
 export type PublicBookingStep = {
   key: PublicBookingStepKey;
@@ -220,18 +219,21 @@ export const getPublicBookingSteps = ({
   hasBarber,
   hasService,
   hasSlot,
-  hasClient
+  hasClient,
+  hasReadyToConfirm = false
 }: {
   hasBarber: boolean;
   hasService: boolean;
   hasSlot: boolean;
   hasClient: boolean;
+  hasReadyToConfirm?: boolean;
 }): PublicBookingStep[] => {
   const steps: Array<Omit<PublicBookingStep, 'active'>> = [
     { key: 'barber', label: 'Barbeiro', complete: hasBarber },
     { key: 'service', label: 'Servico', complete: hasService },
     { key: 'slot', label: 'Horario', complete: hasSlot },
-    { key: 'client', label: 'Dados', complete: hasClient }
+    { key: 'client', label: 'Dados', complete: hasClient },
+    { key: 'confirm', label: 'Confirmar', complete: hasReadyToConfirm }
   ];
   const activeIndex = Math.max(0, steps.findIndex((step) => !step.complete));
 
@@ -239,6 +241,33 @@ export const getPublicBookingSteps = ({
     ...step,
     active: index === (activeIndex === -1 ? steps.length - 1 : activeIndex)
   }));
+};
+
+const formatPublicBookingDateLabel = (dateInput: string): string => {
+  const [year, month, day] = dateInput.split('-').map(Number);
+
+  if (!year || !month || !day) {
+    return 'Selecione uma data';
+  }
+
+  return new Date(year, month - 1, day).toLocaleDateString('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit'
+  });
+};
+
+const formatPublicBookingDateTimeLabel = (isoDate: string): string => {
+  const date = new Date(isoDate);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Horario agendado';
+  }
+
+  return `${date.toLocaleDateString('pt-BR')} as ${date.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })}`;
 };
 
 export const getPublicBookingSummary = (
@@ -620,11 +649,16 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     () => services.find((service) => service.id === serviceId),
     [services, serviceId]
   );
+  const bookingDateLabel = useMemo(() => formatPublicBookingDateLabel(date), [date]);
+  const selectedDateTimeLabel = selectedSlot
+    ? `${bookingDateLabel} as ${selectedSlot.label}`
+    : 'Selecione data e horario';
   const bookingSteps = useMemo(() => getPublicBookingSteps({
     hasBarber: Boolean(selectedBarber?.id),
     hasService: Boolean(selectedService?.id),
     hasSlot: Boolean(selectedSlot),
-    hasClient: Boolean(clientName.trim() && clientPhone.trim())
+    hasClient: Boolean(clientName.trim() && clientPhone.trim()),
+    hasReadyToConfirm: Boolean(selectedBarber?.id && selectedService?.id && selectedSlot && clientName.trim() && clientPhone.trim())
   }), [clientName, clientPhone, selectedBarber, selectedService, selectedSlot]);
   const bookingSummary = useMemo(
     () => getPublicBookingSummary(selectedBarber, selectedService, selectedSlot),
@@ -667,6 +701,9 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
       : !bookingReadiness.hasValidSlotStepMinutes
         ? 'Intervalo de agenda invalido para esta barbearia.'
         : 'A barbearia nao atende neste dia.';
+  const emptySlotsNextStep = contactLinks.whatsapp
+    ? 'Escolha outra data, tente outro profissional ou fale com a barbearia pelo WhatsApp.'
+    : 'Escolha outra data ou tente outro profissional, se houver outro disponivel.';
   
   const availableSlots = useMemo(() => {
     if (!bookingReadiness.ready || !selectedBarber || !selectedService || !date) return [];
@@ -830,8 +867,8 @@ const handleSubmit = async (event: React.FormEvent) => {
   }
 
   if (createdAppointment) {
-    const whatsappLink = buildWhatsAppLink(createdAppointment);
-    const when = new Date(createdAppointment.startAt);
+    const whatsappLink = contactLinks.whatsapp;
+    const whenLabel = formatPublicBookingDateTimeLabel(createdAppointment.startAt);
 
     return (
       <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
@@ -841,15 +878,15 @@ const handleSubmit = async (event: React.FormEvent) => {
           </div>
           <p className="mb-2 text-xs font-bold uppercase tracking-widest text-green-300">Reserva confirmada</p>
           <h1 className="font-display text-2xl font-bold text-white mb-2">Horario reservado com sucesso</h1>
-          <p className="text-gray-400 text-sm mb-6">A barbearia ja recebeu seu agendamento.</p>
+          <p className="text-gray-400 text-sm mb-6">A barbearia ja recebeu seu agendamento. O pagamento, quando houver, e combinado diretamente no atendimento.</p>
 
           <div className="bg-gray-900/60 border border-gray-700 rounded-2xl p-4 text-left space-y-3 mb-6">
-            <p className="text-white font-bold">{createdAppointment.clientName}</p>
-            <p className="text-sm text-gray-300">{createdAppointment.serviceType} · {formatCurrency(createdAppointment.serviceValue)}</p>
-            <p className="text-sm text-gray-300">Com {createdAppointment.barberName}</p>
-            <p className="text-sm text-gold-400 font-mono">
-              {when.toLocaleDateString('pt-BR')} as {when.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </p>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Resumo confirmado</p>
+            <SummaryRow label="Barbearia" value={branding.shopName} />
+            <SummaryRow label="Cliente" value={createdAppointment.clientName} />
+            <SummaryRow label="Servico" value={`${createdAppointment.serviceType} · ${formatCurrency(createdAppointment.serviceValue)}`} />
+            <SummaryRow label="Barbeiro" value={createdAppointment.barberName} />
+            <SummaryRow label="Horario" value={whenLabel} highlight />
             <p className="inline-flex rounded-full border border-green-400/20 bg-green-500/10 px-3 py-1 text-xs font-bold text-green-200">Status: solicitado</p>
           </div>
 
@@ -857,7 +894,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             {whatsappLink && (
               <a href={whatsappLink} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-2 bg-green-500/10 border border-green-500/20 text-green-300 font-bold py-3 rounded-xl">
                 <MessageCircle size={18} />
-                WhatsApp
+                Falar com a barbearia
               </a>
             )}
             <button onClick={handleNewBooking} className="flex-1 bg-gold-500 hover:bg-gold-600 text-black font-bold py-3 rounded-xl">
@@ -957,7 +994,7 @@ const handleSubmit = async (event: React.FormEvent) => {
         </section>
 
         <section className="glass-card rounded-2xl p-2.5 mb-4">
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {bookingSteps.map((step, index) => (
               <div
                 key={step.key}
@@ -980,7 +1017,7 @@ const handleSubmit = async (event: React.FormEvent) => {
               <span className="text-xs font-bold uppercase tracking-widest">Reserva em poucos passos</span>
             </div>
             <h2 className="font-display text-2xl font-bold text-white mb-2">Reserve em poucos segundos</h2>
-            <p className="text-gray-400 text-sm leading-relaxed mb-5">Escolha profissional, servico e horario.</p>
+            <p className="text-gray-400 text-sm leading-relaxed mb-5">Escolha profissional, servico, data e horario. Antes de confirmar, confira o resumo da reserva.</p>
 
             <div className="grid xs:grid-cols-2 gap-3">
               <div className="bg-gray-900/50 border border-gray-700 rounded-xl p-4">
@@ -1009,7 +1046,8 @@ const handleSubmit = async (event: React.FormEvent) => {
                 <SummaryRow label="Barbeiro" value={bookingSummary.barberName} />
                 <SummaryRow label="Servico" value={bookingSummary.serviceName} />
                 <SummaryRow label="Valor" value={bookingSummary.serviceValue} />
-                <SummaryRow label="Horario" value={bookingSummary.slotLabel} highlight={Boolean(selectedSlot)} />
+                <SummaryRow label="Duracao" value={bookingSummary.duration} />
+                <SummaryRow label="Horario" value={selectedDateTimeLabel} highlight={Boolean(selectedSlot)} />
               </div>
             </div>
           </section>
@@ -1046,6 +1084,8 @@ const handleSubmit = async (event: React.FormEvent) => {
                       <button
                         key={barber.value}
                         type="button"
+                        aria-pressed={selected}
+                        aria-label={`${selected ? 'Barbeiro selecionado' : 'Escolher barbeiro'}: ${barber.name}`}
                         onClick={() => handleBarberChange(barber.value)}
                         className={`rounded-2xl border p-3.5 text-left transition-all ${selected ? 'bg-white/10 text-white' : 'bg-gray-900/60 text-gray-300 border-gray-700 hover:border-gray-500'}`}
                         style={selected ? selectedCardStyle : undefined}
@@ -1074,6 +1114,8 @@ const handleSubmit = async (event: React.FormEvent) => {
                       <button
                         key={service.id}
                         type="button"
+                        aria-pressed={selected}
+                        aria-label={`${selected ? 'Servico selecionado' : 'Escolher servico'}: ${service.name}, ${formatCurrency(service.price)}, ${service.durationMinutes} minutos`}
                         onClick={() => handleServiceChange(service.id)}
                         className={`rounded-2xl border p-3.5 text-left transition-all ${selected ? 'bg-white/10 text-white' : 'bg-gray-900/60 text-gray-300 border-gray-700 hover:border-gray-500'}`}
                         style={selected ? selectedCardStyle : undefined}
@@ -1141,7 +1183,7 @@ const handleSubmit = async (event: React.FormEvent) => {
               <label className="block text-sm font-medium text-gray-400 mb-2">Horarios disponiveis</label>
               {availableSlots.length === 0 ? (
                 <p className="text-sm text-gray-400 bg-gray-900/50 border border-gray-700 rounded-2xl p-4">
-  {emptySlotsMessage} Escolha outra data ou fale com a barbearia pelo WhatsApp, se o contato estiver disponivel.
+  {emptySlotsMessage} {emptySlotsNextStep}
 </p>
               ) : (
                 <div className="grid grid-cols-2 xs:grid-cols-3 md:grid-cols-4 gap-2">
@@ -1149,6 +1191,8 @@ const handleSubmit = async (event: React.FormEvent) => {
                     <button
                       key={slot.startAt}
                       type="button"
+                      aria-pressed={selectedSlot?.startAt === slot.startAt}
+                      aria-label={`${selectedSlot?.startAt === slot.startAt ? 'Horario selecionado' : 'Escolher horario'}: ${slot.label}`}
                       onClick={() => setSelectedSlot(slot)}
                       style={selectedSlot?.startAt === slot.startAt ? selectedCardStyle : undefined}
                       className={`py-3.5 rounded-2xl border text-sm font-bold transition-all ${
@@ -1169,28 +1213,36 @@ const handleSubmit = async (event: React.FormEvent) => {
               <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1.5">Seu nome</label>
-                <input required value={clientName} onChange={(e) => setClientName(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
+                <input required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nome de quem vai ser atendido" className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1.5">WhatsApp</label>
-                <input required value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="DDD + numero" className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
+                <input required value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="Ex: 81999999999" className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
               </div>
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1.5">Observacoes</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Opcional: detalhe alguma preferencia para o atendimento" className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
             </div>
 
             <div className="rounded-2xl border border-gray-700 bg-gray-950/70 p-4">
               <p className="mb-3 text-xs font-bold uppercase tracking-widest text-gray-500">Confira sua reserva</p>
               <div className="grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
+                <SummaryRow label="Barbearia" value={branding.shopName} />
                 <SummaryRow label="Barbeiro" value={bookingSummary.barberName} />
                 <SummaryRow label="Servico" value={bookingSummary.serviceName} />
+                <SummaryRow label="Data" value={bookingDateLabel} />
                 <SummaryRow label="Horario" value={bookingSummary.slotLabel} highlight={Boolean(selectedSlot)} />
-                <SummaryRow label="Status" value="Pronto para reservar" />
+                <SummaryRow label="Duracao" value={bookingSummary.duration} />
+                <SummaryRow label="Valor" value={bookingSummary.serviceValue} highlight={Boolean(selectedService)} />
+                <SummaryRow label="Cliente" value={clientName.trim() || 'Informe seu nome'} />
+                <SummaryRow label="Status" value={isSubmitDisabled ? 'Faltam dados' : 'Pronto para reservar'} />
               </div>
+              <p className="mt-3 text-xs leading-relaxed text-gray-500">
+                Revise os dados antes de confirmar. Esta etapa reserva o horario, mas nao confirma pagamento online.
+              </p>
             </div>
 
             <button type="submit" disabled={isSubmitDisabled} style={primaryActionStyle} className="w-full disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-4 rounded-2xl shadow-lg">
