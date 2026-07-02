@@ -84,7 +84,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       {/* Revenue Chart */}
       <div className="bg-gray-800 rounded-2xl border border-gray-700 p-5 shadow-lg flex flex-col">
         <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">
-            {period === 'monthly' ? 'Fluxo do Mês (Dia a Dia)' : 'Faturamento (7 Dias)'}
+            {period === 'monthly' ? 'Faturamento bruto do mes por dia' : 'Faturamento bruto dos ultimos 7 dias'}
         </h3>
         
         {/* Scroll container for monthly view if needed */}
@@ -114,7 +114,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
 
       {/* Services Chart */}
       <div className="bg-gray-800 rounded-2xl border border-gray-700 p-5 shadow-lg">
-         <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Mix de Serviços</h3>
+         <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Mix de servicos por atendimento</h3>
          <div className="space-y-4 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
             {pieData.length === 0 ? (
               <>

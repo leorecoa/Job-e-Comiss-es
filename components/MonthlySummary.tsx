@@ -51,6 +51,8 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
     const totalCommission = filteredClients.reduce((acc, c) => acc + getCommission(c), 0);
     const totalVales = filteredVales.reduce((acc, v) => acc + v.value, 0);
     const netCommission = totalCommission - totalVales;
+    const estimatedShopNet = totalSales - totalCommission;
+    const averageTicket = filteredClients.length > 0 ? totalSales / filteredClients.length : 0;
 
     // Agrupar por dia
     const daysMap: Record<string, { sales: number; commission: number; vales: number; count: number }> = {};
@@ -109,11 +111,24 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
       totalCommission,
       totalVales,
       netCommission,
+      estimatedShopNet,
+      averageTicket,
       totalClients: filteredClients.length,
       dailyBreakdown,
       teamBreakdown
     };
   }, [clients, vales, selectedMonth, settings.commissionRate]);
+
+  const selectedMonthLabel = useMemo(() => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+
+    if (!year || !month) return selectedMonth;
+
+    return new Date(year, month - 1, 1).toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric'
+    });
+  }, [selectedMonth]);
 
   return (
     <div className="animate-slide-in space-y-6 pb-12">
@@ -127,8 +142,8 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h2 className="text-xl font-display font-bold text-white">Resumo Mensal</h2>
-            <p className="text-sm text-gray-400">Analise financeira completa</p>
+            <h2 className="text-xl font-display font-bold text-white">Resumo financeiro mensal</h2>
+            <p className="text-sm text-gray-400">Periodo analisado: {selectedMonthLabel}</p>
           </div>
         </div>
 
@@ -148,27 +163,50 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
       </div>
 
       {/* Cards Totais (Loja Inteira) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <StatsCard 
-          title="Faturamento Total" 
+          title="Faturamento bruto" 
           value={formatCurrency(monthlyData.totalSales)} 
           subtitle={`${monthlyData.totalClients} atendimentos`}
           icon={<DollarSign size={20} />} 
           colorClass="bg-gradient-to-br from-blue-900/40 to-gray-800 border-blue-500/30 text-blue-400"
         />
+        <StatsCard
+          title="Comissao calculada"
+          value={formatCurrency(monthlyData.totalCommission)}
+          subtitle="Baseada nos atendimentos"
+          icon={<TrendingUp size={20} />}
+          colorClass="bg-gradient-to-br from-gold-500/20 to-gray-800 border-gold-500/50 text-gold-500"
+        />
+        <StatsCard
+          title="Liquido estimado da barbearia"
+          value={formatCurrency(monthlyData.estimatedShopNet)}
+          subtitle="Bruto menos comissao calculada"
+          icon={<DollarSign size={20} />}
+          colorClass="bg-gradient-to-br from-green-900/35 to-gray-800 border-green-500/30 text-green-400"
+        />
         <StatsCard 
           title="Vales / Despesas" 
-          value={formatCurrency(monthlyData.totalVales)} 
+          value={formatCurrency(monthlyData.totalVales)}
+          subtitle="Lancamentos do periodo"
           icon={<MinusCircle size={20} />} 
           colorClass="bg-gradient-to-br from-red-900/40 to-gray-800 border-red-500/30 text-red-400"
         />
         <StatsCard 
-          title="Comissões a Pagar" 
+          title="Saldo estimado da equipe" 
           value={formatCurrency(monthlyData.netCommission)} 
-          subtitle="Total líquido da equipe"
+          subtitle="Comissao calculada menos vales"
           icon={<TrendingUp size={20} />} 
           colorClass="bg-gradient-to-br from-gold-500/20 to-gray-800 border-gold-500/50 text-gold-500"
         />
+      </div>
+
+      <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
+        <p className="font-bold text-white">Nota sobre comissoes</p>
+        <p className="mt-1">
+          Os valores de comissao representam o calculo com base nos atendimentos registrados. Este painel nao controla pagamento de repasse.
+          {monthlyData.totalClients > 0 ? ` Ticket medio do periodo: ${formatCurrency(monthlyData.averageTicket)}.` : ''}
+        </p>
       </div>
 
       {/* Gráficos Mensais */}
@@ -186,7 +224,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
             <div className="p-4 border-b border-gray-700 bg-gray-900/50 flex justify-between items-center">
                 <h3 className="font-bold text-white flex items-center gap-2">
                     <Users size={18} className="text-blue-400"/>
-                    Desempenho da Equipe
+                    Producao por barbeiro
                 </h3>
             </div>
             <div className="overflow-x-auto">
@@ -194,10 +232,11 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                 <thead>
                     <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
                     <th className="p-4 font-medium">Barbeiro</th>
-                    <th className="p-4 font-medium text-center">Cortes</th>
-                    <th className="p-4 font-medium text-right text-blue-400">Vendas</th>
+                    <th className="p-4 font-medium text-center">Atend.</th>
+                    <th className="p-4 font-medium text-right text-blue-400">Producao bruta</th>
+                    <th className="p-4 font-medium text-right text-gold-500">Comissao calculada</th>
                     <th className="p-4 font-medium text-right text-red-400">Vales</th>
-                    <th className="p-4 font-medium text-right text-gold-500">A Receber (Liq)</th>
+                    <th className="p-4 font-medium text-right text-gold-500">Saldo estimado</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700/50">
@@ -208,6 +247,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                                 <td className="p-4 text-white font-bold">{barber.name}</td>
                                 <td className="p-4 text-center text-gray-300">{barber.count}</td>
                                 <td className="p-4 text-right text-gray-300">{formatCurrency(barber.sales)}</td>
+                                <td className="p-4 text-right text-gold-300">{formatCurrency(barber.commission)}</td>
                                 <td className="p-4 text-right text-red-300">{barber.vales > 0 ? `- ${formatCurrency(barber.vales)}` : '-'}</td>
                                 <td className="p-4 text-right font-bold text-gold-500 text-lg">{formatCurrency(net)}</td>
                             </tr>
@@ -224,7 +264,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
         <div className="p-4 border-b border-gray-700 bg-gray-900/50">
           <h3 className="font-bold text-white flex items-center gap-2">
             <Calendar size={18} className="text-gray-400"/>
-            Historico Diario (Loja)
+            Historico diario da barbearia
           </h3>
         </div>
         
@@ -242,9 +282,10 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                 <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
                   <th className="p-4 font-medium">Data</th>
                   <th className="p-4 font-medium text-center">Atend.</th>
-                  <th className="p-4 font-medium text-right text-gray-300">Faturamento</th>
-                  <th className="p-4 font-medium text-right text-gold-500">Comissao (Liq)</th>
+                  <th className="p-4 font-medium text-right text-gray-300">Faturamento bruto</th>
+                  <th className="p-4 font-medium text-right text-gold-500">Comissao calculada</th>
                   <th className="p-4 font-medium text-right text-gray-400">Vales</th>
+                  <th className="p-4 font-medium text-right text-gold-500">Saldo estimado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/50">
@@ -254,8 +295,9 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                             <td className="p-4 text-white font-medium">{day.date}</td>
                             <td className="p-4 text-center text-gray-300">{day.count}</td>
                             <td className="p-4 text-right text-gray-300">{formatCurrency(day.sales)}</td>
-                            <td className="p-4 text-right text-gold-500 font-bold">{formatCurrency(day.commission - day.vales)}</td>
+                            <td className="p-4 text-right text-gold-300">{formatCurrency(day.commission)}</td>
                             <td className="p-4 text-right text-gray-400">{day.vales > 0 ? `- ${formatCurrency(day.vales)}` : '-'}</td>
+                            <td className="p-4 text-right text-gold-500 font-bold">{formatCurrency(day.commission - day.vales)}</td>
                         </tr>
                     );
                 })}
