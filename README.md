@@ -28,6 +28,15 @@ O produto cobre tres frentes principais:
 
 Hoje o app ja suporta agenda interna, catalogo por tenant, onboarding de owner, vinculacao de barbeiro a usuario, painel proprio do barbeiro e configuracao operacional da barbearia.
 
+Classificacao atual:
+
+```txt
+MVP tecnico: concluido
+Baseline piloto: concluida
+Piloto controlado: pronto
+SaaS comercial escalavel: ainda em evolucao
+```
+
 ---
 
 ## Problema que resolve
@@ -55,11 +64,15 @@ O Job e Comissoes centraliza essa operacao em uma unica aplicacao, com tenant is
 - catalogo de servicos por tenant;
 - configuracao de business hours e `slot_step_minutes` por barbearia;
 - onboarding de owner e checklist operacional;
+- empty states operacionais para tenants sem dados;
 - branding publico da barbearia;
 - vinculacao de barbeiro a usuario por e-mail via RPC;
+- UX de vinculo de barbeiro com mensagens por erro conhecido;
 - painel do barbeiro com agenda propria;
 - criacao manual de agendamento pelo barbeiro usando a sessao autenticada;
-- controle de comissoes, vales e relatorios;
+- controle de faturamento bruto, comissao calculada, saldo estimado, vales e relatorios;
+- mensagens operacionais para erros conhecidos;
+- logs tecnicos contextualizados e sanitizados;
 - persistencia em Supabase com fallback local apenas para dev/demo;
 - autenticacao com roles `owner` e `barber`;
 - isolamento multi-tenant por `barbershop_id`.
@@ -68,23 +81,40 @@ O Job e Comissoes centraliza essa operacao em uma unica aplicacao, com tenant is
 
 ## Estado atual do produto
 
-O estado atual real do app inclui:
+O Job e Comissoes esta em baseline piloto multi-tenant. O MVP tecnico esta concluido e o app esta pronto para piloto controlado, desde que o ambiente Supabase real esteja configurado e validado. A evolucao para SaaS comercial escalavel ainda depende de billing, convite formal de equipe, admin global e observabilidade externa.
+
+Estado resumido:
+
+```txt
+MVP tecnico: concluido
+Baseline piloto: concluida
+Piloto controlado: pronto
+SaaS comercial escalavel: ainda em evolucao
+```
+
+Estado funcional atual:
 
 - multi-tenant por `barbershop_id`;
 - booking publico por `/book/:slug`;
-- onboarding de owner com criacao de barbearia;
-- checklist operacional do owner;
+- onboarding guiado do owner para criar a propria barbearia;
+- checklist operacional de readiness do booking;
 - catalogo de barbeiros e servicos por tenant;
-- horarios e `slot_step_minutes` por barbearia;
-- branding publico por barbearia;
+- business hours e `slot_step_minutes` por barbearia;
+- branding publico por tenant;
+- empty states para barbearias sem barbeiros, servicos, agenda ou dados financeiros;
 - vinculacao owner -> barber por e-mail via RPC `link_barber_profile_by_email`;
-- painel do barbeiro com leitura da propria agenda;
+- UX de vinculo com mensagens especificas para usuario inexistente, barbeiro fora do tenant, conta de outro tenant e conta owner;
+- painel do barbeiro restrito a propria agenda;
 - criacao manual de agendamento pelo barbeiro usando `authSession.barbershopId` e `authSession.barberId`;
 - bloqueio de slug invalido no booking publico;
-- validacao robusta de payload no booking publico;
-- bloqueio de horarios duplicados ativos;
+- validacao de payload no booking publico;
+- bloqueio de horarios duplicados ativos por `barbershop_id`, `barber_id` e `start_at`;
+- relatorios com nomenclatura explicita: faturamento bruto, comissao calculada e saldo estimado;
+- mensagens humanas para erros operacionais conhecidos;
+- logs tecnicos contextualizados e sanitizados para diagnostico;
 - fail-closed em producao sem Supabase configurado;
-- cobertura automatizada com Vitest e Playwright.
+- cobertura automatizada com Vitest e Playwright;
+- otimizacoes de bundle inicial, splash/loading e render inicial.
 
 O fallback local existe para desenvolvimento e demonstracao. Em producao, o app nao deve operar dados reais sem Supabase configurado.
 
@@ -238,8 +268,10 @@ Pontos principais do modelo atual:
 - booking publico nao faz `SELECT` publico em `appointments`;
 - disponibilidade publica usa `public_appointment_slots`;
 - payload publico e validado antes de chegar ao Supabase;
+- conflitos ativos de slot sao bloqueados no app e por indice unico parcial no banco;
 - RPC dedicada para vinculo owner -> barber por e-mail;
 - regressao automatizada para mutations sensiveis entre tenants;
+- logs tecnicos sao sanitizados para evitar tokens, sessoes, headers e credenciais;
 - fallback/localStorage nao deve ser tratado como auth de producao.
 
 Limites importantes:
@@ -252,6 +284,7 @@ Mais detalhes:
 
 - [docs/security-model.md](./docs/security-model.md)
 - [docs/barber-profile-linking-rpc.md](./docs/barber-profile-linking-rpc.md)
+- [docs/production-error-visibility.md](./docs/production-error-visibility.md)
 
 ---
 
@@ -268,6 +301,7 @@ Comportamento atual:
 - valida `barbershop_id`, `barber_id`, `service_id`, `start_at` e `end_at`;
 - cria appointment sem exigir `SELECT` publico em `appointments`;
 - bloqueia conflito de horario ativo para o mesmo barbeiro.
+- exibe mensagens especificas para slug invalido, tenant incompleto, conflito de horario e falha tecnica.
 
 O booking publico nao deve assumir tenant padrao silencioso em producao.
 
@@ -286,6 +320,7 @@ O painel interno hoje ja diferencia claramente owner e barber.
 - cria, edita, remove ou desativa barbeiros e servicos;
 - usa checklist operacional para readiness do booking;
 - vincula barbeiro a usuario por e-mail via RPC.
+- recebe mensagens especificas para falhas de catalogo, configuracao, upload, agendamento e vinculo de barbeiro.
 
 ### Barber
 
@@ -293,6 +328,7 @@ O painel interno hoje ja diferencia claramente owner e barber.
 - ve somente a propria agenda;
 - cria agendamento manual apenas para o proprio `barberId`;
 - usa `barbershopId` e `barberId` da sessao, nao do formulario.
+- recebe orientacao clara quando o profile esta incompleto ou a sessao precisa ser renovada.
 
 Fluxo operacional completo:
 
@@ -349,11 +385,13 @@ Sem Supabase configurado, o app pode usar fallback local apenas em dev/demo. Em 
 Cobertura atual:
 
 - Vitest para regras de dominio, repositories e regressao de seguranca;
+- Vitest para readiness, booking publico, RBAC, catalogo owner, vinculo de barbeiro, relatorios e visibilidade de erros;
 - Playwright E2E para booking publico;
 - Playwright E2E para painel do barbeiro;
 - Playwright E2E para fluxo operacional do owner;
 - testes de regressao para tenant isolation e mutations sensiveis;
 - validacao de fail-closed sem Supabase em producao.
+- validacao de mensagens amigaveis e logs sanitizados em erros operacionais.
 
 Comandos principais:
 
@@ -374,6 +412,7 @@ Documentacao relacionada:
 - [docs/owner-barber-operational-flow.md](./docs/owner-barber-operational-flow.md)
 - [docs/barber-profile-linking-rpc.md](./docs/barber-profile-linking-rpc.md)
 - [docs/performance-notes.md](./docs/performance-notes.md)
+- [docs/production-error-visibility.md](./docs/production-error-visibility.md)
 
 ---
 
@@ -408,9 +447,10 @@ O projeto ainda nao implementa:
 - billing ou assinatura;
 - convite formal por e-mail;
 - admin global ou suporte operacional multi-tenant;
-- observabilidade mais completa;
+- observabilidade externa ou coleta centralizada de logs;
 - rate limit externo e CAPTCHA;
-- polimento final de UX em alguns estados vazios e fluxos de onboarding.
+- fluxo comercial completo para escala SaaS;
+- hardening adicional de sessao e superficie de XSS.
 
 ---
 
@@ -418,21 +458,21 @@ O projeto ainda nao implementa:
 
 Proximos passos mais relevantes:
 
-- melhorar empty states de owner e barber;
+- validar piloto controlado com uma barbearia real;
 - evoluir onboarding comercial da barbearia;
 - implementar billing e assinatura;
 - criar convite de equipe mais formal;
-- ampliar observabilidade e auditoria operacional;
+- criar admin global/suporte operacional;
+- ampliar observabilidade e auditoria operacional fora do console;
+- avaliar rate limiting e CAPTCHA para booking publico;
 - endurecer ainda mais sessao e superficie de XSS;
-- preparar release piloto com fluxo comercial mais completo.
+- continuar polindo UX de onboarding, owner e barber.
 
 ---
 
 ## Screenshots
 
-Adicione aqui imagens reais do produto.
-
-Sugestao de organizacao:
+Screenshots reais podem ser adicionados em `docs/screenshots/` quando houver material atualizado do piloto. Os caminhos abaixo ficam reservados para imagens do produto, sem representar dados demo obrigatorios.
 
 ### Dashboard
 
