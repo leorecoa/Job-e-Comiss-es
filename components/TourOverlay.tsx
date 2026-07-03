@@ -1,13 +1,13 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronRight, ChevronLeft, X, Check } from 'lucide-react';
-
-export interface TourStep {
-  targetId: string;
-  title: string;
-  content: string;
-  position?: 'top' | 'bottom' | 'left' | 'right';
-}
+import {
+  findNextAvailableTourStepIndex,
+  getTourTooltipPosition,
+  isTourTargetInViewport,
+  type TourRect,
+  type TourStep,
+  type TourTooltipPosition
+} from './tourUtils';
 
 interface TourOverlayProps {
   steps: TourStep[];
@@ -15,168 +15,227 @@ interface TourOverlayProps {
   onComplete: () => void;
 }
 
+const TOUR_TOOLTIP_FALLBACK_WIDTH = 340;
+
 export const TourOverlay: React.FC<TourOverlayProps> = ({ steps, isOpen, onComplete }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-  
-  // Hook para recalcular posição quando a janela muda de tamanho ou o passo muda
+  const [targetRect, setTargetRect] = useState<TourRect | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<TourTooltipPosition | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const previousFocusRef = useRef<Element | null>(null);
+  const completeRef = useRef(onComplete);
+
+  useEffect(() => {
+    completeRef.current = onComplete;
+  }, [onComplete]);
+
   useEffect(() => {
     if (!isOpen) return;
 
-    const updatePosition = () => {
-      const step = steps[currentStepIndex];
-      const element = document.getElementById(step.targetId);
-      
-      if (element) {
-        // Scroll suave até o elemento
-        element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-        
-        // Pequeno delay para garantir que o scroll terminou antes de pegar o retângulo
-        setTimeout(() => {
-            const rect = element.getBoundingClientRect();
-            setTargetRect(rect);
-        }, 100);
-      } else {
-        // Se o elemento não existe (ex: hidden no mobile), pular para próximo ou finalizar
-        // Por segurança, apenas não mostramos o highlight mas mantemos o texto centralizado
-        setTargetRect(null);
+    previousFocusRef.current = document.activeElement;
+    setCurrentStepIndex((index) => {
+      const nextIndex = findNextAvailableTourStepIndex(steps, index);
+      return nextIndex === -1 ? 0 : nextIndex;
+    });
+
+    return () => {
+      const previousFocus = previousFocusRef.current;
+      if (previousFocus instanceof HTMLElement) {
+        previousFocus.focus({ preventScroll: true });
+      }
+    };
+  }, [isOpen, steps]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        completeRef.current();
       }
     };
 
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+
+    let disposed = false;
+    let timeoutId: number | undefined;
+    let rafId: number | undefined;
+
+    const scheduleMeasure = () => {
+      window.clearTimeout(timeoutId);
+      window.cancelAnimationFrame(rafId || 0);
+      rafId = window.requestAnimationFrame(updatePosition);
+    };
+
+    const updatePosition = () => {
+      if (disposed) return;
+
+      const nextAvailableIndex = findNextAvailableTourStepIndex(steps, currentStepIndex);
+      if (nextAvailableIndex === -1) {
+        completeRef.current();
+        return;
+      }
+
+      if (nextAvailableIndex !== currentStepIndex) {
+        setCurrentStepIndex(nextAvailableIndex);
+        return;
+      }
+
+      const currentStep = steps[currentStepIndex];
+      const element = document.getElementById(currentStep.targetId);
+      if (!element) {
+        setTargetRect(null);
+        setTooltipPosition(null);
+        return;
+      }
+
+      const viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight
+      };
+      const rect = element.getBoundingClientRect();
+
+      if (!isTourTargetInViewport(rect, viewport)) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        timeoutId = window.setTimeout(updatePosition, 180);
+        return;
+      }
+
+      const tooltipBox = tooltipRef.current?.getBoundingClientRect();
+      const tooltipSize = {
+        width: tooltipBox?.width || TOUR_TOOLTIP_FALLBACK_WIDTH,
+        height: tooltipBox?.height || 220
+      };
+      const nextPosition = getTourTooltipPosition({
+        targetRect: rect,
+        tooltipSize,
+        viewport,
+        preferredPosition: currentStep.position
+      });
+
+      setTargetRect(rect);
+      setTooltipPosition(nextPosition);
+    };
+
     updatePosition();
-    window.addEventListener('resize', updatePosition);
-    
-    return () => window.removeEventListener('resize', updatePosition);
+    window.addEventListener('resize', scheduleMeasure);
+    window.addEventListener('scroll', scheduleMeasure, true);
+
+    return () => {
+      disposed = true;
+      window.clearTimeout(timeoutId);
+      window.cancelAnimationFrame(rafId || 0);
+      window.removeEventListener('resize', scheduleMeasure);
+      window.removeEventListener('scroll', scheduleMeasure, true);
+    };
   }, [currentStepIndex, isOpen, steps]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (isOpen && tooltipPosition) {
+      tooltipRef.current?.focus({ preventScroll: true });
+    }
+  }, [isOpen, tooltipPosition, currentStepIndex]);
+
+  if (!isOpen || steps.length === 0) return null;
+  if (!targetRect || !tooltipPosition) return null;
 
   const currentStep = steps[currentStepIndex];
   const isLastStep = currentStepIndex === steps.length - 1;
+  const titleId = `tour-title-${currentStepIndex}`;
 
   const handleNext = () => {
     if (isLastStep) {
       onComplete();
-    } else {
-      setCurrentStepIndex(prev => prev + 1);
+      return;
     }
+
+    const nextIndex = findNextAvailableTourStepIndex(steps, currentStepIndex + 1);
+    if (nextIndex === -1 || nextIndex <= currentStepIndex) {
+      onComplete();
+      return;
+    }
+
+    setCurrentStepIndex(nextIndex);
   };
 
   const handlePrev = () => {
-    setCurrentStepIndex(prev => Math.max(0, prev - 1));
-  };
-
-  // Cálculo de estilo para o tooltip
-  const getTooltipStyle = () => {
-    if (!targetRect) return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
-
-    const gap = 15;
-    const position = currentStep.position || 'bottom';
-    
-    let top = 0;
-    let left = 0;
-    let transform = '';
-
-    // Lógica simplificada de posicionamento
-    // Se estiver em mobile (tela pequena), forçar posicionamento mais seguro
-    const isMobile = window.innerWidth < 768;
-
-    if (isMobile) {
-        // No mobile, geralmente bottom ou top é melhor
-        // Se o elemento está muito em baixo, joga o tooltip pra cima
-        if (targetRect.bottom > window.innerHeight - 200) {
-             top = targetRect.top - gap;
-             left = window.innerWidth / 2;
-             transform = 'translate(-50%, -100%)';
-        } else {
-             top = targetRect.bottom + gap;
-             left = window.innerWidth / 2;
-             transform = 'translate(-50%, 0)';
-        }
-    } else {
-        switch (position) {
-            case 'top':
-                top = targetRect.top - gap;
-                left = targetRect.left + (targetRect.width / 2);
-                transform = 'translate(-50%, -100%)';
-                break;
-            case 'bottom':
-                top = targetRect.bottom + gap;
-                left = targetRect.left + (targetRect.width / 2);
-                transform = 'translate(-50%, 0)';
-                break;
-            case 'left':
-                top = targetRect.top + (targetRect.height / 2);
-                left = targetRect.left - gap;
-                transform = 'translate(-100%, -50%)';
-                break;
-            case 'right':
-                top = targetRect.top + (targetRect.height / 2);
-                left = targetRect.right + gap;
-                transform = 'translate(0, -50%)';
-                break;
-        }
-    }
-
-    return { top, left, transform };
+    setCurrentStepIndex((prev) => Math.max(0, prev - 1));
   };
 
   return (
     <div className="fixed inset-0 z-[9999] overflow-hidden">
-      {/* Camada Escura com Recorte (usando mix-blend-mode ou box-shadow trick) */}
-      {/* Método Box-Shadow Gigante é mais robusto para highlights redondos/retangulares */}
-      {targetRect && (
-        <div 
-            className="absolute transition-all duration-300 ease-in-out rounded-xl pointer-events-none border-2 border-gold-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.85)]"
-            style={{
-                top: targetRect.top - 4, // Pequena margem
-                left: targetRect.left - 4,
-                width: targetRect.width + 8,
-                height: targetRect.height + 8,
-            }}
-        />
-      )}
-      
-      {/* Se não achou o elemento, só escurece tudo */}
-      {!targetRect && <div className="absolute inset-0 bg-black/80" />}
+      <div
+        className="absolute rounded-xl border-2 border-gold-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.85)] transition-all duration-200 ease-out pointer-events-none"
+        style={{
+          top: targetRect.top - 4,
+          left: targetRect.left - 4,
+          width: targetRect.width + 8,
+          height: targetRect.height + 8
+        }}
+      />
 
-      {/* Tooltip */}
-      <div 
-        className="absolute w-[300px] bg-gray-800 text-white p-5 rounded-2xl border border-gray-700 shadow-2xl flex flex-col gap-3 transition-all duration-300 animate-slide-in"
-        style={getTooltipStyle()}
+      <div
+        ref={tooltipRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="absolute flex max-w-[calc(100vw-24px)] flex-col gap-3 overflow-y-auto rounded-2xl border border-gray-700 bg-gray-800 p-4 text-white shadow-2xl outline-none transition-all duration-200 md:p-5"
+        style={{
+          top: tooltipPosition.top,
+          left: tooltipPosition.left,
+          width: tooltipPosition.width,
+          maxHeight: tooltipPosition.maxHeight
+        }}
       >
-        <div className="flex justify-between items-start">
-            <h3 className="font-display font-bold text-lg text-gold-500">{currentStep.title}</h3>
-            <button onClick={onComplete} className="text-gray-500 hover:text-white">
-                <X size={16} />
-            </button>
+        <div className="flex justify-between gap-4">
+          <h3 id={titleId} className="font-display text-lg font-bold text-gold-500">
+            {currentStep.title}
+          </h3>
+          <button
+            type="button"
+            onClick={onComplete}
+            aria-label="Pular guia"
+            className="rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold-500"
+          >
+            <X size={16} />
+          </button>
         </div>
-        
-        <p className="text-sm text-gray-300 leading-relaxed">
-            {currentStep.content}
+
+        <p className="text-sm leading-relaxed text-gray-300">
+          {currentStep.content}
         </p>
 
-        <div className="flex justify-between items-center mt-2 pt-3 border-t border-gray-700">
-            <span className="text-xs text-gray-500 font-mono">
-                {currentStepIndex + 1} / {steps.length}
-            </span>
-            <div className="flex gap-2">
-                {currentStepIndex > 0 && (
-                    <button 
-                        onClick={handlePrev}
-                        className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white transition-colors"
-                    >
-                        <ChevronLeft size={16} />
-                    </button>
-                )}
-                <button 
-                    onClick={handleNext}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-600 text-black font-bold text-sm transition-colors"
-                >
-                    {isLastStep ? 'Concluir' : 'Próximo'}
-                    {isLastStep ? <Check size={16} /> : <ChevronRight size={16} />}
-                </button>
-            </div>
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-gray-700 pt-3">
+          <span className="font-mono text-xs text-gray-500">
+            {currentStepIndex + 1} / {steps.length}
+          </span>
+          <div className="flex gap-2">
+            {currentStepIndex > 0 && (
+              <button
+                type="button"
+                onClick={handlePrev}
+                aria-label="Passo anterior"
+                className="rounded-lg bg-gray-700 p-2 text-white transition-colors hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gold-500"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleNext}
+              className="flex items-center gap-2 rounded-lg bg-gold-500 px-4 py-2 text-sm font-bold text-black transition-colors hover:bg-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-500"
+            >
+              {isLastStep ? 'Concluir' : 'Proximo'}
+              {isLastStep ? <Check size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
+            </button>
+          </div>
         </div>
       </div>
     </div>

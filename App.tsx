@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
 import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById, resolveOwnerScopedBarbershopId } from './utils';
 import { 
@@ -24,7 +24,7 @@ import {
 import { StatsCard } from './components/StatsCard';
 import { PublicBookingPage } from './components/PublicBookingPage';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
-import { TourStep } from './components/TourOverlay';
+import type { TourStep } from './components/tourUtils';
 import { isProductionWithoutSupabase, isSupabaseConfigured, PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE, shouldUseLocalFallback } from './lib/supabase';
 import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
@@ -117,6 +117,7 @@ const getCurrentMonthString = () => {
 
 const SAFE_PUBLIC_BOOKING_SHOP_NAME = 'Escolha uma barbearia';
 const SAFE_INTERNAL_SHOP_NAME = 'Sua barbearia';
+const TOUR_STORAGE_KEY = 'hasSeenTour';
 
 export const getOperationalBlockingMessage = (blockInProductionWithoutSupabase: boolean): string | null => (
   blockInProductionWithoutSupabase
@@ -326,6 +327,7 @@ const App: React.FC = () => {
 
   // Tour State
   const [isTourOpen, setTourOpen] = useState(false);
+  const [isTourReopenRequested, setTourReopenRequested] = useState(false);
 
   // -- Notification State --
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -626,18 +628,62 @@ const App: React.FC = () => {
 
   // Check for First Time Tour
   useEffect(() => {
-    if (userProfile) {
-        const hasSeenTour = localStorage.getItem('hasSeenTour');
-        if (!hasSeenTour) {
-            setTimeout(() => setTourOpen(true), 1000);
-        }
-    }
-  }, [userProfile]);
+    const shouldAutoOpen = Boolean(userProfile && !localStorage.getItem(TOUR_STORAGE_KEY));
+    const shouldOpen = Boolean(
+      userProfile
+      && !isPublicBookingRoute
+      && authSession?.role !== 'barber'
+      && viewMode === 'daily'
+      && !isTourOpen
+      && (shouldAutoOpen || isTourReopenRequested)
+    );
+
+    if (!shouldOpen) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    let timeoutId: number | undefined;
+
+    const tryOpenTour = async () => {
+      if (cancelled) return;
+
+      const { areTourTargetsReady } = await import('./components/tourUtils');
+      if (cancelled) return;
+
+      if (areTourTargetsReady()) {
+        setTourOpen(true);
+        setTourReopenRequested(false);
+        return;
+      }
+
+      attempts += 1;
+      if (attempts < 30) {
+        timeoutId = window.setTimeout(tryOpenTour, 100);
+        return;
+      }
+
+      setTourReopenRequested(false);
+    };
+
+    timeoutId = window.setTimeout(tryOpenTour, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [authSession?.role, isPublicBookingRoute, isTourOpen, isTourReopenRequested, userProfile, viewMode]);
 
   const handleTourComplete = () => {
     setTourOpen(false);
-    localStorage.setItem('hasSeenTour', 'true');
+    setTourReopenRequested(false);
+    localStorage.setItem(TOUR_STORAGE_KEY, 'true');
   };
+
+  const handleReopenTour = useCallback(() => {
+    setViewMode('daily');
+    setTourOpen(false);
+    setTourReopenRequested(true);
+  }, []);
 
   // -- Derived State --
   const roleBadgeLabel = useMemo(() => {
@@ -1511,20 +1557,20 @@ const App: React.FC = () => {
   const tourSteps: TourStep[] = [
     {
         targetId: 'tour-stats',
-        title: 'Resumo do Dia',
-        content: 'Aqui você acompanha o total de atendimentos e faturamento.',
+        title: 'Resumo do dia',
+        content: 'Aqui aparecem os principais numeros e atendimentos do periodo selecionado.',
         position: 'bottom'
     },
     {
         targetId: 'tour-actions',
-        title: 'Ações Rápidas',
-        content: 'Lance cortes, vales ou acesse configurações.',
+        title: 'Acoes rapidas',
+        content: 'Use esta area para criar atendimento, acessar a agenda e abrir funcoes operacionais.',
         position: 'bottom'
     },
     {
         targetId: 'tour-filters',
-        title: 'Relatórios',
-        content: 'Baixe PDFs ou Planilhas personalizadas por dia ou período.',
+        title: 'Relatorios',
+        content: 'Aqui voce consulta resultados e gera relatorios do periodo.',
         position: 'bottom'
     }
   ];
@@ -1671,7 +1717,16 @@ const App: React.FC = () => {
                     <span className="text-[10px] uppercase font-bold text-blue-400">{roleBadgeLabel}</span>
                  </div>
             </div>
-            <button onClick={handleLogout} className="text-gray-500 hover:text-red-400"><LogOut size={20}/></button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleReopenTour}
+                className="rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-bold text-gray-300 transition-colors hover:border-gold-500/40 hover:text-gold-300"
+              >
+                Ajuda
+              </button>
+              <button onClick={handleLogout} className="text-gray-500 hover:text-red-400" aria-label="Sair"><LogOut size={20}/></button>
+            </div>
          </div>
       </header>
 
