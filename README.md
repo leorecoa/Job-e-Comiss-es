@@ -285,6 +285,7 @@ Mais detalhes:
 - [docs/security-model.md](./docs/security-model.md)
 - [docs/barber-profile-linking-rpc.md](./docs/barber-profile-linking-rpc.md)
 - [docs/production-error-visibility.md](./docs/production-error-visibility.md)
+- [docs/deployment.md](./docs/deployment.md)
 
 ---
 
@@ -377,6 +378,17 @@ http://localhost:5173
 ```
 
 Sem Supabase configurado, o app pode usar fallback local apenas em dev/demo. Em producao, o comportamento esperado e fail-closed.
+
+Para configurar um ambiente Supabase novo, revise e aplique manualmente a sequencia documentada em [docs/deployment.md](./docs/deployment.md):
+
+```txt
+1. docs/supabase-schema.sql
+2. docs/supabase-tenant-rls-plan.sql
+3. docs/appointments-active-slot-unique-index.sql
+4. docs/barber-profile-linking-rpc.sql
+```
+
+Nao aplique apenas o schema base em producao; RLS tenant-aware, indice de conflito e RPC fazem parte do estado operacional atual.
 
 ---
 

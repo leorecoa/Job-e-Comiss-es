@@ -1,5 +1,21 @@
--- Job e Comissoes - Supabase Scheduling MVP schema
--- Run this SQL in the Supabase SQL editor.
+-- Job e Comissoes - Supabase base schema reference
+-- Review-only SQL. Apply manually in Supabase after reviewing the current docs.
+--
+-- Source-of-truth note:
+-- - This file defines the base tables, helper functions, triggers and public
+--   availability view expected by the app.
+-- - It intentionally does not create broad MVP RLS policies.
+-- - Tenant-aware RLS must be applied from docs/supabase-tenant-rls-plan.sql.
+-- - The public booking flow must read public.public_appointment_slots, not the
+--   full public.appointments table.
+-- - Public appointment inserts must not request returned rows because
+--   appointments contain client data.
+--
+-- Recommended manual order for a new Supabase project:
+-- 1. docs/supabase-schema.sql
+-- 2. docs/supabase-tenant-rls-plan.sql
+-- 3. docs/appointments-active-slot-unique-index.sql
+-- 4. docs/barber-profile-linking-rpc.sql
 
 -- Create internal schema for RLS helpers
 create schema if not exists private;
@@ -46,6 +62,12 @@ as $$
   limit 1;
 $$;
 
+revoke all on function private.current_user_barber_id() from public;
+revoke all on function private.current_user_barber_id() from anon;
+revoke all on function private.current_user_barber_id() from authenticated;
+
+grant execute on function private.current_user_barber_id() to authenticated;
+
 -- Multi-tenant foundation: Barbershops (Tenants)
 create table if not exists public.barbershops (
   id uuid primary key default gen_random_uuid(),
@@ -53,6 +75,15 @@ create table if not exists public.barbershops (
   slug text not null unique,
   phone text,
   address text,
+  logo_url text,
+  cover_image_url text,
+  description text,
+  instagram_url text,
+  whatsapp text,
+  primary_color text,
+  secondary_color text,
+  business_hours jsonb,
+  slot_step_minutes integer,
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -69,10 +100,17 @@ as $$
   select p.barbershop_id
   from public.profiles p
   where p.id = auth.uid()
+    and p.active = true
   limit 1;
 $$;
 
-create table if not exists barbers (
+revoke all on function private.current_user_barbershop_id() from public;
+revoke all on function private.current_user_barbershop_id() from anon;
+revoke all on function private.current_user_barbershop_id() from authenticated;
+
+grant execute on function private.current_user_barbershop_id() to authenticated;
+
+create table if not exists public.barbers (
   id uuid primary key default gen_random_uuid(),
   barbershop_id uuid not null references public.barbershops(id) on delete restrict,
   name text not null,
@@ -80,9 +118,8 @@ create table if not exists barbers (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
--- Note: Existing production data must be associated with a barbershop_id before enforcing NOT NULL.
 
-create table if not exists services (
+create table if not exists public.services (
   id uuid primary key default gen_random_uuid(),
   barbershop_id uuid not null references public.barbershops(id) on delete restrict,
   name text not null,
@@ -94,14 +131,14 @@ create table if not exists services (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists appointments (
+create table if not exists public.appointments (
   id uuid primary key default gen_random_uuid(),
   client_name text not null,
   barbershop_id uuid not null references public.barbershops(id) on delete restrict,
   client_phone text not null,
-  barber_id uuid references barbers(id) on delete restrict,
+  barber_id uuid references public.barbers(id) on delete restrict,
   barber_name text not null,
-  service_id uuid references services(id) on delete restrict,
+  service_id uuid references public.services(id) on delete restrict,
   service_type text not null,
   service_value numeric(10,2) not null default 0,
   commission_rate numeric(5,2),
@@ -114,20 +151,23 @@ create table if not exists appointments (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists profiles (
+create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   role text not null default 'barber' check (role in ('owner', 'barber')),
-  barbershop_id uuid references public.barbershops(id) on delete restrict,
-  barber_id uuid references barbers(id),
+  barbershop_id uuid not null references public.barbershops(id) on delete restrict,
+  barber_id uuid references public.barbers(id),
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-create index if not exists appointments_barber_start_idx on appointments (barber_id, start_at);
-create index if not exists appointments_status_idx on appointments (status);
-create index if not exists appointments_start_at_idx on appointments (start_at);
+create index if not exists appointments_barber_start_idx on public.appointments (barber_id, start_at);
+create index if not exists appointments_status_idx on public.appointments (status);
+create index if not exists appointments_start_at_idx on public.appointments (start_at);
+create index if not exists appointments_barbershop_start_idx on public.appointments (barbershop_id, start_at);
+create index if not exists barbers_barbershop_active_idx on public.barbers (barbershop_id, active);
+create index if not exists services_barbershop_active_idx on public.services (barbershop_id, active);
 
 create or replace function set_updated_at()
 returns trigger as $$
@@ -137,34 +177,30 @@ begin
 end;
 $$ language plpgsql set search_path = public;
 
-drop trigger if exists barbershops_set_updated_at on barbershops;
+drop trigger if exists barbershops_set_updated_at on public.barbershops;
 create trigger barbershops_set_updated_at
-before update on barbershops
+before update on public.barbershops
 for each row execute function set_updated_at();
 
-drop trigger if exists barbers_set_updated_at on barbers;
+drop trigger if exists barbers_set_updated_at on public.barbers;
 create trigger barbers_set_updated_at
-before update on barbers
+before update on public.barbers
 for each row execute function set_updated_at();
 
-drop trigger if exists services_set_updated_at on services;
+drop trigger if exists services_set_updated_at on public.services;
 create trigger services_set_updated_at
-before update on services
+before update on public.services
 for each row execute function set_updated_at();
 
-drop trigger if exists appointments_set_updated_at on appointments;
+drop trigger if exists appointments_set_updated_at on public.appointments;
 create trigger appointments_set_updated_at
-before update on appointments
+before update on public.appointments
 for each row execute function set_updated_at();
 
-drop trigger if exists profiles_set_updated_at on profiles;
+drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
-before update on profiles
+before update on public.profiles
 for each row execute function set_updated_at();
-
--- MVP conflict protection remains in the app repository for now.
--- Next step: add a database-level exclusion constraint using tstzrange + gist
--- after confirming the desired cancelled/no-show behavior and required extensions.
 
 -- Public booking reads this view to calculate occupied slots by barbershop.
 -- Keep barbershop_id at the end of the select list. PostgreSQL does not allow
@@ -184,109 +220,12 @@ where a.status in ('scheduled', 'confirmed');
 
 grant select on public.public_appointment_slots to anon, authenticated;
 
--- Initial RLS policies for the MVP.
--- These policies are intentionally simple and should be hardened further
--- before production multi-tenant usage.
+-- RLS is enabled here, but policies are intentionally not created in this
+-- base schema file. Apply docs/supabase-tenant-rls-plan.sql next.
+alter table public.barbershops enable row level security;
+alter table public.profiles enable row level security;
+alter table public.barbers enable row level security;
+alter table public.services enable row level security;
+alter table public.appointments enable row level security;
 
-alter table barbershops enable row level security;
-alter table profiles enable row level security;
-alter table barbers enable row level security;
-alter table services enable row level security;
-alter table appointments enable row level security;
-
-drop policy if exists "profiles_select_own" on profiles;
-create policy "profiles_select_own"
-on profiles for select
-using (auth.uid() = id);
-
-drop policy if exists "profiles_insert_own" on profiles;
-create policy "profiles_insert_own"
-on profiles for insert
-with check (auth.uid() = id);
-
-drop policy if exists "profiles_update_own" on profiles;
-create policy "profiles_update_own"
-on profiles for update
-using (auth.uid() = id)
-with check (auth.uid() = id);
-
-drop policy if exists "barbers_public_read_active" on barbers;
-create policy "barbers_public_read_active"
-on barbers for select
-using (active = true);
-
-drop policy if exists "barbers_owner_all" on barbers;
-create policy "barbers_owner_all"
-on barbers for all
-using (private.current_user_role() = 'owner');
-
-drop policy if exists "services_public_read_active" on services;
-create policy "services_public_read_active"
-on services for select
-using (active = true);
-
-drop policy if exists "services_owner_all" on services;
-create policy "services_owner_all"
-on services for all
-using (private.current_user_role() = 'owner');
-
--- Future RLS Tenant Hardening (Plan):
--- All tables (barbers, services, appointments) should include:
--- using (barbershop_id = private.current_user_barbershop_id())
-
-drop policy if exists "appointments_authenticated_read" on appointments;
-create policy "appointments_authenticated_read"
-on appointments for select
-to authenticated
-using (
-  private.current_user_role() = 'owner'
-  or (private.current_user_role() = 'barber' and barber_id = private.current_user_barber_id())
-);
-
-drop policy if exists "appointments_authenticated_update" on appointments;
-create policy "appointments_authenticated_update"
-on appointments for update
-to authenticated
-using (
-  private.current_user_role() = 'owner'
-  or (private.current_user_role() = 'barber' and barber_id = private.current_user_barber_id())
-)
-with check (
-  private.current_user_role() = 'owner'
-  or (private.current_user_role() = 'barber' and barber_id = private.current_user_barber_id())
-);
-
-drop policy if exists "appointments_authenticated_insert" on appointments;
-create policy "appointments_authenticated_insert"
-on appointments for insert
-to authenticated
-with check (
-  private.current_user_role() = 'owner'
-  or (private.current_user_role() = 'barber' and barber_id = private.current_user_barber_id())
-);
-
-drop policy if exists "appointments_authenticated_delete" on appointments;
-create policy "appointments_authenticated_delete"
-on appointments for delete
-to authenticated
-using (private.current_user_role() = 'owner');
-
-drop policy if exists "appointments_public_insert_scheduled" on appointments;
-create policy "appointments_public_insert_scheduled"
-on appointments for insert
-with check (status = 'scheduled');
-
--- Privacy note:
--- Public booking needs slot availability without exposing client names/phones.
--- Prefer querying public_appointment_slots for public availability once Supabase
--- policies are fully hardened. The current frontend repository still uses the
--- full appointments table, so production should add an RPC/view-specific
--- repository before exposing a real public link.
-
--- Future production hardening (roadmap):
--- - financial_records
--- - commission snapshots stored in appointments.commission_rate
--- - barbershop_id / multi-tenant
--- - database-level appointment conflict protection
--- - schedule blocks / unavailable slots
--- - RPC or Edge Function for public booking
+notify pgrst, 'reload schema';

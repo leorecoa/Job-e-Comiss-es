@@ -14,6 +14,21 @@ The public booking flow resolves the tenant by slug through routes such as:
 
 The application must not assume a global default tenant for operational actions.
 
+## Supabase reference files
+
+For a new Supabase environment, treat these files as the reviewed reference set:
+
+```txt
+1. docs/supabase-schema.sql
+2. docs/supabase-tenant-rls-plan.sql
+3. docs/appointments-active-slot-unique-index.sql
+4. docs/barber-profile-linking-rpc.sql
+```
+
+`docs/supabase-schema.sql` is the base schema reference. It must not be used as a shortcut to create broad MVP policies. Tenant-aware RLS belongs in `docs/supabase-tenant-rls-plan.sql`.
+
+SQL files in `docs/` are applied manually in Supabase after review. The app does not apply schema, RLS, indexes or RPCs automatically.
+
 ## Multi-tenant model
 
 `public.barbershops` is the root tenant entity.
