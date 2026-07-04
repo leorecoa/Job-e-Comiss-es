@@ -10,8 +10,10 @@
 --
 -- Important:
 -- - apply manually in Supabase SQL editor after review
+-- - apply after docs/supabase-schema.sql and docs/supabase-tenant-rls-plan.sql
 -- - validate in a staging/secondary tenant scenario before production
 -- - this RPC is intended to replace ad hoc SQL updates for barber linking
+-- - it does not expose auth.users or target e-mail addresses to the frontend
 
 begin;
 

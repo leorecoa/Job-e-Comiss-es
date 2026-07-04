@@ -1,9 +1,15 @@
 -- Manual hardening for active appointment slot duplication protection.
 -- Do not apply automatically from the app.
+-- Apply manually after docs/supabase-schema.sql and
+-- docs/supabase-tenant-rls-plan.sql.
 --
 -- Goal:
 -- Prevent two active appointments from sharing the same
 -- barbershop_id + barber_id + start_at combination.
+--
+-- This index is the database race-condition guard. The app also performs a
+-- pre-check, but the app-side check is not enough for concurrent requests.
+-- The index does not grant read access and does not replace RLS.
 --
 -- Blocking statuses:
 -- - scheduled

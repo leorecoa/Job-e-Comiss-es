@@ -4,11 +4,23 @@
 -- multi-tenant model. Do not use the seeded tenant below as a default tenant for
 -- new SaaS environments. New barbershops should be created through owner
 -- onboarding and configured with their own slug, catalog, and business hours.
--- Order of execution:
+--
+-- HISTORICAL REFERENCE ONLY:
+-- Do not use this file to configure a new Supabase project. It predates the
+-- current tenant-aware RLS, NOT NULL hardening, duplicate-slot index, trigger
+-- removal and barber profile linking RPC.
+--
+-- Current manual setup order:
+-- 1. docs/supabase-schema.sql
+-- 2. docs/supabase-tenant-rls-plan.sql
+-- 3. docs/appointments-active-slot-unique-index.sql
+-- 4. docs/barber-profile-linking-rpc.sql
+--
+-- Historical order used during the original backfill:
 -- 1. Infrastructure: Create barbershops table.
--- 2. Seed: Create the initial default tenant.
+-- 2. Seed: Create the historical migration tenant.
 -- 3. Schema Update: Add barbershop_id columns as nullable.
--- 4. Backfill: Map all existing data to the default tenant.
+-- 4. Backfill: Map all existing data to the historical migration tenant.
 -- 5. Verification: Ensure no data is left behind.
 -- 6. Enforcement: Turn on NOT NULL constraints for business tables.
 -- 7. Helpers: Deploy multi-tenant database helpers.
@@ -34,7 +46,8 @@ for each row execute function set_updated_at();
 
 
 -- SECTION 2: Initial Tenant Seed
--- Create the default barbershop for existing data association
+-- Historical one-time seed for existing data association.
+-- Do not run this as a production default tenant.
 insert into public.barbershops (name, slug)
 values ('Gestão Máxima', 'gestao-maxima')
 on conflict (slug) do update 
@@ -82,12 +95,14 @@ select 'appointments', count(*) from public.appointments where barbershop_id is 
 
 -- SECTION 6: Constraint Enforcement (Cleanup phase)
 -- Only run these once Section 5 validation returns 0 for business tables.
+-- Current reference schema has barbershop_id NOT NULL on profiles, barbers,
+-- services and appointments. See docs/supabase-schema.sql.
 -- alter table public.barbers alter column barbershop_id set not null;
 -- alter table public.services alter column barbershop_id set not null;
 -- alter table public.appointments alter column barbershop_id set not null;
 
--- Note: public.profiles.barbershop_id remains nullable for now until the 
--- sign-up flow is updated to handle tenant assignment.
+-- Historical note removed: public.profiles.barbershop_id is NOT NULL in the
+-- current reference schema.
 
 
 -- SECTION 7: Helper Functions
@@ -106,9 +121,9 @@ as $$
 $$;
 
 
--- SECTION 8: Future RLS Planning (Documentation)
--- After the frontend and repositories are updated to support barbershop filters, 
--- the following RLS hardening can be applied:
+-- SECTION 8: Historical RLS Planning (Documentation)
+-- Historical note: tenant-aware RLS is no longer future work. Use
+-- docs/supabase-tenant-rls-plan.sql for the current RLS policy reference.
 
 -- EXAMPLE (Do not run yet):
 -- drop policy if exists "barbers_tenant_isolation" on public.barbers;

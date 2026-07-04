@@ -1,14 +1,15 @@
--- Job e Comissoes - Planned tenant-aware RLS policies
+-- Job e Comissoes - Tenant-aware RLS policy reference
 -- Review-only script. Do not apply automatically.
 --
 -- Purpose:
--- - prepare multi-tenant RLS policies based on barbershop_id
--- - preserve current public booking behavior
--- - keep the temporary public appointment fallback trigger in place
+-- - apply tenant-aware RLS policies based on barbershop_id
+-- - preserve current public booking behavior without public SELECT on appointments
+-- - keep owners and barbers scoped to their authenticated profile tenant
 --
 -- Do not add NOT NULL changes here.
--- Do not drop public.set_default_appointment_barbershop_id().
--- Do not drop trigger set_default_appointment_barbershop_id.
+-- Do not create or restore public.set_default_appointment_barbershop_id().
+-- Do not create or restore trigger set_default_appointment_barbershop_id.
+-- Do not grant public SELECT on public.appointments.
 --
 -- Required helpers before applying this plan:
 -- - private.current_user_role()
@@ -16,7 +17,11 @@
 -- - private.current_user_barbershop_id()
 --
 -- These helpers are documented in docs/supabase-schema.sql and must exist before
--- applying this policy plan.
+-- applying this policy plan. For a new environment, apply manually in this order:
+-- 1. docs/supabase-schema.sql
+-- 2. docs/supabase-tenant-rls-plan.sql
+-- 3. docs/appointments-active-slot-unique-index.sql
+-- 4. docs/barber-profile-linking-rpc.sql
 
 begin;
 
@@ -355,10 +360,12 @@ drop policy if exists "appointments_public_insert_scheduled" on public.appointme
 create policy "appointments_public_insert_scheduled"
 on public.appointments
 for insert
-to anon
+to anon, authenticated
 with check (
   status = 'scheduled'
   and barbershop_id is not null
+  and barber_id is not null
+  and service_id is not null
   and nullif(trim(client_name), '') is not null
   and nullif(trim(client_phone), '') is not null
   and nullif(trim(barber_name), '') is not null
@@ -372,25 +379,19 @@ with check (
     where b.id = appointments.barbershop_id
       and b.active = true
   )
-  and (
-    barber_id is null
-    or exists (
-      select 1
-      from public.barbers br
-      where br.id = appointments.barber_id
-        and br.barbershop_id = appointments.barbershop_id
-        and br.active = true
-    )
+  and exists (
+    select 1
+    from public.barbers br
+    where br.id = appointments.barber_id
+      and br.barbershop_id = appointments.barbershop_id
+      and br.active = true
   )
-  and (
-    service_id is null
-    or exists (
-      select 1
-      from public.services s
-      where s.id = appointments.service_id
-        and s.barbershop_id = appointments.barbershop_id
-        and s.active = true
-    )
+  and exists (
+    select 1
+    from public.services s
+    where s.id = appointments.service_id
+      and s.barbershop_id = appointments.barbershop_id
+      and s.active = true
   )
 );
 
