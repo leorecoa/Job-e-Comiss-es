@@ -82,7 +82,7 @@ Regras atuais:
 - barber opera somente a propria `barbershop_id` e o proprio `barber_id`;
 - public booking resolve a barbearia por slug antes de listar catalogo;
 - public booking lista apenas barbeiros e servicos ativos do tenant;
-- public booking usa `public.public_appointment_slots` para disponibilidade;
+- public booking usa RPC `public.get_public_appointment_slots(uuid)` para disponibilidade;
 - public booking nao deve ler linhas completas de `public.appointments`;
 - public appointment insert nao deve solicitar retorno de linhas sensiveis;
 - vinculo owner -> barber por e-mail usa RPC `public.link_barber_profile_by_email`.
@@ -92,8 +92,9 @@ SQL manual de referencia:
 ```txt
 1. docs/supabase-schema.sql
 2. docs/supabase-tenant-rls-plan.sql
-3. docs/appointments-active-slot-unique-index.sql
-4. docs/barber-profile-linking-rpc.sql
+3. docs/public-appointment-availability-rpc.sql
+4. docs/appointments-active-slot-unique-index.sql
+5. docs/barber-profile-linking-rpc.sql
 ```
 
 `docs/supabase-schema.sql` e a referencia de schema base. Ele nao deve recriar policies MVP permissivas. As policies atuais ficam em `docs/supabase-tenant-rls-plan.sql`.

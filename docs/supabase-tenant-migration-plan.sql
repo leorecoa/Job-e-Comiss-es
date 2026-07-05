@@ -13,8 +13,9 @@
 -- Current manual setup order:
 -- 1. docs/supabase-schema.sql
 -- 2. docs/supabase-tenant-rls-plan.sql
--- 3. docs/appointments-active-slot-unique-index.sql
--- 4. docs/barber-profile-linking-rpc.sql
+-- 3. docs/public-appointment-availability-rpc.sql
+-- 4. docs/appointments-active-slot-unique-index.sql
+-- 5. docs/barber-profile-linking-rpc.sql
 --
 -- Historical order used during the original backfill:
 -- 1. Infrastructure: Create barbershops table.

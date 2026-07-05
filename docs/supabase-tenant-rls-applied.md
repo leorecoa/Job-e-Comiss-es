@@ -85,9 +85,11 @@ barbershops_public_read_active
 - Barbers can read, insert, and update appointments only inside their own barbershop and own `barber_id`.
 - Barbers cannot delete appointments.
 
-## Public Slots View
+## Public Availability
 
-`public.public_appointment_slots` remains the public read surface for booking availability.
+Public booking availability is now expected to use `public.get_public_appointment_slots(uuid)`.
+
+`public.public_appointment_slots` remains as a legacy compatibility/reference view during rollout.
 
 The view exposes:
 
@@ -111,7 +113,7 @@ notes
 financial_record_id
 ```
 
-Public booking must continue to use this view for availability instead of reading full `appointments` rows.
+Public booking must use the RPC for availability instead of reading full `appointments` rows or issuing a global slot query.
 
 ## Validated Production Flows
 
@@ -125,7 +127,7 @@ Validated successfully after manual RLS application:
 - owner dashboard
 - barber dashboard
 - public appointment creation
-- public booking availability through `public.public_appointment_slots`
+- public booking availability through `public.get_public_appointment_slots(uuid)`
 
 ## Second Barbershop Validation
 

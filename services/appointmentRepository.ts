@@ -203,20 +203,22 @@ export const listInternalAppointments = async (barbershopId?: string, barberId?:
   return ((data || []) as DatabaseAppointmentRow[]).map(mapAppointmentFromDb);
 };
 
-export const listPublicAppointmentSlots = async (barbershopId?: string): Promise<Appointment[]> => {
-  if (shouldUseLocalFallback) return readLocalAppointments();
-  assertOperationalSupabase();
+export const listPublicAppointmentSlots = async (barbershopId: string): Promise<Appointment[]> => {
+  const scopedBarbershopId = barbershopId.trim();
 
-  let query = supabase
-    .from('public_appointment_slots')
-    .select('barbershop_id,barber_id,barber_name,start_at,end_at,status');
-
-  if (barbershopId) {
-    query = query.eq('barbershop_id', barbershopId);
+  if (!scopedBarbershopId) {
+    throw new Error('Barbearia nao encontrada ou indisponivel.');
   }
 
-  const { data, error } = await query
-    .order('start_at', { ascending: true });
+  if (shouldUseLocalFallback) {
+    return readLocalAppointments().filter((appointment) => appointment.barbershopId === scopedBarbershopId);
+  }
+
+  assertOperationalSupabase();
+
+  const { data, error } = await supabase.rpc('get_public_appointment_slots', {
+    p_barbershop_id: scopedBarbershopId
+  });
 
   if (error) throw error;
 
@@ -297,7 +299,7 @@ export const createAppointment = async ( // This function is used by both intern
     throw new Error(validationErrors[0]);
   }
 
-  const appointments = existingAppointments || await listPublicAppointmentSlots(appointment.barbershopId);
+  const appointments = existingAppointments || await listPublicAppointmentSlots(appointment.barbershopId || '');
 
   if (hasAppointmentConflict(appointments, appointment)) {
     throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);

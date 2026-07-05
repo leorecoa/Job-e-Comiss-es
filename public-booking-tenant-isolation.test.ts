@@ -3,7 +3,8 @@ import { Appointment } from './types';
 import { PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE } from './scheduling';
 
 const supabaseMock = vi.hoisted(() => ({
-  from: vi.fn()
+  from: vi.fn(),
+  rpc: vi.fn()
 }));
 
 vi.mock('./lib/supabase', () => ({
@@ -95,26 +96,6 @@ const createOrderedAppointmentsQuery = (result: {
   query.eq.mockReturnValue(query);
   query.order.mockReturnValue(query);
   query.then = Promise.resolve(result).then.bind(Promise.resolve(result));
-  return query;
-};
-
-const createOrderedPublicSlotsQuery = (result: {
-  data: Array<{
-    barbershop_id: string | null;
-    barber_id: string | null;
-    barber_name: string;
-    start_at: string;
-    end_at: string;
-    status: Appointment['status'];
-  }>;
-  error: null;
-}) => {
-  const query = {
-    eq: vi.fn(),
-    order: vi.fn()
-  };
-  query.eq.mockReturnValue(query);
-  query.order.mockResolvedValue(result);
   return query;
 };
 
@@ -320,8 +301,8 @@ describe('public booking tenant isolation repositories', () => {
     expect(appointments[0]?.barbershopId).toBe('shop-leo');
   });
 
-  it('public booking reads occupied slots from public_appointment_slots instead of appointments', async () => {
-    const query = createOrderedPublicSlotsQuery({
+  it('public booking reads occupied slots through get_public_appointment_slots instead of appointments or the public view', async () => {
+    supabaseMock.rpc.mockResolvedValue({
       data: [
         {
           barbershop_id: 'shop-leo',
@@ -334,35 +315,33 @@ describe('public booking tenant isolation repositories', () => {
       ],
       error: null
     });
-    const select = vi.fn().mockReturnValue(query);
-
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table !== 'public_appointment_slots') throw new Error(`Unexpected table ${table}`);
-      return { select };
-    });
 
     const slots = await listPublicAppointmentSlots('shop-leo');
 
-    expect(supabaseMock.from).toHaveBeenCalledWith('public_appointment_slots');
-    expect(select).toHaveBeenCalledWith('barbershop_id,barber_id,barber_name,start_at,end_at,status');
-    expect(query.eq).toHaveBeenCalledWith('barbershop_id', 'shop-leo');
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('get_public_appointment_slots', {
+      p_barbershop_id: 'shop-leo'
+    });
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('public_appointment_slots');
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
     expect(slots).toHaveLength(1);
     expect(slots[0]?.barbershopId).toBe('shop-leo');
   });
 
+  it('rejects public slot lookup with an empty barbershopId before Supabase', async () => {
+    await expect(listPublicAppointmentSlots('   ')).rejects.toThrow('Barbearia nao encontrada ou indisponivel.');
+
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+  });
+
   it('public booking create flow does not perform SELECT on appointments', async () => {
-    const publicSlotsQuery = createOrderedPublicSlotsQuery({
+    supabaseMock.rpc.mockResolvedValue({
       data: [],
       error: null
     });
-    const publicSlotsSelect = vi.fn().mockReturnValue(publicSlotsQuery);
     const insert = vi.fn().mockResolvedValue({ error: null });
 
     supabaseMock.from.mockImplementation((table: string) => {
-      if (table === 'public_appointment_slots') {
-        return { select: publicSlotsSelect };
-      }
-
       if (table === 'barbers') {
         const query = createTenantLookupQuery({
           data: { id: 'barber-leo', barbershop_id: 'shop-leo' },
@@ -396,7 +375,10 @@ describe('public booking tenant isolation repositories', () => {
       barbershopId: 'shop-leo'
     });
 
-    expect(publicSlotsSelect).toHaveBeenCalled();
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('get_public_appointment_slots', {
+      p_barbershop_id: 'shop-leo'
+    });
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('public_appointment_slots');
     expect(insert).toHaveBeenCalledTimes(1);
   });
 

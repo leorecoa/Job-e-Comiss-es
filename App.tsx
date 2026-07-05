@@ -591,6 +591,10 @@ const App: React.FC = () => {
           currentBarbershopId = authSession.barbershopId;
         }
 
+        if (isPublicBookingRoute && !currentBarbershopId) {
+          throw new Error('Barbearia nao encontrada ou indisponivel.');
+        }
+
         const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([ //
           isPublicBookingRoute ? listPublicAppointmentSlots(currentBarbershopId) : listInternalAppointments(currentBarbershopId, authSession?.barberId),
           listBarbers(currentBarbershopId),

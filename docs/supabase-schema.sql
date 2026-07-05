@@ -6,16 +6,18 @@
 --   availability view expected by the app.
 -- - It intentionally does not create broad MVP RLS policies.
 -- - Tenant-aware RLS must be applied from docs/supabase-tenant-rls-plan.sql.
--- - The public booking flow must read public.public_appointment_slots, not the
---   full public.appointments table.
+-- - The current public booking flow must read occupied slots through
+--   public.get_public_appointment_slots(uuid), not the full public.appointments
+--   table.
 -- - Public appointment inserts must not request returned rows because
 --   appointments contain client data.
 --
 -- Recommended manual order for a new Supabase project:
 -- 1. docs/supabase-schema.sql
 -- 2. docs/supabase-tenant-rls-plan.sql
--- 3. docs/appointments-active-slot-unique-index.sql
--- 4. docs/barber-profile-linking-rpc.sql
+-- 3. docs/public-appointment-availability-rpc.sql
+-- 4. docs/appointments-active-slot-unique-index.sql
+-- 5. docs/barber-profile-linking-rpc.sql
 
 -- Create internal schema for RLS helpers.
 create schema if not exists private;

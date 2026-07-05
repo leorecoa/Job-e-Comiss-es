@@ -221,7 +221,7 @@ Current customer flow:
 2. Resolve the barbershop by slug.
 3. Load active barbers for that tenant.
 4. Load active services for that tenant.
-5. Load public occupied slots through `public_appointment_slots`.
+5. Load public occupied slots through `public.get_public_appointment_slots(uuid)`.
 6. Select barber, service, date, and hour.
 7. Fill customer data.
 8. Submit a validated public appointment payload.

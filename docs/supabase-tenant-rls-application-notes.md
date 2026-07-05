@@ -99,8 +99,8 @@ notify pgrst, 'reload schema';
 - `/book/barbearia-inexistente` cannot submit or create an appointment.
 - Public booking lists only active barbers needed for booking.
 - Public booking lists only active services needed for booking.
-- Public booking reads occupied slots through `public.public_appointment_slots`.
-- Anonymous reads from `public.public_appointment_slots` still work after RLS hardening.
+- Public booking reads occupied slots through `public.get_public_appointment_slots(uuid)`.
+- Anonymous/public booking must not rely on direct reads from `public.public_appointment_slots` when it uses `security_invoker = true`; apply and validate `docs/public-appointment-availability-rpc.sql`.
 - Public booking creates an appointment with `status = 'scheduled'`.
 - Public booking creates an appointment with a non-null `barbershop_id`.
 - Public booking creates an appointment with a non-null `barber_id`.
