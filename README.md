@@ -266,7 +266,7 @@ Pontos principais do modelo atual:
 - owner opera a propria barbearia;
 - barber opera apenas o proprio escopo autenticado;
 - booking publico nao faz `SELECT` publico em `appointments`;
-- disponibilidade publica usa `public_appointment_slots`;
+- disponibilidade publica usa `public.get_public_appointment_slots(uuid)`;
 - payload publico e validado antes de chegar ao Supabase;
 - conflitos ativos de slot sao bloqueados no app e por indice unico parcial no banco;
 - RPC dedicada para vinculo owner -> barber por e-mail;
@@ -384,11 +384,12 @@ Para configurar um ambiente Supabase novo, revise e aplique manualmente a sequen
 ```txt
 1. docs/supabase-schema.sql
 2. docs/supabase-tenant-rls-plan.sql
-3. docs/appointments-active-slot-unique-index.sql
-4. docs/barber-profile-linking-rpc.sql
+3. docs/public-appointment-availability-rpc.sql
+4. docs/appointments-active-slot-unique-index.sql
+5. docs/barber-profile-linking-rpc.sql
 ```
 
-Nao aplique apenas o schema base em producao; RLS tenant-aware, indice de conflito e RPC fazem parte do estado operacional atual.
+Nao aplique apenas o schema base em producao; RLS tenant-aware, RPC publica de disponibilidade, indice de conflito e RPC de vinculo fazem parte do estado operacional atual.
 
 ---
 

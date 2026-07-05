@@ -99,7 +99,7 @@ The tenant hardening cycle is now complete for the current single-business produ
 - existing tenant data was backfilled
 - public booking resolves barbershops by slug
 - invalid public slugs are blocked
-- public slot reads use `public_appointment_slots`
+- public slot reads use `public.get_public_appointment_slots(uuid)`
 - tenant-aware RLS is applied
 - broad legacy policies were removed
 - public appointment inserts require tenant and entity IDs

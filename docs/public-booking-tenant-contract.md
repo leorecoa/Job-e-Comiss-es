@@ -68,16 +68,52 @@ The public booking flow uses tenant-aware data:
 
 - barbers are filtered by `active = true` and `barbershop_id`
 - services are filtered by `active = true` and `barbershop_id`
-- public slots are filtered by `barbershop_id`
+- public slots are loaded through `public.get_public_appointment_slots(uuid)` and filtered by the required `barbershop_id` argument
 - appointments are created with `barbershop_id`, `barber_id`, and `service_id`
 
 Tenant-aware RLS has been applied manually in Supabase and validated in production. See `docs/supabase-tenant-rls-applied.md`.
 
 Public appointment inserts were hardened to require `barbershop_id`, `barber_id`, and `service_id`. See `docs/public-appointment-entity-id-hardening.md`.
 
-## Public Slots View Contract
+## Public Slots Availability Contract
 
-Public booking availability is calculated from `public.public_appointment_slots`, not from full `appointments` rows.
+Public booking availability is calculated through `public.get_public_appointment_slots(uuid)`, not from full `appointments` rows and not from a global slot query.
+
+The RPC must receive the resolved tenant id:
+
+```txt
+p_barbershop_id = resolved barbershop id from /book/:slug
+```
+
+It must return only:
+
+```txt
+barber_id
+barber_name
+start_at
+end_at
+status
+barbershop_id
+```
+
+The RPC must not return `client_name`, `client_phone`, `notes`, `service_value` or other personal/financial fields.
+
+Reference SQL:
+
+```txt
+docs/public-appointment-availability-rpc.sql
+```
+
+Rollout rule:
+
+1. Apply and validate `public.get_public_appointment_slots(uuid)` manually in Supabase.
+2. Deploy the frontend that calls the RPC.
+3. Confirm `/book/:slug` works without public SELECT on `appointments`.
+4. Only in a later PR or operational step, evaluate revoking public access to the legacy view.
+
+## Legacy Public Slots View Contract
+
+`public.public_appointment_slots` is retained during rollout for compatibility/reference. New frontend code should not query it directly.
 
 The view must expose these columns in this order:
 
@@ -90,7 +126,7 @@ status
 barbershop_id
 ```
 
-`barbershop_id` is required so the frontend repository can filter occupied slots by barbershop.
+`barbershop_id` is required so legacy callers can filter occupied slots by barbershop.
 
 Keep `barbershop_id` at the end of the view. This preserves the existing PostgreSQL view column order and avoids the `create or replace view` error:
 
@@ -115,7 +151,7 @@ from public.appointments a
 where a.status in ('scheduled', 'confirmed');
 ```
 
-This document records the expected state only; do not add a separate executable migration for this hotfix.
+This document records the expected legacy view state only. The current public availability SQL is `docs/public-appointment-availability-rpc.sql`.
 
 ## Removed Temporary Database Fallback
 

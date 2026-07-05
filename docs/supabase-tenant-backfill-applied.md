@@ -35,7 +35,8 @@ Initial tenant backfill was applied successfully in Supabase.
 * Existing data is linked to the initial barbershop.
 * Public booking still works.
 * New public appointments receive the default `barbershop_id` automatically.
-* Public booking availability reads `public.public_appointment_slots`.
+* Historical note: public booking availability originally read `public.public_appointment_slots`.
+* Current frontend availability should use `public.get_public_appointment_slots(uuid)` after applying `docs/public-appointment-availability-rpc.sql`.
 * `public.public_appointment_slots` exposes `barber_id`, `barber_name`, `start_at`, `end_at`, `status`, and `barbershop_id` in that order.
 
 ## Decision At Backfill Time
@@ -69,7 +70,7 @@ Validated successfully:
 * Barber dashboard works.
 * Public booking `/book` works.
 * Public appointments receive `barbershop_id`.
-* Public slot reads can filter by `barbershop_id` through `public.public_appointment_slots`.
+* Historical public slot reads could filter by `barbershop_id` through `public.public_appointment_slots`; current frontend reads should use `public.get_public_appointment_slots(uuid)`.
 * Existing appointments continue working.
 
 ## Next steps

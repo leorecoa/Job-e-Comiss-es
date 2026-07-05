@@ -117,7 +117,9 @@ Gestão Máxima      | 24 appointments
 
 ## Public Slots View
 
-`public.public_appointment_slots` remains the public read surface for booking availability.
+`public.get_public_appointment_slots(uuid)` is the current public read surface for booking availability.
+
+`public.public_appointment_slots` remains as a legacy compatibility/reference view during rollout.
 
 It exposes the fields needed by public booking:
 

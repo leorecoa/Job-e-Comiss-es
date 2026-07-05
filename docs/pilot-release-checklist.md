@@ -36,7 +36,7 @@ appointments_unique_active_barbershop_barber_start
 ```
 
 - [ ] O fluxo publico de booking nao exige `SELECT` publico em `appointments`.
-- [ ] `public.public_appointment_slots` esta disponivel para disponibilidade publica.
+- [ ] A RPC `public.get_public_appointment_slots(uuid)` esta aplicada e validada para disponibilidade publica.
 - [ ] Profiles de owner e barber estao coerentes com `barbershop_id` e `barber_id` quando aplicavel.
 
 ## 4. Tenant e barbearia piloto

@@ -29,7 +29,7 @@ O modelo atual usa `barbershop_id` como chave de isolamento multi-tenant:
 - public booking resolve a barbearia por slug em `/book/:slug`;
 - public booking nao deve assumir tenant padrao silencioso;
 - public booking nao deve fazer `SELECT` publico na tabela completa `appointments`;
-- disponibilidade publica deve usar `public.public_appointment_slots`;
+- disponibilidade publica deve usar `public.get_public_appointment_slots(uuid)`;
 - inserts publicos em `appointments` nao devem solicitar retorno de linhas sensiveis;
 - a RPC `public.link_barber_profile_by_email` deve ser usada para vincular usuario existente a barbeiro sem expor `auth.users`.
 
@@ -42,6 +42,7 @@ Arquivos de referencia:
 - `docs/security-model.md`
 - `docs/supabase-schema.sql`
 - `docs/supabase-tenant-rls-plan.sql`
+- `docs/public-appointment-availability-rpc.sql`
 - `docs/appointments-active-slot-unique-index.sql`
 - `docs/barber-profile-linking-rpc.sql`
 - `docs/deployment.md`

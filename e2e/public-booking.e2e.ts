@@ -182,7 +182,7 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
 
   const barbersRequests: string[] = [];
   const servicesRequests: string[] = [];
-  const slotRequests: string[] = [];
+  const slotRequests: CapturedRequest[] = [];
   const appointmentRequests: CapturedRequest[] = [];
   const appointmentReadRequests: CapturedRequest[] = [];
 
@@ -253,15 +253,25 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
       return;
     }
 
-    if (url.pathname === '/rest/v1/public_appointment_slots') {
-      slotRequests.push(request.url());
-      const barbershopId = toEqValue(url.searchParams.get('barbershop_id'));
+    if (url.pathname === '/rest/v1/rpc/get_public_appointment_slots') {
+      const body = parseRequestBody(route) as { p_barbershop_id?: string } | null;
+      slotRequests.push({
+        method: request.method(),
+        url: request.url(),
+        body
+      });
+      const barbershopId = body?.p_barbershop_id || null;
 
       const rows = state.slots.filter((slot) => (
         !barbershopId || slot.barbershop_id === barbershopId
       ));
 
       await fulfillJson(route, 200, rows);
+      return;
+    }
+
+    if (url.pathname === '/rest/v1/public_appointment_slots') {
+      await fulfillJson(route, 500, { message: 'Public booking must use get_public_appointment_slots RPC' });
       return;
     }
 
@@ -337,7 +347,10 @@ test.describe('public booking /book/:slug', () => {
     expect(network.barbersRequests.some((url) => url.includes('active=eq.true'))).toBeTruthy();
     expect(network.servicesRequests.some((url) => url.includes(`barbershop_id=eq.${LEO_BARBERSHOP_ID}`))).toBeTruthy();
     expect(network.servicesRequests.some((url) => url.includes('active=eq.true'))).toBeTruthy();
-    expect(network.slotRequests.some((url) => url.includes(`barbershop_id=eq.${LEO_BARBERSHOP_ID}`))).toBeTruthy();
+    expect(network.slotRequests.some((request) => (
+      request.method === 'POST'
+      && (request.body as { p_barbershop_id?: string } | null)?.p_barbershop_id === LEO_BARBERSHOP_ID
+    ))).toBeTruthy();
     expect(network.appointmentReadRequests).toHaveLength(0);
   });
 
