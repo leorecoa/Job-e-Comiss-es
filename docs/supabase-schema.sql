@@ -17,7 +17,7 @@
 -- 3. docs/appointments-active-slot-unique-index.sql
 -- 4. docs/barber-profile-linking-rpc.sql
 
--- Create internal schema for RLS helpers
+-- Create internal schema for RLS helpers.
 create schema if not exists private;
 
 revoke all on schema private from public;
@@ -26,49 +26,7 @@ revoke all on schema private from authenticated;
 
 grant usage on schema private to authenticated;
 
--- Helper to get role of current authenticated active user.
-create or replace function private.current_user_role()
-returns text
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select role
-  from public.profiles
-  where id = auth.uid()
-    and active = true
-  limit 1;
-$$;
-
-revoke all on function private.current_user_role() from public;
-revoke all on function private.current_user_role() from anon;
-revoke all on function private.current_user_role() from authenticated;
-
-grant execute on function private.current_user_role() to authenticated;
-
--- Helper to get barber_id of current authenticated active user.
-create or replace function private.current_user_barber_id()
-returns uuid
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select barber_id
-  from public.profiles
-  where id = auth.uid()
-    and active = true
-  limit 1;
-$$;
-
-revoke all on function private.current_user_barber_id() from public;
-revoke all on function private.current_user_barber_id() from anon;
-revoke all on function private.current_user_barber_id() from authenticated;
-
-grant execute on function private.current_user_barber_id() to authenticated;
-
--- Multi-tenant foundation: Barbershops (Tenants)
+-- Multi-tenant foundation: Barbershops (Tenants).
 create table if not exists public.barbershops (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -88,27 +46,6 @@ create table if not exists public.barbershops (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
--- Helper to get barbershop_id of current authenticated user.
-create or replace function private.current_user_barbershop_id()
-returns uuid
-language sql
-stable
-security definer
-set search_path = public, private
-as $$
-  select p.barbershop_id
-  from public.profiles p
-  where p.id = auth.uid()
-    and p.active = true
-  limit 1;
-$$;
-
-revoke all on function private.current_user_barbershop_id() from public;
-revoke all on function private.current_user_barbershop_id() from anon;
-revoke all on function private.current_user_barbershop_id() from authenticated;
-
-grant execute on function private.current_user_barbershop_id() to authenticated;
 
 create table if not exists public.barbers (
   id uuid primary key default gen_random_uuid(),
@@ -162,6 +99,69 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Helper to get role of current authenticated active user.
+create or replace function private.current_user_role()
+returns text
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select role
+  from public.profiles
+  where id = auth.uid()
+    and active = true
+  limit 1;
+$$;
+
+revoke all on function private.current_user_role() from public;
+revoke all on function private.current_user_role() from anon;
+revoke all on function private.current_user_role() from authenticated;
+
+grant execute on function private.current_user_role() to authenticated;
+
+-- Helper to get barber_id of current authenticated active user.
+create or replace function private.current_user_barber_id()
+returns uuid
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select barber_id
+  from public.profiles
+  where id = auth.uid()
+    and active = true
+  limit 1;
+$$;
+
+revoke all on function private.current_user_barber_id() from public;
+revoke all on function private.current_user_barber_id() from anon;
+revoke all on function private.current_user_barber_id() from authenticated;
+
+grant execute on function private.current_user_barber_id() to authenticated;
+
+-- Helper to get barbershop_id of current authenticated user.
+create or replace function private.current_user_barbershop_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public, private
+as $$
+  select p.barbershop_id
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active = true
+  limit 1;
+$$;
+
+revoke all on function private.current_user_barbershop_id() from public;
+revoke all on function private.current_user_barbershop_id() from anon;
+revoke all on function private.current_user_barbershop_id() from authenticated;
+
+grant execute on function private.current_user_barbershop_id() to authenticated;
+
 create index if not exists appointments_barber_start_idx on public.appointments (barber_id, start_at);
 create index if not exists appointments_status_idx on public.appointments (status);
 create index if not exists appointments_start_at_idx on public.appointments (start_at);
@@ -203,6 +203,8 @@ before update on public.profiles
 for each row execute function set_updated_at();
 
 -- Public booking reads this view to calculate occupied slots by barbershop.
+-- Access to this view with anon/authenticated roles depends on dedicated
+-- RLS/RPC policy design and must be validated separately.
 -- Keep barbershop_id at the end of the select list. PostgreSQL does not allow
 -- create or replace view to reorder existing columns without dropping the view.
 create or replace view public.public_appointment_slots
