@@ -48,9 +48,19 @@ Se algum comando nao puder ser executado, explique o motivo.
 - Nunca commite `.env`.
 - Use `.env.example` para documentar variaveis.
 - Booking publico nao deve ler dados sensiveis de `appointments`.
-- Em fluxo publico, use `public_appointment_slots` para disponibilidade.
+- Em fluxo publico, use `public.get_public_appointment_slots(uuid)` para disponibilidade ocupada por tenant. Nao consulte `public.appointments` nem `public_appointment_slots` diretamente no frontend publico.
 - Leitura completa de `appointments` deve ser restrita ao painel interno autenticado.
-- Nao desative RLS para resolver bug de frontend.
+- Nao resolva bugs de Supabase desativando RLS, concedendo SELECT publico em `appointments` ou criando fallback global de tenant.
+- Para tasks com Supabase, gere SQL review-only; a aplicacao remota e manual.
+
+## SaaS Security
+
+- Preserve tenant isolation.
+- Public flows must be scoped by `barbershop_id` or slug-resolved tenant.
+- Do not add global tenant fallback.
+- Do not grant public SELECT on `appointments`.
+- Prefer small review-only SQL files for schema/RLS/security changes.
+- Security PRs must be small, focused and auditable, with validation commands and rollout notes.
 
 ## Git
 
