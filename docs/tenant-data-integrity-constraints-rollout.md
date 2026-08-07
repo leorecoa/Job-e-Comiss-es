@@ -2,9 +2,11 @@
 
 ## Objective
 
-Add declarative value checks and tenant-consistent relationships without changing RLS, public grants, application code or existing data.
+Add tenant-consistent relationships without changing RLS, public grants, application code or existing data.
 
 Review-only SQL: `docs/tenant-data-integrity-constraints.sql`.
+
+The remote schema already contains and has validated these CHECK constraints: `services_price_non_negative`, `services_duration_valid`, `services_commission_rate_valid`, `appointments_service_value_non_negative`, `appointments_commission_rate_valid`, `appointments_time_valid` and `appointments_status_check`. They are not created, validated or removed by this rollout.
 
 ## Risks And Prerequisites
 
@@ -19,8 +21,8 @@ Review-only SQL: `docs/tenant-data-integrity-constraints.sql`.
 1. Open the reviewed SQL in the Supabase SQL Editor. Do not run the whole file blindly.
 2. Run section 1 and require zero invalid rows.
 3. Run section 2 outside an explicit transaction.
-4. Run sections 3 and 4 one constraint group at a time, monitoring locks and errors.
-5. Run section 5 and confirm every proposed constraint has `convalidated = true`.
+4. Run section 3 one constraint group at a time, monitoring locks and errors.
+5. Run section 4 and confirm every proposed constraint has `convalidated = true`.
 6. Re-run all preflight queries and validate public booking plus owner and barber flows.
 
 The script does not grant public `SELECT` on `public.appointments`, does not disable RLS and does not add a global tenant fallback.

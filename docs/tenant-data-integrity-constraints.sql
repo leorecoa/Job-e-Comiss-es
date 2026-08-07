@@ -142,49 +142,7 @@ end
 $block$;
 
 -- =============================================================================
--- 3. Value and domain checks. NOT VALID avoids validating old rows while adding.
--- =============================================================================
-
-do $block$
-begin
-  if not exists (select 1 from pg_constraint where conrelid = 'public.services'::regclass and conname = 'services_price_nonnegative_check') then
-    alter table public.services add constraint services_price_nonnegative_check check (price >= 0) not valid;
-  end if;
-  if not exists (select 1 from pg_constraint where conrelid = 'public.services'::regclass and conname = 'services_duration_positive_check') then
-    alter table public.services add constraint services_duration_positive_check check (duration_minutes > 0) not valid;
-  end if;
-  if not exists (select 1 from pg_constraint where conrelid = 'public.services'::regclass and conname = 'services_commission_rate_range_check') then
-    alter table public.services add constraint services_commission_rate_range_check check (commission_rate between 0 and 100) not valid;
-  end if;
-  if not exists (select 1 from pg_constraint where conrelid = 'public.appointments'::regclass and conname = 'appointments_service_value_nonnegative_check') then
-    alter table public.appointments add constraint appointments_service_value_nonnegative_check check (service_value >= 0) not valid;
-  end if;
-  if not exists (select 1 from pg_constraint where conrelid = 'public.appointments'::regclass and conname = 'appointments_commission_rate_range_check') then
-    alter table public.appointments add constraint appointments_commission_rate_range_check check (commission_rate between 0 and 100) not valid;
-  end if;
-  if not exists (select 1 from pg_constraint where conrelid = 'public.appointments'::regclass and conname = 'appointments_time_order_check') then
-    alter table public.appointments add constraint appointments_time_order_check check (end_at > start_at) not valid;
-  end if;
-  if not exists (select 1 from pg_constraint where conrelid = 'public.appointments'::regclass and conname = 'appointments_status_domain_check') then
-    alter table public.appointments add constraint appointments_status_domain_check
-      check (status in ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show')) not valid;
-  end if;
-end
-$block$;
-
--- A NULL commission_rate remains valid because PostgreSQL CHECK accepts UNKNOWN.
-alter table public.services validate constraint services_price_nonnegative_check;
-alter table public.services validate constraint services_duration_positive_check;
-alter table public.services validate constraint services_commission_rate_range_check;
-alter table public.appointments validate constraint appointments_service_value_nonnegative_check;
-alter table public.appointments validate constraint appointments_commission_rate_range_check;
-alter table public.appointments validate constraint appointments_time_order_check;
-alter table public.appointments validate constraint appointments_status_domain_check;
-
--- No duration maximum is added: the current application proves only a minimum of 1.
-
--- =============================================================================
--- 4. Composite foreign keys for tenant consistency.
+-- 3. Composite foreign keys for tenant consistency.
 -- =============================================================================
 
 do $block$
@@ -212,7 +170,7 @@ alter table public.appointments validate constraint appointments_service_tenant_
 alter table public.profiles validate constraint profiles_barber_tenant_fkey;
 
 -- =============================================================================
--- 5. Final validation. All listed constraints should be validated.
+-- 4. Final validation. All listed constraints should be validated.
 -- =============================================================================
 
 select c.conrelid::regclass as table_name, c.conname, c.convalidated,
@@ -222,13 +180,6 @@ where c.connamespace = 'public'::regnamespace
   and c.conname in (
     'barbers_id_barbershop_id_key',
     'services_id_barbershop_id_key',
-    'services_price_nonnegative_check',
-    'services_duration_positive_check',
-    'services_commission_rate_range_check',
-    'appointments_service_value_nonnegative_check',
-    'appointments_commission_rate_range_check',
-    'appointments_time_order_check',
-    'appointments_status_domain_check',
     'appointments_barber_tenant_fkey',
     'appointments_service_tenant_fkey',
     'profiles_barber_tenant_fkey'
@@ -238,20 +189,12 @@ order by c.conrelid::regclass::text, c.conname;
 -- Re-run every query in section 1 after validation.
 
 -- =============================================================================
--- 6. Rollback (manual, run only when explicitly approved; no CASCADE).
+-- 5. Rollback (manual, run only when explicitly approved; no CASCADE).
 -- =============================================================================
 /*
 alter table public.profiles drop constraint if exists profiles_barber_tenant_fkey;
 alter table public.appointments drop constraint if exists appointments_service_tenant_fkey;
 alter table public.appointments drop constraint if exists appointments_barber_tenant_fkey;
-
-alter table public.appointments drop constraint if exists appointments_status_domain_check;
-alter table public.appointments drop constraint if exists appointments_time_order_check;
-alter table public.appointments drop constraint if exists appointments_commission_rate_range_check;
-alter table public.appointments drop constraint if exists appointments_service_value_nonnegative_check;
-alter table public.services drop constraint if exists services_commission_rate_range_check;
-alter table public.services drop constraint if exists services_duration_positive_check;
-alter table public.services drop constraint if exists services_price_nonnegative_check;
 
 alter table public.services drop constraint if exists services_id_barbershop_id_key;
 alter table public.barbers drop constraint if exists barbers_id_barbershop_id_key;
