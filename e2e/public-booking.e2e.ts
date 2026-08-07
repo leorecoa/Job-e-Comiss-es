@@ -270,6 +270,20 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
       return;
     }
 
+    if (url.pathname === '/rest/v1/rpc/create_public_appointment') {
+      appointmentRequests.push({
+        method: request.method(),
+        url: request.url(),
+        body: parseRequestBody(route)
+      });
+      await fulfillJson(
+        route,
+        state.appointmentInsertResponse.status,
+        state.appointmentInsertResponse.body
+      );
+      return;
+    }
+
     if (url.pathname === '/rest/v1/public_appointment_slots') {
       await fulfillJson(route, 500, { message: 'Public booking must use get_public_appointment_slots RPC' });
       return;
@@ -282,18 +296,8 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
         body: parseRequestBody(route)
       };
 
-      if (request.method() === 'POST') {
-        appointmentRequests.push(captured);
-        await fulfillJson(
-          route,
-          state.appointmentInsertResponse.status,
-          state.appointmentInsertResponse.body
-        );
-        return;
-      }
-
       appointmentReadRequests.push(captured);
-      await fulfillJson(route, 405, { message: 'Public booking must not read appointments' });
+      await fulfillJson(route, 405, { message: 'Public booking must not access appointments directly' });
       return;
     }
 
@@ -354,7 +358,7 @@ test.describe('public booking /book/:slug', () => {
     expect(network.appointmentReadRequests).toHaveLength(0);
   });
 
-  test('creates a valid public appointment with tenant ids and without public SELECT on appointments', async ({ page }) => {
+  test('creates a valid public appointment through RPC without direct appointments access', async ({ page }) => {
     const network = await installSupabaseMocks(page);
 
     await page.goto('/book/leo-do-leo');
@@ -381,15 +385,19 @@ test.describe('public booking /book/:slug', () => {
     const payload = Array.isArray(body) ? body[0] : body as Record<string, unknown>;
 
     expect(method).toBe('POST');
-    expect(url).not.toContain('select=');
+    expect(url).toContain('/rpc/create_public_appointment');
     expect(payload).toMatchObject({
-      barbershop_id: LEO_BARBERSHOP_ID,
-      barber_id: LEO_BARBER_ID,
-      barber_name: 'test',
-      service_id: LEO_SERVICE_ID,
-      service_type: 'corte',
-      status: 'scheduled'
+      p_barbershop_id: LEO_BARBERSHOP_ID,
+      p_barber_id: LEO_BARBER_ID,
+      p_service_id: LEO_SERVICE_ID,
+      p_client_name: 'pedro',
+      p_client_phone: '81987324097'
     });
+    expect(payload).not.toHaveProperty('barber_name');
+    expect(payload).not.toHaveProperty('service_type');
+    expect(payload).not.toHaveProperty('service_value');
+    expect(payload).not.toHaveProperty('commission_rate');
+    expect(payload).not.toHaveProperty('status');
   });
 
   test('blocks submit when no slot is selected and does not post appointments', async ({ page }) => {
@@ -410,14 +418,13 @@ test.describe('public booking /book/:slug', () => {
     expect(network.appointmentReadRequests).toHaveLength(0);
   });
 
-  test('shows the friendly conflict message when a slot is taken during public insert', async ({ page }) => {
+  test('shows the friendly conflict message when a slot is taken during public RPC', async ({ page }) => {
     const network = await installSupabaseMocks(page, {
       appointmentInsertResponse: {
         status: 409,
         body: {
-          code: '23505',
-          message: 'duplicate key value violates unique constraint',
-          details: 'appointments_unique_active_barbershop_barber_start'
+          code: 'P0001',
+          message: 'PUBLIC_APPOINTMENT_SLOT_CONFLICT'
         }
       }
     });

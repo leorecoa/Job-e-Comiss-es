@@ -15,7 +15,7 @@ vi.mock('./lib/supabase', () => ({
   supabase: supabaseMock
 }));
 
-import { createAppointment, listInternalAppointments, listPublicAppointmentSlots } from './services/appointmentRepository';
+import { createAppointment, createPublicAppointment, listInternalAppointments, listPublicAppointmentSlots } from './services/appointmentRepository';
 import { listBarbers } from './services/barberRepository';
 import { listServices } from './services/serviceRepository';
 
@@ -335,51 +335,56 @@ describe('public booking tenant isolation repositories', () => {
   });
 
   it('public booking create flow does not perform SELECT on appointments', async () => {
-    supabaseMock.rpc.mockResolvedValue({
-      data: [],
-      error: null
-    });
-    const insert = vi.fn().mockResolvedValue({ error: null });
-
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table === 'barbers') {
-        const query = createTenantLookupQuery({
-          data: { id: 'barber-leo', barbershop_id: 'shop-leo' },
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'services') {
-        const query = createTenantLookupQuery({
-          data: { id: 'service-leo', barbershop_id: 'shop-leo' },
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'appointments') {
-        return {
-          insert,
-          select: vi.fn(() => {
-            throw new Error('appointments SELECT must not be used in public booking');
-          })
-        };
-      }
-
-      throw new Error(`Unexpected table ${table}`);
+    supabaseMock.rpc.mockImplementation((name: string) => {
+      if (name === 'get_public_appointment_slots') return Promise.resolve({ data: [], error: null });
+      if (name === 'create_public_appointment') return Promise.resolve({ data: 'created-appointment-id', error: null });
+      throw new Error(`Unexpected RPC ${name}`);
     });
 
-    await expect(createAppointment(makeAppointment())).resolves.toMatchObject({
-      id: 'appointment-1',
+    await expect(createPublicAppointment(makeAppointment())).resolves.toMatchObject({
+      id: 'created-appointment-id',
       barbershopId: 'shop-leo'
     });
 
     expect(supabaseMock.rpc).toHaveBeenCalledWith('get_public_appointment_slots', {
       p_barbershop_id: 'shop-leo'
     });
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('create_public_appointment', {
+      p_barbershop_id: 'shop-leo',
+      p_barber_id: 'barber-leo',
+      p_service_id: 'service-leo',
+      p_client_name: 'Cliente Leo',
+      p_client_phone: '85999990000',
+      p_start_at: '2026-06-22T15:00:00.000Z',
+      p_end_at: '2026-06-22T15:45:00.000Z',
+      p_notes: null
+    });
     expect(supabaseMock.from).not.toHaveBeenCalledWith('public_appointment_slots');
-    expect(insert).toHaveBeenCalledTimes(1);
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
+  });
+
+  it.each([
+    ['PUBLIC_APPOINTMENT_INVALID_BARBER', 'Barbeiro invalido para esta barbearia.'],
+    ['PUBLIC_APPOINTMENT_INVALID_SERVICE', 'Servico invalido para esta barbearia.']
+  ])('maps tenant-scoped RPC error %s without direct appointment INSERT', async (rpcCode, expectedMessage) => {
+    supabaseMock.rpc.mockResolvedValue({ data: null, error: { code: 'P0001', message: rpcCode } });
+
+    await expect(createPublicAppointment(makeAppointment(), [])).rejects.toThrow(expectedMessage);
+
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('create_public_appointment', expect.any(Object));
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
+  });
+
+  it('maps an RPC slot race to the friendly public conflict message', async () => {
+    supabaseMock.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'PUBLIC_APPOINTMENT_SLOT_CONFLICT' }
+    });
+
+    await expect(createPublicAppointment(makeAppointment(), [])).rejects.toThrow(
+      PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
+    );
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
   });
 
   it('creates the appointment with the current barbershop_id after validating barber and service tenant ownership', async () => {
