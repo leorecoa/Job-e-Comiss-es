@@ -26,7 +26,7 @@ import { PublicBookingPage } from './components/PublicBookingPage';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import type { TourStep } from './components/tourUtils';
 import { isProductionWithoutSupabase, isSupabaseConfigured, PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE, shouldUseLocalFallback } from './lib/supabase';
-import { createAppointment as createAppointmentRecord, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
+import { createAppointment as createAppointmentRecord, createPublicAppointment, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
 import { linkBarberProfileByEmail } from './services/profileLinkingRepository';
 import { createService, listServices, removeService, updateService } from './services/serviceRepository';
@@ -1341,7 +1341,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const savedAppointment = await createAppointmentRecord(appointment, appointments); //
+      const savedAppointment = await createPublicAppointment(appointment, appointments); //
       setAppointments(prev => [savedAppointment, ...prev]);
     } catch (error) {
       logOperationalError('public-booking:create-appointment', error);

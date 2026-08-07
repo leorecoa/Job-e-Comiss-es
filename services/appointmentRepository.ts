@@ -57,6 +57,17 @@ type DatabaseWriteError = {
 };
 
 const ACTIVE_SLOT_UNIQUE_INDEX_NAME = 'appointments_unique_active_barbershop_barber_start';
+const PUBLIC_APPOINTMENT_RPC_NAME = 'create_public_appointment';
+
+const PUBLIC_APPOINTMENT_RPC_ERRORS: Record<string, string> = {
+  PUBLIC_APPOINTMENT_INVALID_TENANT: 'Barbearia nao encontrada ou indisponivel.',
+  PUBLIC_APPOINTMENT_INVALID_BARBER: 'Barbeiro invalido para esta barbearia.',
+  PUBLIC_APPOINTMENT_INACTIVE_BARBER: 'Barbeiro indisponivel para agendamento.',
+  PUBLIC_APPOINTMENT_INVALID_SERVICE: 'Servico invalido para esta barbearia.',
+  PUBLIC_APPOINTMENT_INACTIVE_SERVICE: 'Servico indisponivel para agendamento.',
+  PUBLIC_APPOINTMENT_INVALID_TIME: 'Horario invalido para este servico.',
+  PUBLIC_APPOINTMENT_INVALID_INPUT: 'Confira os dados obrigatorios do agendamento.'
+};
 
 const nullableUuid = (value?: string | null): string | null => {
   const trimmed = value?.trim();
@@ -72,6 +83,17 @@ const isActiveAppointmentConflictError = (error: DatabaseWriteError): boolean =>
     || details.includes('barber_id')
     || details.includes('start_at')
   );
+};
+
+const mapPublicAppointmentRpcError = (error: DatabaseWriteError): Error => {
+  const details = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
+
+  if (details.includes('PUBLIC_APPOINTMENT_SLOT_CONFLICT')) {
+    return createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
+  }
+
+  const errorCode = Object.keys(PUBLIC_APPOINTMENT_RPC_ERRORS).find((code) => details.includes(code));
+  return new Error(errorCode ? PUBLIC_APPOINTMENT_RPC_ERRORS[errorCode] : 'Nao foi possivel confirmar este horario. Tente novamente.');
 };
 
 export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment => ({
@@ -289,7 +311,7 @@ const assertAppointmentTenantIntegrity = async (appointment: Appointment): Promi
   await Promise.all(checks);
 };
 
-export const createAppointment = async ( // This function is used by both internal and public booking
+export const createAppointment = async ( // Internal owner/barber appointment creation.
   appointment: Appointment,
   existingAppointments?: Appointment[]
 ): Promise<Appointment> => {
@@ -328,6 +350,50 @@ export const createAppointment = async ( // This function is used by both intern
   }
 
   return appointment;
+};
+
+export const createPublicAppointment = async (
+  appointment: Appointment,
+  existingAppointments?: Appointment[]
+): Promise<Appointment> => {
+  const validationErrors = validatePublicAppointmentRecord(appointment);
+
+  if (validationErrors.length > 0) {
+    throw new Error(validationErrors[0]);
+  }
+
+  const appointments = existingAppointments || await listPublicAppointmentSlots(appointment.barbershopId || '');
+
+  if (hasAppointmentConflict(appointments, appointment)) {
+    throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
+  }
+
+  if (shouldUseLocalFallback) {
+    writeLocalAppointments([appointment, ...appointments]);
+    return appointment;
+  }
+  assertOperationalSupabase();
+
+  const { data, error } = await supabase.rpc(PUBLIC_APPOINTMENT_RPC_NAME, {
+    p_barbershop_id: appointment.barbershopId,
+    p_barber_id: appointment.barberId,
+    p_service_id: appointment.serviceId,
+    p_client_name: appointment.clientName.trim(),
+    p_client_phone: appointment.clientPhone || '',
+    p_start_at: appointment.startAt,
+    p_end_at: appointment.endAt,
+    p_notes: appointment.notes?.trim() || null
+  });
+
+  if (error) {
+    logOperationalError('appointment-repository:create-public', error);
+    throw mapPublicAppointmentRpcError(error);
+  }
+
+  return {
+    ...appointment,
+    id: typeof data === 'string' && data ? data : appointment.id
+  };
 };
 
 export const updateAppointment = async (
