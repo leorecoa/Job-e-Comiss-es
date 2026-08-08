@@ -364,8 +364,13 @@ describe('public booking tenant isolation repositories', () => {
   });
 
   it.each([
+    ['PUBLIC_APPOINTMENT_INVALID_TENANT', 'Barbearia nao encontrada ou indisponivel.'],
     ['PUBLIC_APPOINTMENT_INVALID_BARBER', 'Barbeiro invalido para esta barbearia.'],
-    ['PUBLIC_APPOINTMENT_INVALID_SERVICE', 'Servico invalido para esta barbearia.']
+    ['PUBLIC_APPOINTMENT_INACTIVE_BARBER', 'Barbeiro indisponivel para agendamento.'],
+    ['PUBLIC_APPOINTMENT_INVALID_SERVICE', 'Servico invalido para esta barbearia.'],
+    ['PUBLIC_APPOINTMENT_INACTIVE_SERVICE', 'Servico indisponivel para agendamento.'],
+    ['PUBLIC_APPOINTMENT_INVALID_INPUT', 'Confira os dados obrigatorios do agendamento.'],
+    ['PUBLIC_APPOINTMENT_INVALID_TIME', 'Horario invalido para este servico.']
   ])('maps tenant-scoped RPC error %s without direct appointment INSERT', async (rpcCode, expectedMessage) => {
     supabaseMock.rpc.mockResolvedValue({ data: null, error: { code: 'P0001', message: rpcCode } });
 

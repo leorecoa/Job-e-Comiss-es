@@ -67,7 +67,7 @@ declare
   v_service_active boolean;
   v_client_name text := pg_catalog.btrim(p_client_name);
   v_client_phone text := pg_catalog.btrim(p_client_phone);
-  v_notes text := pg_catalog.nullif(pg_catalog.btrim(p_notes), '');
+  v_notes text := nullif(pg_catalog.btrim(p_notes), '');
 begin
   if p_barbershop_id is null or not exists (
     select 1 from public.barbershops as bs
