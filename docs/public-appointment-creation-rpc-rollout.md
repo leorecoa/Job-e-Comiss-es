@@ -4,6 +4,8 @@
 
 Move anonymous appointment creation from direct table INSERT to the tenant-scoped `public.create_public_appointment(...)` RPC. The RPC derives catalog and financial snapshot fields from the database and returns only the created UUID.
 
+The review-only SQL was synchronized with the remote RPC correction related to PR #160. This repository change does not apply remote SQL. The RPC creates appointments with `status = 'scheduled'`; after frontend validation, the rollout removes `appointments_public_insert_scheduled` and revokes direct INSERT from `anon`. Roles `anon` and `authenticated` receive only EXECUTE on the RPC as defined by the script.
+
 ## Safe Order
 
 1. Run the preflight in `docs/public-appointment-creation-rpc.sql` and review RLS, grants, constraints and the active-slot index.
