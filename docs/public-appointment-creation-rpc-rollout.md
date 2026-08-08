@@ -13,7 +13,9 @@ The review-only SQL was synchronized with the remote RPC correction related to P
 3. Test valid, cross-tenant, inactive entity, invalid input and slot-conflict calls as `anon`.
 4. Deploy the frontend that calls the RPC and validate `/book/:slug` in production.
 5. Only after successful validation, run section 3 to drop `appointments_public_insert_scheduled` and revoke direct INSERT from `anon`.
-6. Run section 4 and repeat public, owner and barber smoke tests.
+6. Confirm `anon` also has no direct SELECT on `public.appointments`.
+7. Run section 4 to inspect RLS, policies, table grants, both RPC signatures, `SECURITY DEFINER`, controlled search paths, return fields and EXECUTE privileges.
+8. Repeat public, owner and barber smoke tests.
 
 Do not deploy the RPC frontend before section 2 exists. Do not run sections 2 and 3 as one unattended operation.
 
@@ -23,6 +25,20 @@ Do not deploy the RPC frontend before section 2 exists. Do not run sections 2 an
 - No public SELECT on `public.appointments` is added.
 - `barber_name`, `service_type`, `service_value`, `commission_rate`, `status` and `financial_record_id` are not trusted from the client.
 - The function is `SECURITY DEFINER` only to perform the controlled insert without public table access. It has a restricted search path and explicit grants.
+
+## Final Expected State
+
+`anon`:
+
+- can execute `public.create_public_appointment(uuid, uuid, uuid, text, text, timestamptz, timestamptz, text)`;
+- can execute `public.get_public_appointment_slots(uuid)`;
+- cannot INSERT directly into `public.appointments`;
+- cannot SELECT directly from `public.appointments`;
+- has no dependency on `appointments_public_insert_scheduled`, which must be absent.
+
+`authenticated` keeps only the table access required by the existing internal RLS policies. This rollout does not add authenticated table privileges. Both `anon` and `authenticated` receive EXECUTE on the two reviewed public RPCs, while `PUBLIC` does not. The canonical revokes from `PUBLIC` are defined in `docs/public-appointment-creation-rpc.sql` for creation and `docs/public-appointment-availability-rpc.sql` for slots.
+
+`public.get_public_appointment_slots(uuid)` is scoped by its required `barbershop_id` argument and returns only `barber_id`, `barber_name`, `start_at`, `end_at`, `status` and `barbershop_id`. It must not return `client_name`, `client_phone`, `notes` or `financial_record_id`.
 
 ## Validation
 

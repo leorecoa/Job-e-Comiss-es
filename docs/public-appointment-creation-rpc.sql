@@ -22,6 +22,13 @@ where table_schema = 'public'
   and grantee in ('anon', 'authenticated')
 order by grantee, privilege_type;
 
+select grantee, privilege_type
+from information_schema.table_privileges
+where table_schema = 'public'
+  and table_name = 'appointments'
+  and grantee in ('PUBLIC', 'anon', 'authenticated')
+order by grantee, privilege_type;
+
 -- Confirm the tenant entities and active-slot guard exist before rollout.
 select c.conname, c.convalidated, pg_catalog.pg_get_constraintdef(c.oid) as definition
 from pg_catalog.pg_constraint as c
@@ -148,6 +155,7 @@ commit;
 begin;
 drop policy if exists "appointments_public_insert_scheduled" on public.appointments;
 revoke insert on public.appointments from anon;
+revoke select on public.appointments from anon;
 notify pgrst, 'reload schema';
 commit;
 
@@ -155,11 +163,25 @@ commit;
 -- 4. Final validation
 -- =============================================================================
 
-select p.proname, p.prosecdef, p.proconfig, pg_catalog.pg_get_function_identity_arguments(p.oid) as arguments
-from pg_catalog.pg_proc as p
-where p.oid = 'public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)'::regprocedure;
+select
+  c.relrowsecurity as rls_enabled,
+  c.relforcerowsecurity as rls_forced
+from pg_catalog.pg_class as c
+where c.oid = 'public.appointments'::regclass;
 
-select policyname, roles, cmd
+select
+  p.proname,
+  pg_catalog.pg_get_function_identity_arguments(p.oid) as arguments,
+  pg_catalog.pg_get_function_result(p.oid) as result,
+  p.prosecdef as security_definer,
+  p.proconfig as function_config
+from pg_catalog.pg_proc as p
+inner join pg_catalog.pg_namespace as n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in ('create_public_appointment', 'get_public_appointment_slots')
+order by p.proname, arguments;
+
+select policyname, roles, cmd, qual, with_check
 from pg_catalog.pg_policies
 where schemaname = 'public' and tablename = 'appointments'
 order by policyname;
@@ -170,6 +192,61 @@ where table_schema = 'public'
   and table_name = 'appointments'
   and grantee in ('anon', 'authenticated')
 order by grantee, privilege_type;
+
+select grantee, routine_name, privilege_type
+from information_schema.routine_privileges
+where routine_schema = 'public'
+  and routine_name in ('create_public_appointment', 'get_public_appointment_slots')
+  and grantee in ('PUBLIC', 'anon', 'authenticated')
+order by routine_name, grantee, privilege_type;
+
+select grantee, privilege_type
+from information_schema.table_privileges
+where table_schema = 'public'
+  and table_name = 'appointments'
+  and grantee in ('PUBLIC', 'anon', 'authenticated')
+order by grantee, privilege_type;
+
+select
+  not exists (
+    select 1
+    from pg_catalog.pg_policies
+    where schemaname = 'public'
+      and tablename = 'appointments'
+      and policyname = 'appointments_public_insert_scheduled'
+  ) as public_insert_policy_removed,
+  pg_catalog.has_table_privilege('anon', 'public.appointments', 'INSERT') as anon_can_insert_appointments,
+  pg_catalog.has_table_privilege('anon', 'public.appointments', 'SELECT') as anon_can_select_appointments,
+  pg_catalog.has_function_privilege(
+    'anon',
+    'public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)',
+    'EXECUTE'
+  ) as anon_can_execute_create_rpc,
+  pg_catalog.has_function_privilege(
+    'anon',
+    'public.get_public_appointment_slots(uuid)',
+    'EXECUTE'
+  ) as anon_can_execute_slots_rpc,
+  not exists (
+    select 1
+    from information_schema.routine_privileges
+    where routine_schema = 'public'
+      and routine_name = 'create_public_appointment'
+      and grantee = 'PUBLIC'
+      and privilege_type = 'EXECUTE'
+  ) as public_cannot_execute_create_rpc,
+  not exists (
+    select 1
+    from information_schema.routine_privileges
+    where routine_schema = 'public'
+      and routine_name = 'get_public_appointment_slots'
+      and grantee = 'PUBLIC'
+      and privilege_type = 'EXECUTE'
+  ) as public_cannot_execute_slots_rpc;
+
+-- Expected final booleans: true, false, false, true, true, true, true.
+-- The get_public_appointment_slots result above must contain only:
+-- barber_id, barber_name, start_at, end_at, status and barbershop_id.
 
 -- =============================================================================
 -- 5. Rollback (manual; use only after explicit review)
