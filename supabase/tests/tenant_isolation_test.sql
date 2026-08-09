@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(67);
+select plan(92);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -17,6 +17,20 @@ select ok(has_function_privilege('anon', 'public.create_public_appointment(uuid,
 select ok(has_function_privilege('anon', 'public.get_public_appointment_slots(uuid)', 'execute'), 'anon can execute slots RPC');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'create_public_appointment' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute creation RPC');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'get_public_appointment_slots' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute slots RPC');
+
+select ok(not exists(select 1 from information_schema.table_privileges where table_schema = 'public' and table_name = 'profiles' and grantee = 'PUBLIC'), 'PUBLIC has no direct profiles privileges');
+select ok(not has_table_privilege('anon', 'public.profiles', 'select') and not has_table_privilege('anon', 'public.profiles', 'insert') and not has_table_privilege('anon', 'public.profiles', 'update') and not has_table_privilege('anon', 'public.profiles', 'delete') and not has_table_privilege('anon', 'public.profiles', 'truncate') and not has_table_privilege('anon', 'public.profiles', 'references') and not has_table_privilege('anon', 'public.profiles', 'trigger'), 'anon has no direct profiles privileges');
+select ok(has_table_privilege('authenticated', 'public.profiles', 'select'), 'authenticated can select profiles');
+select ok(has_table_privilege('authenticated', 'public.profiles', 'insert'), 'authenticated can insert profiles');
+select ok(has_table_privilege('authenticated', 'public.profiles', 'update'), 'authenticated can update profiles');
+select ok(not has_table_privilege('authenticated', 'public.profiles', 'delete'), 'authenticated cannot delete profiles');
+select ok(not has_table_privilege('authenticated', 'public.profiles', 'truncate'), 'authenticated cannot truncate profiles');
+select ok(not has_table_privilege('authenticated', 'public.profiles', 'references'), 'authenticated has no profiles references privilege');
+select ok(not has_table_privilege('authenticated', 'public.profiles', 'trigger'), 'authenticated has no profiles trigger privilege');
+select ok(has_table_privilege('service_role', 'public.profiles', 'select') and has_table_privilege('service_role', 'public.profiles', 'insert') and has_table_privilege('service_role', 'public.profiles', 'update') and has_table_privilege('service_role', 'public.profiles', 'delete') and has_table_privilege('service_role', 'public.profiles', 'truncate') and has_table_privilege('service_role', 'public.profiles', 'references') and has_table_privilege('service_role', 'public.profiles', 'trigger'), 'service_role retains all profiles privileges');
+select ok((select relrowsecurity from pg_class where oid = 'public.profiles'::regclass), 'profiles RLS remains enabled');
+select is((select count(*) from pg_policies where schemaname = 'public' and tablename = 'profiles'), 9::bigint, 'profiles policies remain unchanged');
+select ok(has_function_privilege('authenticated', 'public.link_barber_profile_by_email(text,uuid)', 'execute'), 'authenticated can execute profile linking RPC');
 
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'private' and routine_name = 'current_user_barber_id' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC has no direct execute on barber helper');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'private' and routine_name = 'current_user_barbershop_id' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC has no direct execute on tenant helper');
@@ -44,7 +58,8 @@ values
   ('aaaa0000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'owner-alpha@example.test', now(), now()),
   ('bbbb0000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'owner-beta@example.test', now(), now()),
   ('aaaa0000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'barber-alpha@example.test', now(), now()),
-  ('aaaa0000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'cross-profile@example.test', now(), now());
+  ('aaaa0000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'cross-profile@example.test', now(), now()),
+  ('aaaa0000-0000-4000-8000-000000000004', 'authenticated', 'authenticated', 'self-profile@example.test', now(), now());
 
 insert into public.barbers (id, name, active, barbershop_id)
 values ('55555555-5555-4555-8555-555555555555', 'Barber Alpha Two', true, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
@@ -69,6 +84,11 @@ select is((select count(*) from public.services where barbershop_id = 'aaaaaaaa-
 select is((select count(*) from public.services where barbershop_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'), 0::bigint, 'Owner A cannot read Tenant B services');
 select results_eq($test$update public.services set price = 99 where id = '44444444-4444-4444-8444-444444444444' returning 1$test$, array[]::integer[], 'Owner A cannot update Tenant B');
 select results_eq($test$delete from public.services where id = '44444444-4444-4444-8444-444444444444' returning 1$test$, array[]::integer[], 'Owner A cannot delete Tenant B');
+select is((select count(*) from public.profiles where id = 'aaaa0000-0000-4000-8000-000000000001'), 1::bigint, 'Owner A reads own profile');
+select is((select count(*) from public.profiles where barbershop_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'), 0::bigint, 'Owner A cannot read Tenant B profiles');
+select results_eq($test$update public.profiles set display_name = 'Blocked' where id = 'bbbb0000-0000-4000-8000-000000000001' returning 1$test$, array[]::integer[], 'Owner A cannot update Tenant B profile');
+select throws_ok($test$delete from public.profiles where id = 'bbbb0000-0000-4000-8000-000000000001'$test$, '42501'::char(5), null, 'profile delete is unavailable to authenticated owners');
+select throws_ok($test$insert into public.profiles (id, display_name, role, active, barbershop_id, barber_id) values ('aaaa0000-0000-4000-8000-000000000003', 'Cross Tenant Profile', 'owner', true, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', null)$test$, '42501'::char(5), null, 'Owner A cannot insert a Tenant B profile');
 
 reset role;
 set local role authenticated;
@@ -77,6 +97,8 @@ select is((select count(*) from public.barbers where barbershop_id = 'bbbbbbbb-b
 select is((select count(*) from public.barbers where barbershop_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'), 0::bigint, 'Owner B cannot read Tenant A barbers');
 select is((select count(*) from public.services where barbershop_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'), 1::bigint, 'Owner B reads Tenant B services');
 select is((select count(*) from public.services where barbershop_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'), 0::bigint, 'Owner B cannot read Tenant A services');
+select is((select count(*) from public.profiles where id = 'bbbb0000-0000-4000-8000-000000000001'), 1::bigint, 'Owner B reads own profile');
+select is((select count(*) from public.profiles where barbershop_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'), 0::bigint, 'Owner B cannot read Tenant A profiles');
 
 reset role;
 set local role authenticated;
@@ -87,6 +109,15 @@ select is((select count(*) from public.appointments where id = '60000000-0000-40
 select results_eq($test$update public.appointments set notes = 'Own update' where id = '60000000-0000-4000-8000-000000000001' returning 1$test$, array[1], 'Barber A updates own appointment');
 select results_eq($test$update public.appointments set notes = 'Blocked' where id = '60000000-0000-4000-8000-000000000002' returning 1$test$, array[]::integer[], 'Barber A cannot update Tenant B appointment');
 select results_eq($test$update public.appointments set notes = 'Blocked' where id = '60000000-0000-4000-8000-000000000003' returning 1$test$, array[]::integer[], 'Barber A cannot update another barber appointment');
+select is((select count(*) from public.profiles where id = 'aaaa0000-0000-4000-8000-000000000002'), 1::bigint, 'Barber A reads own profile');
+select is((select count(*) from public.profiles where barbershop_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'), 0::bigint, 'Barber A cannot read Tenant B profiles');
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000004","role":"authenticated"}';
+select lives_ok($test$insert into public.profiles (id, display_name, role, active, barbershop_id, barber_id) values ('aaaa0000-0000-4000-8000-000000000004', 'Self Profile', 'owner', true, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', null)$test$, 'authenticated owner can create own onboarding profile');
+select lives_ok($test$update public.profiles set display_name = 'Self Profile Updated' where id = 'aaaa0000-0000-4000-8000-000000000004'$test$, 'authenticated owner can update own onboarding profile');
+select is((select display_name from public.profiles where id = 'aaaa0000-0000-4000-8000-000000000004'), 'Self Profile Updated', 'authenticated user reads updated own profile');
 
 reset role;
 select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Cross Barber', '0000000000', '22222222-2222-4222-8222-222222222222', 'Barber Beta', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '10 days', now() + interval '10 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '23503'::char(5), null, 'cross-tenant barber FK rejects appointment');
