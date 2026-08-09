@@ -43,7 +43,7 @@ Arquivos de estado aplicado/historico, como `docs/supabase-tenant-rls-applied.md
 ## Regras importantes
 
 - Public booking usa a RPC `public.get_public_appointment_slots(uuid)` para disponibilidade.
-- A view `public.public_appointment_slots` permanece temporariamente para rollout/compatibilidade, mas nao deve ser usada pelo frontend novo.
+- A view legada `public.public_appointment_slots` foi removida; a RPC e a unica interface publica de disponibilidade.
 - Public booking nao deve consultar `public.appointments` completo.
 - Inserts publicos em `appointments` nao devem usar `.select()` ou `.single()`.
 - `appointments` contem dados sensiveis de cliente, como nome, telefone e observacoes.

@@ -109,49 +109,11 @@ Rollout rule:
 1. Apply and validate `public.get_public_appointment_slots(uuid)` manually in Supabase.
 2. Deploy the frontend that calls the RPC.
 3. Confirm `/book/:slug` works without public SELECT on `appointments`.
-4. Only in a later PR or operational step, evaluate revoking public access to the legacy view.
+4. Remove the legacy view through migration `20260809001000` after validating the RPC.
 
-## Legacy Public Slots View Contract
+## Removed Legacy Public Slots View
 
-`public.public_appointment_slots` is retained during rollout for compatibility/reference. New frontend code should not query it directly.
-
-The view must expose these columns in this order:
-
-```txt
-barber_id
-barber_name
-start_at
-end_at
-status
-barbershop_id
-```
-
-`barbershop_id` is required so legacy callers can filter occupied slots by barbershop.
-
-Keep `barbershop_id` at the end of the view. This preserves the existing PostgreSQL view column order and avoids the `create or replace view` error:
-
-```txt
-cannot change name of view column "barber_id" to "barbershop_id"
-```
-
-Expected reference definition:
-
-```sql
-create or replace view public.public_appointment_slots
-with (security_invoker = true)
-as
-select
-  a.barber_id,
-  a.barber_name,
-  a.start_at,
-  a.end_at,
-  a.status,
-  a.barbershop_id
-from public.appointments a
-where a.status in ('scheduled', 'confirmed');
-```
-
-This document records the expected legacy view state only. The current public availability SQL is `docs/public-appointment-availability-rpc.sql`.
+The historical baseline retained `public.public_appointment_slots` during the RPC rollout. Migration `20260809001000` removes it; public booking uses only `public.get_public_appointment_slots(uuid)`.
 
 ## Removed Temporary Database Fallback
 

@@ -284,11 +284,6 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
       return;
     }
 
-    if (url.pathname === '/rest/v1/public_appointment_slots') {
-      await fulfillJson(route, 500, { message: 'Public booking must use get_public_appointment_slots RPC' });
-      return;
-    }
-
     if (url.pathname === '/rest/v1/appointments') {
       const captured = {
         method: request.method(),

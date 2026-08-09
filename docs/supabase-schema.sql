@@ -204,26 +204,6 @@ create trigger profiles_set_updated_at
 before update on public.profiles
 for each row execute function set_updated_at();
 
--- Public booking reads this view to calculate occupied slots by barbershop.
--- Access to this view with anon/authenticated roles depends on dedicated
--- RLS/RPC policy design and must be validated separately.
--- Keep barbershop_id at the end of the select list. PostgreSQL does not allow
--- create or replace view to reorder existing columns without dropping the view.
-create or replace view public.public_appointment_slots
-with (security_invoker = true)
-as
-select
-  a.barber_id,
-  a.barber_name,
-  a.start_at,
-  a.end_at,
-  a.status,
-  a.barbershop_id
-from public.appointments a
-where a.status in ('scheduled', 'confirmed');
-
-grant select on public.public_appointment_slots to anon, authenticated;
-
 -- RLS is enabled here, but policies are intentionally not created in this
 -- base schema file. Apply docs/supabase-tenant-rls-plan.sql next.
 alter table public.barbershops enable row level security;

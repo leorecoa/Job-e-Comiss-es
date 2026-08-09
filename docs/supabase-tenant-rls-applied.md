@@ -89,9 +89,9 @@ barbershops_public_read_active
 
 Public booking availability is now expected to use `public.get_public_appointment_slots(uuid)`.
 
-`public.public_appointment_slots` remains as a legacy compatibility/reference view during rollout.
+The historical compatibility view `public.public_appointment_slots` is removed by migration `20260809001000`; the RPC is the only current public availability surface.
 
-The view exposes:
+The RPC exposes:
 
 ```txt
 barbershop_id
@@ -102,7 +102,7 @@ end_at
 status
 ```
 
-It allows only `SELECT` for `anon` and `authenticated`.
+It allows `EXECUTE` for `anon` and `authenticated`, without direct `SELECT` on `appointments`.
 
 It does not expose sensitive client data such as:
 
