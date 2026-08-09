@@ -45,7 +45,7 @@ O procedimento revisavel para reconciliar o historico de producao esta em `docs/
 ## Dividas preservadas
 
 - Dois indices equivalentes em `appointments`.
-- Dois conjuntos equivalentes de policies de escrita no Storage.
+- Policies de escrita do Storage consolidadas pela migration `20260809000900`.
 - View publica legada `public_appointment_slots`.
 - Privilegios de `profiles` endurecidos pela migration `20260809000800`.
 - Privilegios dos helpers privados endurecidos pela migration `20260809000700`.

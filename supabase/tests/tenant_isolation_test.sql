@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(92);
+select plan(119);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -53,6 +53,18 @@ select is((select proconfig from pg_proc p join pg_namespace n on n.oid = p.pron
 select is((select proconfig from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname = 'current_user_role'), array['search_path=public'], 'role helper search path is unchanged');
 select ok(not pg_catalog.has_function_privilege('anon', 'public.link_barber_profile_by_email(text,uuid)', 'execute'), 'anon cannot execute authenticated profile RPC');
 
+select is((select count(*) from storage.buckets where id = 'barbershop-branding'), 1::bigint, 'branding bucket exists');
+select is((select public from storage.buckets where id = 'barbershop-branding'), true, 'branding bucket remains public');
+select is((select file_size_limit from storage.buckets where id = 'barbershop-branding'), 5242880::bigint, 'branding bucket keeps the 5 MB limit');
+select is((select allowed_mime_types from storage.buckets where id = 'barbershop-branding'), array['image/png', 'image/jpeg', 'image/webp']::text[], 'branding bucket keeps the exact MIME types');
+select is((select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and (qual like '%barbershop-branding%' or with_check like '%barbershop-branding%')), 4::bigint, 'branding policies are consolidated to four');
+select is((select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname in ('storage_branding_owner_delete', 'storage_branding_owner_insert', 'storage_branding_owner_update')), 0::bigint, 'duplicate branding policies are absent');
+select is((select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname in ('Owner delete own barbershop branding', 'Owner insert own barbershop branding', 'Owner update own barbershop branding', 'Public read barbershop branding')), 4::bigint, 'canonical branding policies remain present');
+select is((select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Owner delete own barbershop branding' and permissive = 'PERMISSIVE' and roles = array['authenticated']::name[] and cmd = 'DELETE' and qual = $$((bucket_id = 'barbershop-branding'::text) AND ((storage.foldername(name))[1] = (private.current_user_barbershop_id())::text) AND (private.current_user_role() = 'owner'::text))$$ and with_check is null), 1::bigint, 'canonical branding delete policy is unchanged');
+select is((select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Owner insert own barbershop branding' and permissive = 'PERMISSIVE' and roles = array['authenticated']::name[] and cmd = 'INSERT' and qual is null and with_check = $$((bucket_id = 'barbershop-branding'::text) AND ((storage.foldername(name))[1] = (private.current_user_barbershop_id())::text) AND (private.current_user_role() = 'owner'::text))$$), 1::bigint, 'canonical branding insert policy is unchanged');
+select is((select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Owner update own barbershop branding' and permissive = 'PERMISSIVE' and roles = array['authenticated']::name[] and cmd = 'UPDATE' and qual = $$((bucket_id = 'barbershop-branding'::text) AND ((storage.foldername(name))[1] = (private.current_user_barbershop_id())::text) AND (private.current_user_role() = 'owner'::text))$$ and with_check = $$((bucket_id = 'barbershop-branding'::text) AND ((storage.foldername(name))[1] = (private.current_user_barbershop_id())::text) AND (private.current_user_role() = 'owner'::text))$$), 1::bigint, 'canonical branding update policy is unchanged');
+select is((select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Public read barbershop branding' and permissive = 'PERMISSIVE' and roles = array['anon', 'authenticated']::name[] and cmd = 'SELECT' and qual = $$(bucket_id = 'barbershop-branding'::text)$$ and with_check is null), 1::bigint, 'canonical branding public read policy is unchanged');
+
 insert into auth.users (id, aud, role, email, created_at, updated_at)
 values
   ('aaaa0000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'owner-alpha@example.test', now(), now()),
@@ -76,6 +88,21 @@ values
   ('60000000-0000-4000-8000-000000000002', 'Client Beta', '0000000000', '22222222-2222-4222-8222-222222222222', 'Barber Beta', '44444444-4444-4444-8444-444444444444', 'Service Beta', 55, date_trunc('minute', now()) + interval '8 days', date_trunc('minute', now()) + interval '8 days 30 minutes', 'scheduled', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'),
   ('60000000-0000-4000-8000-000000000003', 'Client Alpha Two', '0000000000', '55555555-5555-4555-8555-555555555555', 'Barber Alpha Two', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, date_trunc('minute', now()) + interval '9 days', date_trunc('minute', now()) + interval '9 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
 
+insert into storage.objects (bucket_id, name, owner_id, metadata)
+values
+  ('barbershop-branding', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/owner-source.png', 'aaaa0000-0000-4000-8000-000000000001', '{}'::jsonb),
+  ('barbershop-branding', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/delete-source.png', 'aaaa0000-0000-4000-8000-000000000001', '{}'::jsonb),
+  ('barbershop-branding', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2/owner-source.png', 'bbbb0000-0000-4000-8000-000000000001', '{}'::jsonb);
+
+set local role anon;
+set local "request.jwt.claims" = '{"role":"anon"}';
+select is((select count(*) from storage.objects where bucket_id = 'barbershop-branding'), 3::bigint, 'anon can read public branding metadata');
+select throws_ok($test$insert into storage.objects (bucket_id, name) values ('barbershop-branding', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/anon.png')$test$, '42501'::char(5), null, 'anon cannot insert branding objects');
+select results_eq($test$update storage.objects set metadata = '{"blocked":true}'::jsonb where bucket_id = 'barbershop-branding' returning 1$test$, array[]::integer[], 'anon cannot update branding objects');
+select ok(not exists(select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and cmd = 'DELETE' and 'anon' = any(roles)), 'anon has no branding delete policy');
+
+reset role;
+
 set local role authenticated;
 set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000001","role":"authenticated"}';
 select is((select count(*) from public.barbers where barbershop_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'), 2::bigint, 'Owner A reads Tenant A barbers');
@@ -89,6 +116,12 @@ select is((select count(*) from public.profiles where barbershop_id = 'bbbbbbbb-
 select results_eq($test$update public.profiles set display_name = 'Blocked' where id = 'bbbb0000-0000-4000-8000-000000000001' returning 1$test$, array[]::integer[], 'Owner A cannot update Tenant B profile');
 select throws_ok($test$delete from public.profiles where id = 'bbbb0000-0000-4000-8000-000000000001'$test$, '42501'::char(5), null, 'profile delete is unavailable to authenticated owners');
 select throws_ok($test$insert into public.profiles (id, display_name, role, active, barbershop_id, barber_id) values ('aaaa0000-0000-4000-8000-000000000003', 'Cross Tenant Profile', 'owner', true, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', null)$test$, '42501'::char(5), null, 'Owner A cannot insert a Tenant B profile');
+select lives_ok($test$insert into storage.objects (bucket_id, name, owner_id) values ('barbershop-branding', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/upload.png', 'aaaa0000-0000-4000-8000-000000000001')$test$, 'Owner A inserts branding in Tenant Alpha directory');
+select results_eq($test$update storage.objects set metadata = '{"updated":true}'::jsonb where bucket_id = 'barbershop-branding' and name = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/owner-source.png' returning 1$test$, array[1], 'Owner A updates branding in Tenant Alpha directory');
+select ok((storage.foldername('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/delete-source.png'))[1] = private.current_user_barbershop_id()::text and private.current_user_role() = 'owner', 'Owner A delete policy accepts Tenant Alpha directory');
+select throws_ok($test$insert into storage.objects (bucket_id, name, owner_id) values ('barbershop-branding', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2/cross-insert.png', 'aaaa0000-0000-4000-8000-000000000001')$test$, '42501'::char(5), null, 'Owner A cannot insert branding in Tenant Beta directory');
+select results_eq($test$update storage.objects set metadata = '{"blocked":true}'::jsonb where bucket_id = 'barbershop-branding' and name = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2/owner-source.png' returning 1$test$, array[]::integer[], 'Owner A cannot update Tenant Beta branding');
+select ok(not ((storage.foldername('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2/owner-source.png'))[1] = private.current_user_barbershop_id()::text and private.current_user_role() = 'owner'), 'Owner A delete policy rejects Tenant Beta directory');
 
 reset role;
 set local role authenticated;
@@ -99,6 +132,8 @@ select is((select count(*) from public.services where barbershop_id = 'bbbbbbbb-
 select is((select count(*) from public.services where barbershop_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'), 0::bigint, 'Owner B cannot read Tenant A services');
 select is((select count(*) from public.profiles where id = 'bbbb0000-0000-4000-8000-000000000001'), 1::bigint, 'Owner B reads own profile');
 select is((select count(*) from public.profiles where barbershop_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'), 0::bigint, 'Owner B cannot read Tenant A profiles');
+select throws_ok($test$insert into storage.objects (bucket_id, name, owner_id) values ('barbershop-branding', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/cross-insert.png', 'bbbb0000-0000-4000-8000-000000000001')$test$, '42501'::char(5), null, 'Owner B cannot insert branding in Tenant Alpha directory');
+select results_eq($test$update storage.objects set metadata = '{"blocked":true}'::jsonb where bucket_id = 'barbershop-branding' and name = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/owner-source.png' returning 1$test$, array[]::integer[], 'Owner B cannot update Tenant Alpha branding');
 
 reset role;
 set local role authenticated;
@@ -111,6 +146,10 @@ select results_eq($test$update public.appointments set notes = 'Blocked' where i
 select results_eq($test$update public.appointments set notes = 'Blocked' where id = '60000000-0000-4000-8000-000000000003' returning 1$test$, array[]::integer[], 'Barber A cannot update another barber appointment');
 select is((select count(*) from public.profiles where id = 'aaaa0000-0000-4000-8000-000000000002'), 1::bigint, 'Barber A reads own profile');
 select is((select count(*) from public.profiles where barbershop_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'), 0::bigint, 'Barber A cannot read Tenant B profiles');
+select is((select count(*) from storage.objects where bucket_id = 'barbershop-branding'), 4::bigint, 'Barber A has public read behavior for branding');
+select throws_ok($test$insert into storage.objects (bucket_id, name, owner_id) values ('barbershop-branding', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/barber.png', 'aaaa0000-0000-4000-8000-000000000002')$test$, '42501'::char(5), null, 'Barber A cannot insert branding objects');
+select results_eq($test$update storage.objects set metadata = '{"blocked":true}'::jsonb where bucket_id = 'barbershop-branding' returning 1$test$, array[]::integer[], 'Barber A cannot update branding objects');
+select ok(private.current_user_role() <> 'owner', 'Barber A does not satisfy branding delete policy');
 
 reset role;
 set local role authenticated;
