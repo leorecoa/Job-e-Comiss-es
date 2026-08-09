@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(47);
+select plan(67);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -17,6 +17,27 @@ select ok(has_function_privilege('anon', 'public.create_public_appointment(uuid,
 select ok(has_function_privilege('anon', 'public.get_public_appointment_slots(uuid)', 'execute'), 'anon can execute slots RPC');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'create_public_appointment' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute creation RPC');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'get_public_appointment_slots' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute slots RPC');
+
+select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'private' and routine_name = 'current_user_barber_id' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC has no direct execute on barber helper');
+select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'private' and routine_name = 'current_user_barbershop_id' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC has no direct execute on tenant helper');
+select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'private' and routine_name = 'current_user_role' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC has no direct execute on role helper');
+select ok(not pg_catalog.has_function_privilege('anon', 'private.current_user_barber_id()', 'execute'), 'anon cannot execute barber helper');
+select ok(not pg_catalog.has_function_privilege('anon', 'private.current_user_barbershop_id()', 'execute'), 'anon cannot execute tenant helper');
+select ok(not pg_catalog.has_function_privilege('anon', 'private.current_user_role()', 'execute'), 'anon cannot execute role helper');
+select ok(not pg_catalog.has_schema_privilege('anon', 'private', 'usage'), 'anon has no usage on private schema');
+select ok(pg_catalog.has_schema_privilege('authenticated', 'private', 'usage'), 'authenticated has usage on private schema');
+select ok(pg_catalog.has_function_privilege('authenticated', 'private.current_user_barber_id()', 'execute'), 'authenticated can execute barber helper');
+select ok(pg_catalog.has_function_privilege('authenticated', 'private.current_user_barbershop_id()', 'execute'), 'authenticated can execute tenant helper');
+select ok(pg_catalog.has_function_privilege('authenticated', 'private.current_user_role()', 'execute'), 'authenticated can execute role helper');
+select ok(not pg_catalog.has_function_privilege('service_role', 'private.current_user_barber_id()', 'execute'), 'service_role cannot execute barber helper');
+select ok(not pg_catalog.has_function_privilege('service_role', 'private.current_user_barbershop_id()', 'execute'), 'service_role cannot execute tenant helper');
+select ok(not pg_catalog.has_function_privilege('service_role', 'private.current_user_role()', 'execute'), 'service_role cannot execute role helper');
+select ok(not pg_catalog.has_schema_privilege('anon', 'private', 'create') and not pg_catalog.has_schema_privilege('authenticated', 'private', 'create') and not pg_catalog.has_schema_privilege('service_role', 'private', 'create'), 'application roles cannot create in private schema');
+select is((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname in ('current_user_barber_id', 'current_user_barbershop_id', 'current_user_role') and p.prosecdef), 3::bigint, 'all private helpers remain security definer');
+select is((select proconfig from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname = 'current_user_barber_id'), array['search_path=public, private'], 'barber helper search path is unchanged');
+select is((select proconfig from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname = 'current_user_barbershop_id'), array['search_path=public, private'], 'tenant helper search path is unchanged');
+select is((select proconfig from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname = 'current_user_role'), array['search_path=public'], 'role helper search path is unchanged');
+select ok(not pg_catalog.has_function_privilege('anon', 'public.link_barber_profile_by_email(text,uuid)', 'execute'), 'anon cannot execute authenticated profile RPC');
 
 insert into auth.users (id, aud, role, email, created_at, updated_at)
 values
