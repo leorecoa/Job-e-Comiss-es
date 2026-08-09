@@ -5,6 +5,10 @@ import {
   sanitizeOperationalError
 } from './utils/errorHandling';
 import { getPublicBookingSubmissionErrorMessage } from './components/PublicBookingPage';
+import {
+  PUBLIC_BOOKING_ACTIVE_LIMIT_MESSAGE,
+  PUBLIC_BOOKING_RATE_LIMIT_MESSAGE
+} from './scheduling';
 
 describe('production error visibility', () => {
   afterEach(() => {
@@ -62,4 +66,11 @@ describe('production error visibility', () => {
       code: '42501'
     })).toBe('Nao foi possivel confirmar este horario. Tente novamente.');
   });
+
+  it.each([PUBLIC_BOOKING_RATE_LIMIT_MESSAGE, PUBLIC_BOOKING_ACTIVE_LIMIT_MESSAGE])(
+    'preserves controlled public abuse message %s',
+    (message) => {
+      expect(getPublicBookingSubmissionErrorMessage(new Error(message))).toBe(message);
+    }
+  );
 });

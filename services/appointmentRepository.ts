@@ -7,7 +7,9 @@ import {
   createAppointmentConflictError,
   getAppointmentDateInput,
   hasAppointmentConflict,
+  PUBLIC_BOOKING_ACTIVE_LIMIT_MESSAGE,
   PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE,
+  PUBLIC_BOOKING_RATE_LIMIT_MESSAGE,
   validatePublicAppointmentRecord
 } from '../scheduling';
 
@@ -66,7 +68,9 @@ const PUBLIC_APPOINTMENT_RPC_ERRORS: Record<string, string> = {
   PUBLIC_APPOINTMENT_INVALID_SERVICE: 'Servico invalido para esta barbearia.',
   PUBLIC_APPOINTMENT_INACTIVE_SERVICE: 'Servico indisponivel para agendamento.',
   PUBLIC_APPOINTMENT_INVALID_TIME: 'Horario invalido para este servico.',
-  PUBLIC_APPOINTMENT_INVALID_INPUT: 'Confira os dados obrigatorios do agendamento.'
+  PUBLIC_APPOINTMENT_INVALID_INPUT: 'Confira os dados obrigatorios do agendamento.',
+  PUBLIC_APPOINTMENT_RATE_LIMITED: PUBLIC_BOOKING_RATE_LIMIT_MESSAGE,
+  PUBLIC_APPOINTMENT_ACTIVE_LIMIT: PUBLIC_BOOKING_ACTIVE_LIMIT_MESSAGE
 };
 
 const nullableUuid = (value?: string | null): string | null => {
