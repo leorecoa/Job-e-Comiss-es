@@ -28,6 +28,7 @@ export type DatabaseAppointmentRow = {
   status: Appointment['status'];
   notes: string | null;
   financial_record_id: string | null;
+  commission_rate: number | string | null;
   created_at: string;
   updated_at: string;
 };
@@ -106,6 +107,7 @@ export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment =
   barberId: row.barber_id || undefined,
   serviceId: row.service_id || undefined,
   financialRecordId: row.financial_record_id || undefined,
+  commissionRate: row.commission_rate == null ? undefined : Number(row.commission_rate),
   clientName: row.client_name,
   clientPhone: row.client_phone,
   barberName: row.barber_name,
@@ -132,7 +134,8 @@ export const mapAppointmentToDb = (appointment: Appointment): DatabaseAppointmen
   end_at: appointment.endAt,
   status: appointment.status,
   notes: appointment.notes || null,
-  financial_record_id: appointment.financialRecordId || null
+  financial_record_id: appointment.financialRecordId || null,
+  commission_rate: appointment.commissionRate ?? null
 });
 
 const readLocalAppointments = (): Appointment[] => {

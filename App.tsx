@@ -14,6 +14,7 @@ import {
 } from './services/barbershopRepository';
 import {
   APPOINTMENT_STORAGE_KEY,
+  appointmentToClient,
   completeAppointmentFinancialRecord,
   createAppointmentConflictError,
   getAppointmentDateInput,
@@ -27,6 +28,7 @@ import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import type { TourStep } from './components/tourUtils';
 import { isProductionWithoutSupabase, isSupabaseConfigured, PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE, shouldUseLocalFallback } from './lib/supabase';
 import { createAppointment as createAppointmentRecord, createPublicAppointment, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
+import { completeAppointmentWithFinancialRecord, listFinancialRecords, mapFinancialRecordToClient } from './services/financialRecordRepository';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
 import { linkBarberProfileByEmail } from './services/profileLinkingRepository';
 import { createService, listServices, removeService, updateService } from './services/serviceRepository';
@@ -601,8 +603,18 @@ const App: React.FC = () => {
           listServices(currentBarbershopId)
         ]);
 
+        const remoteFinancialRecords = isPublicBookingRoute
+          ? []
+          : await listFinancialRecords(currentBarbershopId || '');
+
         if (!active) return;
         setAppointments(remoteAppointments);
+        if (!isPublicBookingRoute) {
+          setClients(remoteFinancialRecords.flatMap((record) => {
+            const appointment = remoteAppointments.find((item) => item.id === record.appointment_id);
+            return appointment ? [mapFinancialRecordToClient(record, appointment)] : [];
+          }));
+        }
         setSettings(prev => normalizeSettings({
           ...prev,
           ...(isPublicBookingRoute ? { shopName: currentShopName || SAFE_PUBLIC_BOOKING_SHOP_NAME } : {}),
@@ -1321,6 +1333,26 @@ const App: React.FC = () => {
     let createdFinancialRecord = false;
 
     if (updatedAppointment.status === 'completed' && !currentAppointment.financialRecordId) {
+      if (!shouldUseLocalFallback) {
+        try {
+          const completion = await completeAppointmentWithFinancialRecord(id);
+          const completedAppointment = {
+            ...updatedAppointment,
+            status: 'completed' as const,
+            financialRecordId: completion.financialRecordId
+          };
+          setAppointments(prev => prev.map(item => item.id === id ? completedAppointment : item));
+          setClients(prev => prev.some(client => client.appointmentId === id)
+            ? prev
+            : [appointmentToClient(completedAppointment, settings, completion.financialRecordId), ...prev]);
+          addToast('Agendamento concluido e financeiro lancado!', 'success');
+        } catch (error) {
+          logOperationalError('barber-dashboard:complete-appointment', error);
+          addToast(getOperationalErrorMessage(error, 'Nao foi possivel concluir o agendamento e salvar o financeiro.'), 'error');
+        }
+        return;
+      }
+
       const result = completeAppointmentFinancialRecord(updatedAppointment, clients, settings, generateId);
       createdFinancialRecord = result.created;
       setClients(result.clients);
@@ -1369,6 +1401,35 @@ const App: React.FC = () => {
       status,
       updatedAt: new Date().toISOString()
     };
+
+    if (status === 'completed' && !shouldUseLocalFallback) {
+      try {
+        const completion = await completeAppointmentWithFinancialRecord(appointment.id);
+        const completedAppointment = {
+          ...updatedAppointment,
+          status: 'completed' as const,
+          financialRecordId: completion.financialRecordId
+        };
+        setAppointments(prev => prev.map(item => item.id === appointment.id ? completedAppointment : item));
+        setClients(prev => prev.some(client => client.appointmentId === appointment.id)
+          ? prev
+          : [appointmentToClient(completedAppointment, settings, completion.financialRecordId), ...prev]);
+        addToast(appointment.financialRecordId
+          ? 'Agendamento concluido sem duplicar financeiro.'
+          : 'Agendamento concluido e financeiro lancado!', 'success');
+      } catch (error) {
+        logOperationalError('dashboard:complete-appointment', error);
+        addToast(getOperationalErrorMessage(
+          error,
+          'Nao foi possivel concluir o agendamento e salvar o financeiro.',
+          {
+            authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de concluir.',
+            networkMessage: 'Nao foi possivel conectar ao Supabase para concluir o agendamento.'
+          }
+        ), 'error');
+      }
+      return;
+    }
 
     let patch: Partial<Appointment> = updatedAppointment;
     let createdFinancialRecord = false;

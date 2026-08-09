@@ -16,6 +16,7 @@ import {
   mapAppointmentToDb,
   updateAppointment
 } from './services/appointmentRepository';
+import { mapFinancialRecordToClient } from './services/financialRecordRepository';
 import {
   APPOINTMENT_STORAGE_KEY,
   getAvailableTimeSlots,
@@ -77,6 +78,28 @@ describe('appointment persistence mappers', () => {
       ...appointment,
       notes: undefined
     });
+  });
+
+  it('maps a persisted financial record back into the dashboard client model', () => {
+    const appointment = makeAppointment({ status: 'completed' });
+    const mapped = mapFinancialRecordToClient({
+      id: 'financial-1',
+      appointment_id: appointment.id,
+      barbershop_id: 'shop-1',
+      barber_id: 'barber-1',
+      service_id: 'service-1',
+      service_type: 'Corte',
+      service_value: 50,
+      commission_rate: 40,
+      commission_value: 20,
+      completed_at: appointment.updatedAt,
+      created_at: appointment.updatedAt
+    }, appointment);
+
+    expect(mapped.id).toBe('financial-1');
+    expect(mapped.appointmentId).toBe(appointment.id);
+    expect(mapped.totalValue).toBe(50);
+    expect(mapped.commissionValue).toBe(20);
   });
 
   it('maps empty uuid fields to null before sending to database', () => {

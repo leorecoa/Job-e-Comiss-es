@@ -420,7 +420,7 @@ test.describe('public booking /book/:slug', () => {
 
   for (const [code, message] of [
     ['PUBLIC_APPOINTMENT_RATE_LIMITED', /Aguarde um minuto antes de tentar agendar novamente/i],
-    ['PUBLIC_APPOINTMENT_ACTIVE_LIMIT', /ja possui tres agendamentos futuros ativos/i]
+    ['PUBLIC_APPOINTMENT_ACTIVE_LIMIT', /já possui três agendamentos futuros ativos/i]
   ] as const) {
     test(`shows friendly public abuse error ${code} and restores submit`, async ({ page }) => {
       const network = await installSupabaseMocks(page, {

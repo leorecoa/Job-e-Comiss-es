@@ -80,6 +80,20 @@ type MockAppointment = {
   updated_at: string;
 };
 
+type MockFinancialRecord = {
+  id: string;
+  appointment_id: string;
+  barbershop_id: string;
+  barber_id: string | null;
+  service_id: string | null;
+  service_type: string;
+  service_value: number;
+  commission_rate: number;
+  commission_value: number;
+  completed_at: string;
+  created_at: string;
+};
+
 type CapturedRequest = {
   method: string;
   url: string;
@@ -97,7 +111,9 @@ type MockScenario = {
   barbers?: MockBarber[];
   services?: MockService[];
   appointments?: MockAppointment[];
+  financialRecords?: MockFinancialRecord[];
   rpcResponse?: MockRpcResponse;
+  completionRpcResponse?: MockRpcResponse;
 };
 
 const ownerBusinessHours = {
@@ -270,6 +286,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
       time: '10:00'
     })
   ];
+  const financialRecords = scenario.financialRecords ?? [];
 
   const rpcResponse: MockRpcResponse = scenario.rpcResponse ?? {
     status: 200,
@@ -289,6 +306,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
   const serviceRequests: string[] = [];
   const appointmentReadRequests: string[] = [];
   const rpcRequests: CapturedRequest[] = [];
+  const completionRequests: CapturedRequest[] = [];
 
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
     const request = route.request();
@@ -449,6 +467,47 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
       return;
     }
 
+    if (url.pathname === '/rest/v1/financial_records') {
+      const barbershopId = toEqValue(url.searchParams.get('barbershop_id'));
+      await fulfillJson(route, 200, financialRecords.filter((record) => !barbershopId || record.barbershop_id === barbershopId));
+      return;
+    }
+
+    if (url.pathname === '/rest/v1/rpc/complete_appointment_with_financial_record') {
+      const body = parseRequestBody(route) as { p_appointment_id?: string };
+      completionRequests.push({ method: request.method(), url: request.url(), body });
+      if (scenario.completionRpcResponse) {
+        await fulfillJson(route, scenario.completionRpcResponse.status, scenario.completionRpcResponse.body);
+        return;
+      }
+
+      const appointment = appointments.find((item) => item.id === body.p_appointment_id);
+      if (!appointment) {
+        await fulfillJson(route, 404, { message: 'FINANCIAL_COMPLETION_APPOINTMENT_NOT_FOUND' });
+        return;
+      }
+      const financialId = appointment.financial_record_id || '7d78c751-94d7-4788-a1bd-93475cf9e274';
+      appointment.status = 'completed';
+      appointment.financial_record_id = financialId;
+      if (!financialRecords.some((record) => record.appointment_id === appointment.id)) {
+        financialRecords.push({
+          id: financialId,
+          appointment_id: appointment.id,
+          barbershop_id: appointment.barbershop_id,
+          barber_id: appointment.barber_id,
+          service_id: appointment.service_id,
+          service_type: appointment.service_type,
+          service_value: appointment.service_value,
+          commission_rate: 50,
+          commission_value: 30,
+          completed_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        });
+      }
+      await fulfillJson(route, 200, [{ appointment_id: appointment.id, financial_record_id: financialId }]);
+      return;
+    }
+
     if (url.pathname === '/rest/v1/rpc/link_barber_profile_by_email') {
       rpcRequests.push({
         method: request.method(),
@@ -469,7 +528,8 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
     barberRequests,
     serviceRequests,
     appointmentReadRequests,
-    rpcRequests
+    rpcRequests,
+    completionRequests
   };
 };
 
@@ -485,6 +545,37 @@ const signInAsOwner = async (page: Page) => {
 };
 
 test.describe('owner operational dashboard e2e', () => {
+  test('financial completion persists after reload and remote failure creates no phantom record', async ({ page, browser }) => {
+    const network = await installOwnerSupabaseMocks(page);
+    await signInAsOwner(page);
+
+    await page.getByRole('button', { name: 'Concluir' }).first().click();
+    await expect(page.getByText('Agendamento concluido e financeiro lancado!')).toBeVisible();
+    expect(network.completionRequests).toHaveLength(1);
+
+    await page.getByRole('button', { name: 'Clientes' }).click();
+    await expect(page.getByRole('cell', { name: /Cliente Leo/ }).first()).toBeVisible();
+    await page.reload();
+    await page.getByRole('button', { name: 'Clientes' }).click();
+    await expect(page.getByRole('cell', { name: /Cliente Leo/ }).first()).toBeVisible();
+
+    const failedContext = await browser.newContext();
+    const failedPage = await failedContext.newPage();
+    const failedNetwork = await installOwnerSupabaseMocks(failedPage, {
+      completionRpcResponse: {
+        status: 400,
+        body: { message: 'forced financial failure' }
+      }
+    });
+    await signInAsOwner(failedPage);
+    await failedPage.getByRole('button', { name: 'Concluir' }).first().click();
+    await expect(failedPage.getByText(/Nao foi possivel concluir o agendamento e salvar o financeiro/)).toBeVisible();
+    await failedPage.getByRole('button', { name: 'Clientes' }).click();
+    await expect(failedPage.getByRole('cell', { name: /Cliente Leo/ })).toHaveCount(0);
+    expect(failedNetwork.completionRequests).toHaveLength(1);
+    await failedContext.close();
+  });
+
   test('owner sees only own tenant data, operational checklist, and public booking link', async ({ page }) => {
     const network = await installOwnerSupabaseMocks(page);
 
