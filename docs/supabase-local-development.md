@@ -20,11 +20,21 @@ npx supabase status
 npx supabase stop
 ```
 
-A configuracao local versionada fica em `supabase/config.toml`. As seis migrations sao aplicadas em ordem: schema principal, helpers RLS, policies tenant-scoped, RPCs de booking, constraints e Storage. Esta PR ainda nao cria `supabase/seed.sql`; essa sera a proxima etapa e usara somente dados ficticios.
+A configuracao local versionada fica em `supabase/config.toml`. As seis migrations sao aplicadas em ordem: schema principal, helpers RLS, policies tenant-scoped, RPCs de booking, constraints e Storage.
+
+O `supabase/seed.sql` e exclusivamente local e cria dois tenants ficticios, cada um com um barbeiro e um servico ativos. Ele nao cria usuarios Auth, appointments, e-mails ou dados reais.
+
+Execute os testes pgTAP locais depois do reset:
+
+```powershell
+npx supabase test db --local supabase/tests
+```
+
+Os testes criam usuarios Auth e profiles ficticios somente dentro de transacoes revertidas. Eles simulam JWTs locais para comprovar isolamento de owners e barbers, constraints tenant-scoped e o contrato das RPCs publicas.
 
 O dump estrutural remoto e somente uma fonte read-only para revisao. Dumps brutos ficam fora do repositorio e nunca incluem dados. O schema `storage` e gerenciado pelo Supabase; a baseline versiona somente o bucket e as policies da aplicacao.
 
-Use `supabase db reset` exclusivamente na stack local. Nunca use `db push`, `db reset --linked` ou `db reset --db-url`, e nunca execute reset em producao.
+Use `supabase db reset --local` exclusivamente na stack local. Nunca use `db push`, `db reset --linked` ou `db reset --db-url`, e nunca execute reset em producao.
 
 ## Producao existente
 
