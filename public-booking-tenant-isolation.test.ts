@@ -410,6 +410,7 @@ describe('public booking tenant isolation repositories', () => {
       barbershop_id: 'shop-leo',
       client_name: 'Cliente Leo',
       client_phone: '85999990000',
+      commission_rate: null,
       barber_id: 'barber-leo',
       barber_name: 'Leo',
       service_id: 'service-leo',

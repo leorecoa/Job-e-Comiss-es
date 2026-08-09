@@ -349,6 +349,11 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
       return;
     }
 
+    if (url.pathname === '/rest/v1/financial_records') {
+      await fulfillJson(route, 200, []);
+      return;
+    }
+
     await fulfillJson(route, 404, { message: `Unhandled mock path: ${url.pathname}` });
   });
 

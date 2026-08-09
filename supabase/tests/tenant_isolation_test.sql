@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(140);
+select plan(179);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -218,6 +218,84 @@ select lives_ok($test$select public.create_public_appointment('aaaaaaaa-aaaa-4aa
 select ok((select count(*) > 0 from public.get_public_appointment_slots('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')), 'anon reads occupied slots through RPC');
 select ok(position('client_name' in lower(pg_get_function_result('public.get_public_appointment_slots(uuid)'::regprocedure))) = 0 and position('client_phone' in lower(pg_get_function_result('public.get_public_appointment_slots(uuid)'::regprocedure))) = 0 and position('financial' in lower(pg_get_function_result('public.get_public_appointment_slots(uuid)'::regprocedure))) = 0, 'slots RPC result excludes personal and financial fields');
 select is((select count(*) from public.get_public_appointment_slots('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') where barbershop_id <> 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'), 0::bigint, 'slots RPC remains tenant scoped');
+
+reset role;
+
+select ok(to_regclass('public.financial_records') is not null, 'financial records table is versioned');
+select ok((select relrowsecurity from pg_class where oid = 'public.financial_records'::regclass), 'financial records RLS is enabled');
+select ok(has_table_privilege('authenticated', 'public.financial_records', 'select'), 'authenticated can read financial records through RLS');
+select ok(not has_table_privilege('authenticated', 'public.financial_records', 'insert'), 'authenticated cannot insert financial records directly');
+select ok(not has_table_privilege('anon', 'public.financial_records', 'select'), 'anon cannot read financial records');
+select ok(not has_function_privilege('anon', 'public.complete_appointment_with_financial_record(uuid)', 'execute'), 'anon cannot execute financial completion RPC');
+select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'complete_appointment_with_financial_record' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute financial completion RPC');
+select ok(has_function_privilege('authenticated', 'public.complete_appointment_with_financial_record(uuid)', 'execute'), 'authenticated can execute financial completion RPC');
+select is((select prosecdef from pg_proc where oid = 'public.complete_appointment_with_financial_record(uuid)'::regprocedure), true, 'financial completion RPC is security definer');
+select is((select proconfig from pg_proc where oid = 'public.complete_appointment_with_financial_record(uuid)'::regprocedure), array['search_path=pg_catalog'], 'financial completion RPC has controlled search path');
+select ok(exists(select 1 from pg_constraint where conrelid = 'public.financial_records'::regclass and conname = 'financial_records_appointment_key'), 'one financial record per appointment is enforced');
+select ok(exists(select 1 from pg_constraint where conrelid = 'public.financial_records'::regclass and conname = 'financial_records_appointment_tenant_fkey'), 'financial appointment relationship is tenant scoped');
+
+set local role authenticated;
+set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000001","role":"authenticated"}';
+select lives_ok($test$select * from public.complete_appointment_with_financial_record('60000000-0000-4000-8000-000000000001')$test$, 'owner completes own tenant appointment');
+select is((select status from public.appointments where id = '60000000-0000-4000-8000-000000000001'), 'completed', 'completion updates appointment status');
+select ok((select financial_record_id is not null from public.appointments where id = '60000000-0000-4000-8000-000000000001'), 'completion links financial record');
+select is((select count(*) from public.financial_records where appointment_id = '60000000-0000-4000-8000-000000000001'), 1::bigint, 'completion creates exactly one financial record');
+select is((select service_type from public.financial_records where appointment_id = '60000000-0000-4000-8000-000000000001'), 'Service Alpha', 'financial record preserves service type');
+select is((select service_value from public.financial_records where appointment_id = '60000000-0000-4000-8000-000000000001'), 40.00::numeric, 'financial record preserves service value');
+select is((select commission_rate from public.financial_records where appointment_id = '60000000-0000-4000-8000-000000000001'), (select commission_rate from public.services where id = '33333333-3333-4333-8333-333333333333'), 'financial record preserves the effective commission rate');
+select ok((select commission_value = round(service_value * commission_rate / 100, 2) from public.financial_records where appointment_id = '60000000-0000-4000-8000-000000000001'), 'commission value is calculated in PostgreSQL');
+select lives_ok($test$select * from public.complete_appointment_with_financial_record('60000000-0000-4000-8000-000000000001')$test$, 'repeated completion is idempotent');
+select is((select count(*) from public.financial_records where appointment_id = '60000000-0000-4000-8000-000000000001'), 1::bigint, 'repeated completion does not duplicate financial record');
+select throws_ok($test$select * from public.complete_appointment_with_financial_record('60000000-0000-4000-8000-000000000002')$test$, 'P0001'::char(5), 'FINANCIAL_COMPLETION_APPOINTMENT_NOT_FOUND', 'owner cannot complete cross-tenant appointment');
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000002","role":"authenticated"}';
+select lives_ok($test$select * from public.complete_appointment_with_financial_record('60000000-0000-4000-8000-000000000001')$test$, 'barber can repeat completion of own appointment');
+select throws_ok($test$select * from public.complete_appointment_with_financial_record('60000000-0000-4000-8000-000000000003')$test$, 'P0001'::char(5), 'FINANCIAL_COMPLETION_APPOINTMENT_NOT_FOUND', 'barber cannot complete another barber appointment');
+select is((select count(*) from public.financial_records), 1::bigint, 'barber reads only own financial records');
+
+reset role;
+insert into public.appointments (id, client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, commission_rate, start_at, end_at, status, barbershop_id)
+values
+  ('80000000-0000-4000-8000-000000000001', 'Cancelled Finance', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, 50, now() + interval '60 days', now() + interval '60 days 30 minutes', 'cancelled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'),
+  ('80000000-0000-4000-8000-000000000002', 'Repair Finance', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, 50, now() + interval '61 days', now() + interval '61 days 30 minutes', 'completed', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'),
+  ('80000000-0000-4000-8000-000000000003', 'Rollback Finance', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, 50, now() + interval '62 days', now() + interval '62 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'),
+  ('80000000-0000-4000-8000-000000000004', 'No Show Finance', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, 50, now() + interval '63 days', now() + interval '63 days 30 minutes', 'no_show', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
+
+set local role authenticated;
+set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000001","role":"authenticated"}';
+select throws_ok($test$select * from public.complete_appointment_with_financial_record('80000000-0000-4000-8000-000000000001')$test$, 'P0001'::char(5), 'FINANCIAL_COMPLETION_INVALID_STATUS', 'cancelled appointment cannot be completed');
+select is((select count(*) from public.financial_records where appointment_id = '80000000-0000-4000-8000-000000000001'), 0::bigint, 'blocked status creates no financial record');
+select is((select status from public.appointments where id = '80000000-0000-4000-8000-000000000001'), 'cancelled', 'blocked status remains unchanged');
+select throws_ok($test$select * from public.complete_appointment_with_financial_record('80000000-0000-4000-8000-000000000004')$test$, 'P0001'::char(5), 'FINANCIAL_COMPLETION_INVALID_STATUS', 'no-show appointment cannot be completed');
+select is((select count(*) from public.financial_records where appointment_id = '80000000-0000-4000-8000-000000000004'), 0::bigint, 'no-show creates no financial record');
+select lives_ok($test$select * from public.complete_appointment_with_financial_record('80000000-0000-4000-8000-000000000002')$test$, 'completed appointment with null link can be repaired');
+select ok((select financial_record_id is not null from public.appointments where id = '80000000-0000-4000-8000-000000000002'), 'repair fills financial record link');
+select throws_ok($test$insert into public.financial_records (appointment_id, barbershop_id, barber_id, service_id, service_type, service_value, commission_rate, commission_value, completed_at) values ('80000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, 50, 20, now())$test$, '42501'::char(5), null, 'authenticated cannot insert financial records directly');
+select is((select count(*) from public.financial_records where barbershop_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'), 0::bigint, 'owner cannot read cross-tenant financial records');
+
+reset role;
+create function pg_temp.reject_rollback_financial_record() returns trigger language plpgsql as $$
+begin
+  if new.appointment_id = '80000000-0000-4000-8000-000000000003'::uuid then
+    raise exception 'forced financial failure';
+  end if;
+  return new;
+end;
+$$;
+create trigger test_reject_financial_record before insert on public.financial_records
+for each row execute function pg_temp.reject_rollback_financial_record();
+set local role authenticated;
+set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000001","role":"authenticated"}';
+select throws_ok($test$select * from public.complete_appointment_with_financial_record('80000000-0000-4000-8000-000000000003')$test$, 'P0001'::char(5), 'forced financial failure', 'financial insert failure aborts completion');
+select is((select status from public.appointments where id = '80000000-0000-4000-8000-000000000003'), 'scheduled', 'financial failure rolls appointment status back');
+select is((select count(*) from public.financial_records where appointment_id = '80000000-0000-4000-8000-000000000003'), 0::bigint, 'financial failure leaves no financial record');
+
+reset role;
+set local role anon;
+set local "request.jwt.claims" = '{"role":"anon"}';
+select throws_ok('select * from public.financial_records', '42501'::char(5), null, 'anon direct financial read is denied');
 
 select * from finish();
 rollback;
