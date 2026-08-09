@@ -64,6 +64,8 @@ export const ACTIVE_APPOINTMENT_CONFLICT_STATUSES: Appointment['status'][] = [
 
 export const APPOINTMENT_CONFLICT_ERROR_CODE = 'APPOINTMENT_ACTIVE_SLOT_CONFLICT';
 export const PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE = 'Esse hor\u00E1rio acabou de ser reservado. Escolha outro hor\u00E1rio.';
+export const PUBLIC_BOOKING_RATE_LIMIT_MESSAGE = 'Aguarde um minuto antes de tentar agendar novamente com este WhatsApp.';
+export const PUBLIC_BOOKING_ACTIVE_LIMIT_MESSAGE = 'Este WhatsApp já possui três agendamentos futuros ativos nesta barbearia.';
 export const PUBLIC_BOOKING_NAME_MIN_LENGTH = 2;
 export const PUBLIC_BOOKING_NAME_MAX_LENGTH = 80;
 export const PUBLIC_BOOKING_NOTES_MAX_LENGTH = 500;

@@ -74,6 +74,7 @@ type MockScenario = {
     status: number;
     body: unknown;
   };
+  appointmentInsertDelayMs?: number;
 };
 
 const tomorrowDate = (): string => {
@@ -144,7 +145,8 @@ const scenarioDefaults: Required<MockScenario> = {
   appointmentInsertResponse: {
     status: 201,
     body: []
-  }
+  },
+  appointmentInsertDelayMs: 0
 };
 
 const toEqValue = (value: string | null): string | null => {
@@ -177,7 +179,8 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
     barbers: scenario.barbers ?? scenarioDefaults.barbers,
     services: scenario.services ?? scenarioDefaults.services,
     slots: scenario.slots ?? scenarioDefaults.slots,
-    appointmentInsertResponse: scenario.appointmentInsertResponse ?? scenarioDefaults.appointmentInsertResponse
+    appointmentInsertResponse: scenario.appointmentInsertResponse ?? scenarioDefaults.appointmentInsertResponse,
+    appointmentInsertDelayMs: scenario.appointmentInsertDelayMs ?? 0
   };
 
   const barbersRequests: string[] = [];
@@ -276,6 +279,9 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
         url: request.url(),
         body: parseRequestBody(route)
       });
+      if (state.appointmentInsertDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, state.appointmentInsertDelayMs));
+      }
       await fulfillJson(
         route,
         state.appointmentInsertResponse.status,
@@ -394,6 +400,42 @@ test.describe('public booking /book/:slug', () => {
     expect(payload).not.toHaveProperty('commission_rate');
     expect(payload).not.toHaveProperty('status');
   });
+
+  test('prevents double submit while the public RPC is in flight', async ({ page }) => {
+    const network = await installSupabaseMocks(page, { appointmentInsertDelayMs: 150 });
+
+    await page.goto('/book/leo-do-leo');
+    await fillValidPublicBookingForm(page);
+
+    const submitButton = page.getByRole('button', { name: /Reservar horario/i });
+    await submitButton.evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+
+    await expect(page.getByRole('button', { name: /Confirmando/i })).toBeDisabled();
+    await expect(page.getByRole('heading', { name: /Horario reservado com sucesso/i })).toBeVisible();
+    expect(network.appointmentRequests).toHaveLength(1);
+  });
+
+  for (const [code, message] of [
+    ['PUBLIC_APPOINTMENT_RATE_LIMITED', /Aguarde um minuto antes de tentar agendar novamente/i],
+    ['PUBLIC_APPOINTMENT_ACTIVE_LIMIT', /ja possui tres agendamentos futuros ativos/i]
+  ] as const) {
+    test(`shows friendly public abuse error ${code} and restores submit`, async ({ page }) => {
+      const network = await installSupabaseMocks(page, {
+        appointmentInsertResponse: { status: 429, body: { code: 'P0001', message: code } }
+      });
+
+      await page.goto('/book/leo-do-leo');
+      await fillValidPublicBookingForm(page);
+      await page.getByRole('button', { name: /Reservar horario/i }).click();
+
+      await expect(page.getByText(message).first()).toBeVisible();
+      await expect(page.getByRole('button', { name: /Reservar horario/i })).toBeEnabled();
+      expect(network.appointmentRequests).toHaveLength(1);
+    });
+  }
 
   test('blocks submit when no slot is selected and does not post appointments', async ({ page }) => {
     const network = await installSupabaseMocks(page);

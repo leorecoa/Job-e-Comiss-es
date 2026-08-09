@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarCheck, CheckCircle, Clock, MapPin, MessageCircle, Phone, Scissors } from 'lucide-react';
 import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfile } from '../types';
 import { getBarbershopBySlug } from '../services/barbershopRepository';
@@ -8,7 +8,9 @@ import {
   getAvailableTimeSlots,
   getPublicBookingWorkdayForDate,
   isAppointmentConflictError,
+  PUBLIC_BOOKING_ACTIVE_LIMIT_MESSAGE,
   PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE,
+  PUBLIC_BOOKING_RATE_LIMIT_MESSAGE,
   PublicBookingInput,
   TimeSlot,
   validatePublicBookingInput
@@ -395,7 +397,9 @@ export const isPublicBookingSubmitDisabled = ({
 export const getPublicBookingSubmissionErrorMessage = (error: unknown): string => (
   isAppointmentConflictError(error)
     ? PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
-    : 'Nao foi possivel confirmar este horario. Tente novamente.'
+    : error instanceof Error && [PUBLIC_BOOKING_RATE_LIMIT_MESSAGE, PUBLIC_BOOKING_ACTIVE_LIMIT_MESSAGE].includes(error.message)
+      ? error.message
+      : 'Nao foi possivel confirmar este horario. Tente novamente.'
 );
 
 export const buildPublicBookingInput = ({
@@ -502,6 +506,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   const [barbershopError, setBarbershopError] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [isSubmitting, setSubmitting] = useState(false);
+  const submissionInFlightRef = useRef(false);
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
 
   const settings = useMemo(() => getPublicBookingScopedSettings(appSettings, barbershop), [appSettings, barbershop]);
@@ -753,6 +758,8 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
 const handleSubmit = async (event: React.FormEvent) => {
   event.preventDefault();
 
+  if (submissionInFlightRef.current) return;
+
   if (!bookingReadiness.ready) {
     setErrors(bookingReadiness.issues);
     return;
@@ -812,6 +819,7 @@ const handleSubmit = async (event: React.FormEvent) => {
 
   
 
+  submissionInFlightRef.current = true;
   setSubmitting(true);
 
   try {
@@ -822,6 +830,7 @@ const handleSubmit = async (event: React.FormEvent) => {
     logOperationalError('public-booking:submit', error);
     setErrors([getPublicBookingSubmissionErrorMessage(error)]);
   } finally {
+    submissionInFlightRef.current = false;
     setSubmitting(false);
   }
 };
