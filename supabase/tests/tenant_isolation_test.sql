@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(119);
+select plan(127);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -17,6 +17,14 @@ select ok(has_function_privilege('anon', 'public.create_public_appointment(uuid,
 select ok(has_function_privilege('anon', 'public.get_public_appointment_slots(uuid)', 'execute'), 'anon can execute slots RPC');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'create_public_appointment' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute creation RPC');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'get_public_appointment_slots' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute slots RPC');
+select is(to_regclass('public.public_appointment_slots'), null::regclass, 'legacy public slots view is absent');
+select is((select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname = 'public_appointment_slots' and c.relkind in ('v', 'm')), 0::bigint, 'no legacy public slots view remains in pg_catalog');
+select is((select count(*) from information_schema.table_privileges where table_schema = 'public' and table_name = 'public_appointment_slots'), 0::bigint, 'no legacy public slots grants remain');
+select ok(to_regprocedure('public.get_public_appointment_slots(uuid)') is not null, 'public slots RPC exists with uuid input');
+select is(pg_get_function_result('public.get_public_appointment_slots(uuid)'::regprocedure), 'TABLE(barber_id uuid, barber_name text, start_at timestamp with time zone, end_at timestamp with time zone, status text, barbershop_id uuid)', 'public slots RPC result signature remains exact');
+select is((select prosecdef from pg_proc where oid = 'public.get_public_appointment_slots(uuid)'::regprocedure), true, 'public slots RPC remains security definer');
+select is((select proconfig from pg_proc where oid = 'public.get_public_appointment_slots(uuid)'::regprocedure), array['search_path=pg_catalog'], 'public slots RPC keeps controlled search path');
+select ok(has_function_privilege('authenticated', 'public.get_public_appointment_slots(uuid)', 'execute'), 'authenticated can execute slots RPC');
 
 select ok(not exists(select 1 from information_schema.table_privileges where table_schema = 'public' and table_name = 'profiles' and grantee = 'PUBLIC'), 'PUBLIC has no direct profiles privileges');
 select ok(not has_table_privilege('anon', 'public.profiles', 'select') and not has_table_privilege('anon', 'public.profiles', 'insert') and not has_table_privilege('anon', 'public.profiles', 'update') and not has_table_privilege('anon', 'public.profiles', 'delete') and not has_table_privilege('anon', 'public.profiles', 'truncate') and not has_table_privilege('anon', 'public.profiles', 'references') and not has_table_privilege('anon', 'public.profiles', 'trigger'), 'anon has no direct profiles privileges');

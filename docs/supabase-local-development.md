@@ -46,7 +46,7 @@ O procedimento revisavel para reconciliar o historico de producao esta em `docs/
 
 - Dois indices equivalentes em `appointments`.
 - Policies de escrita do Storage consolidadas pela migration `20260809000900`.
-- View publica legada `public_appointment_slots`.
+- View publica legada `public_appointment_slots` removida pela migration `20260809001000`.
 - Privilegios de `profiles` endurecidos pela migration `20260809000800`.
 - Privilegios dos helpers privados endurecidos pela migration `20260809000700`.
 - Search paths dos helpers privados a revisar.

@@ -12,7 +12,7 @@
 -- 3. Test the RPC as anon for an active barbershop.
 -- 4. Deploy the frontend that calls this RPC.
 -- 5. Confirm public booking works for /book/:slug.
--- 6. In a later PR, evaluate revoking public access to public.public_appointment_slots.
+-- 6. The legacy public.public_appointment_slots view is removed by migration 20260809001000.
 
 begin;
 

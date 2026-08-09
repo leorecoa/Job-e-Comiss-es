@@ -115,11 +115,11 @@ Barbearia Fake RLS | 1 appointment
 Gestão Máxima      | 24 appointments
 ```
 
-## Public Slots View
+## Public Slots Availability
 
 `public.get_public_appointment_slots(uuid)` is the current public read surface for booking availability.
 
-`public.public_appointment_slots` remains as a legacy compatibility/reference view during rollout.
+The legacy `public.public_appointment_slots` view is removed by migration `20260809001000`.
 
 It exposes the fields needed by public booking:
 

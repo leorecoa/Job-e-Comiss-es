@@ -41,13 +41,7 @@ services
 appointments
 ```
 
-Confirm the public slots view exposes `barbershop_id` as the final view column:
-
-```txt
-public.public_appointment_slots
-```
-
-Confirm the public slots view still returns occupied slots for anonymous public booking after RLS is applied. If the view uses `security_invoker`, validate the underlying permissions/RLS behavior carefully in the controlled environment before production.
+Confirm `public.get_public_appointment_slots(uuid)` returns only tenant-scoped occupied slots. The legacy public slots view is not part of the current interface.
 
 ## Existing Broad Policies
 
@@ -100,7 +94,7 @@ notify pgrst, 'reload schema';
 - Public booking lists only active barbers needed for booking.
 - Public booking lists only active services needed for booking.
 - Public booking reads occupied slots through `public.get_public_appointment_slots(uuid)`.
-- Anonymous/public booking must not rely on direct reads from `public.public_appointment_slots` when it uses `security_invoker = true`; apply and validate `docs/public-appointment-availability-rpc.sql`.
+- Anonymous/public booking must use `public.get_public_appointment_slots(uuid)`; apply and validate `docs/public-appointment-availability-rpc.sql`.
 - Public booking creates an appointment with `status = 'scheduled'`.
 - Public booking creates an appointment with a non-null `barbershop_id`.
 - Public booking creates an appointment with a non-null `barber_id`.
