@@ -40,6 +40,8 @@ Use `supabase db reset --local` exclusivamente na stack local. Nunca use `db pus
 
 A baseline cria projetos novos, mas nao deve ser aplicada retroativamente sem uma estrategia revisada de migration history. Projetos existentes exigirao uma etapa futura de alinhamento; correcoes devem ser feitas por novas migrations, nunca editando migrations ja aplicadas.
 
+O procedimento revisavel para reconciliar o historico de producao esta em `docs/supabase-production-migration-history-rollout.md`.
+
 ## Dividas preservadas
 
 - Dois indices equivalentes em `appointments`.
