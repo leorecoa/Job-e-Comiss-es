@@ -42,7 +42,10 @@ export const sanitizeOperationalError = (error: unknown): Record<string, unknown
 };
 
 export const logOperationalError = (context: string, error: unknown): void => {
-  console.error(`[${context}]`, sanitizeOperationalError(error));
+  if (import.meta.env.DEV) {
+    console.error(`[${context}]`, sanitizeOperationalError(error));
+  }
+  reportUnexpectedError(context, error);
 };
 
 export const getOperationalErrorMessage = (
@@ -90,3 +93,4 @@ export const getOperationalErrorMessage = (
 
   return fallbackMessage;
 };
+import { reportUnexpectedError } from './observability';
