@@ -11,7 +11,9 @@ VITE_SENTRY_DSN=
 VITE_APP_ENVIRONMENT=preview|production
 ```
 
-`VITE_SENTRY_DSN` is a public client configuration value, not an administrative secret. Never add a Sentry auth token or server credential to a `VITE_` variable. The build exposes the Vercel commit SHA as the Sentry release when `VERCEL_GIT_COMMIT_SHA` is available.
+`VITE_SENTRY_DSN` is a public client configuration value, not an administrative secret. Never add a Sentry auth token or server credential to a `VITE_` variable.
+
+In Vercel project settings, open **Environment Variables** and enable **Automatically expose System Environment Variables**. The Vite build reads `VERCEL_GIT_COMMIT_SHA` directly from the build process and exposes only that SHA as the Sentry release. It also reads `VERCEL_ENV` as an environment fallback. If the SHA is unavailable, events use the safe technical fallback `job-e-comissoes@unversioned`; no branch, author or deployment URL is exposed.
 
 ## Privacy controls
 
