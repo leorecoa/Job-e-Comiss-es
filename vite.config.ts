@@ -17,7 +17,10 @@ export default defineConfig(({ mode }) => {
     ],
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA': JSON.stringify(
+        env.VITE_VERCEL_GIT_COMMIT_SHA || env.VERCEL_GIT_COMMIT_SHA || ''
+      )
     },
     resolve: {
       alias: {
