@@ -17,12 +17,13 @@ type ErrorLike = {
 
 const PUBLIC_CODE_PATTERN = /(PUBLIC_APPOINTMENT_[A-Z_]+|FINANCIAL_COMPLETION_[A-Z_]+|APPOINTMENT_ACTIVE_SLOT_CONFLICT)/;
 const SENSITIVE_TEXT_PATTERN = /(bearer\s+[a-z0-9._~+/=-]+|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|\b(?:\+?\d[\s().-]*){8,}\b|(?:access_token|refresh_token|authorization|apikey|client_name|client_phone|telefone|e-?mail|notes?)\s*[:=]\s*[^\s,;]+)/gi;
+const FALLBACK_RELEASE = 'job-e-comissoes@unversioned';
 
 let initialized = false;
 
 const getMonitoringConfig = (): MonitoringConfig => ({
   dsn: import.meta.env.VITE_SENTRY_DSN,
-  environment: import.meta.env.VITE_APP_ENVIRONMENT || import.meta.env.MODE,
+  environment: import.meta.env.VITE_APP_ENVIRONMENT || import.meta.env.VITE_VERCEL_ENV || import.meta.env.MODE,
   release: import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA
 });
 
@@ -48,7 +49,7 @@ export const sanitizeSentryEvent = (event: ErrorEvent, _hint?: EventHint): Error
   );
   const correlationId = typeof event.extra?.correlation_id === 'string'
     ? event.extra.correlation_id
-    : undefined;
+    : createCorrelationId();
 
   return {
     type: event.type,
@@ -56,9 +57,11 @@ export const sanitizeSentryEvent = (event: ErrorEvent, _hint?: EventHint): Error
     timestamp: event.timestamp,
     platform: event.platform,
     level: event.level,
+    environment: event.environment,
+    release: event.release || FALLBACK_RELEASE,
     exception: exception ? { values: exception } : undefined,
     tags,
-    extra: correlationId ? { correlation_id: correlationId } : undefined
+    extra: { correlation_id: correlationId }
   };
 };
 
@@ -69,7 +72,7 @@ export const initializeObservability = (config: MonitoringConfig = getMonitoring
     Sentry.init({
       dsn: config.dsn.trim(),
       environment: config.environment || 'unknown',
-      release: config.release || undefined,
+      release: config.release?.trim() || FALLBACK_RELEASE,
       sendDefaultPii: false,
       tracesSampleRate: 0,
       beforeSend: sanitizeSentryEvent

@@ -49,6 +49,8 @@ describe('privacy-safe production observability', () => {
   it('removes request data, headers, tokens, PII, user, breadcrumbs and storage-like context', () => {
     const event = sanitizeSentryEvent({
       type: undefined,
+      environment: 'preview',
+      release: 'preview-commit-sha',
       message: 'Maria maria@example.com 81999999999 notes=segredo',
       request: {
         url: 'https://example.test/book/shop?access_token=secret',
@@ -82,7 +84,36 @@ describe('privacy-safe production observability', () => {
     expect(event.message).toBeUndefined();
     expect(event.tags).toEqual({ operation: 'appointment-repository:create', route: '/book/:tenant' });
     expect(event.extra).toEqual({ correlation_id: 'random-correlation' });
+    expect(event.environment).toBe('preview');
+    expect(event.release).toBe('preview-commit-sha');
     expect(serialized).not.toMatch(/Maria|maria@example|81999999999|Bearer|apikey|access_token|refresh_token|segredo|payload/);
+  });
+
+  it('adds safe metadata to automatic global errors', () => {
+    const event = sanitizeSentryEvent({
+      type: undefined,
+      environment: 'preview',
+      release: 'vercel-build-sha',
+      exception: {
+        values: [{ type: 'Error', value: 'global timer failure', stacktrace: { frames: [] } }]
+      }
+    });
+
+    expect(event.environment).toBe('preview');
+    expect(event.release).toBe('vercel-build-sha');
+    expect(event.release).not.toBeNull();
+    expect(event.extra?.correlation_id).toMatch(/^[0-9a-f-]{36}$|^error-/);
+    expect(event.exception?.values?.[0]?.value).toBe('Unexpected application error');
+    expect(event.request).toBeUndefined();
+    expect(event.user).toBeUndefined();
+  });
+
+  it('uses a safe release fallback only when build SHA is unavailable', () => {
+    initializeObservability({ dsn: 'https://public@example.invalid/1', environment: 'preview' });
+
+    expect(sentry.init).toHaveBeenCalledWith(expect.objectContaining({
+      release: 'job-e-comissoes@unversioned'
+    }));
   });
 
   it('does not report expected public booking outcomes', () => {

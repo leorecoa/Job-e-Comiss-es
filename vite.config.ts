@@ -5,6 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
+  const vercelCommitSha = process.env.VERCEL_GIT_COMMIT_SHA || env.VITE_VERCEL_GIT_COMMIT_SHA || '';
+  const vercelEnvironment = process.env.VERCEL_ENV || env.VITE_VERCEL_ENV || '';
 
   return {
     server: {
@@ -18,9 +20,8 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA': JSON.stringify(
-        env.VITE_VERCEL_GIT_COMMIT_SHA || env.VERCEL_GIT_COMMIT_SHA || ''
-      )
+      'import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA': JSON.stringify(vercelCommitSha),
+      'import.meta.env.VITE_VERCEL_ENV': JSON.stringify(vercelEnvironment)
     },
     resolve: {
       alias: {
