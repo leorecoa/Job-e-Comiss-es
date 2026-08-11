@@ -48,8 +48,11 @@ if ([string]::IsNullOrWhiteSpace($DbUrl)) {
   throw 'SUPABASE_DB_URL must be set in the process environment.'
 }
 
-$installedVersion = (& npx --no-install supabase --version 2>$null | Select-Object -First 1).Trim()
-if ($LASTEXITCODE -ne 0 -or $installedVersion -ne $CliVersion) {
+$versionOutput = & npx --no-install supabase --version 2>$null
+$versionExitCode = $LASTEXITCODE
+$versionFirstLine = $versionOutput | Select-Object -First 1
+$installedVersion = if ($null -eq $versionFirstLine) { '' } else { ([string]$versionFirstLine).Trim() }
+if ($versionExitCode -ne 0 -or $installedVersion -ne $CliVersion) {
   throw "Supabase CLI $CliVersion is required. Run npm install from the repository lockfile."
 }
 
