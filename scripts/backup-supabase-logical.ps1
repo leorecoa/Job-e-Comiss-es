@@ -26,8 +26,17 @@ function Invoke-SupabaseDump {
     [string]$Connection
   )
 
-  $output = & npx --no-install supabase @Arguments --db-url $Connection 2>&1
-  if ($LASTEXITCODE -ne 0) {
+  $previousErrorActionPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = & npx --no-install supabase @Arguments --db-url $Connection 2>&1
+    $dumpExitCode = $LASTEXITCODE
+  }
+  finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
+
+  if ($dumpExitCode -ne 0) {
     throw 'Supabase CLI dump failed. CLI output was suppressed to avoid exposing credentials.'
   }
 }
