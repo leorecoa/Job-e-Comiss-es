@@ -24,6 +24,23 @@ Regras:
 
 ## Supabase
 
+### Confirmacao de email do owner
+
+Configure manualmente em **Supabase Dashboard > Authentication > URL Configuration**:
+
+```text
+Site URL:
+https://job-e-comiss-es.vercel.app
+
+Redirect URLs:
+https://job-e-comiss-es.vercel.app/auth/callback
+http://localhost:4173/auth/callback
+```
+
+O cadastro envia `emailRedirectTo` para `/auth/callback` na origem atual. O cliente usa fluxo implicit e processa a sessao antes de encaminhar o owner para onboarding ou painel. O rewrite SPA existente em `vercel.json` atende refresh direto nessa rota.
+
+Para testar Preview, adicione somente a URL exata do deploy Preview sob o dominio controlado da Vercel. Nao use wildcard amplo. A configuracao do Dashboard e um gate manual e nao e executada por esta alteracao.
+
 O estado atual do app depende de schema, RLS tenant-aware, RPC publica de disponibilidade, indice contra slot duplicado e RPC de vinculo de barbeiro.
 
 Nao aplique apenas um SQL isolado em ambiente novo. Aplique e valide manualmente a sequencia completa.
