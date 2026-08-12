@@ -55,6 +55,7 @@ import {
   Clock
 } from 'lucide-react';
 import { getOperationalErrorMessage, logOperationalError } from './utils/errorHandling';
+import { AUTH_CALLBACK_PATH, AuthCallbackScreen } from './components/AuthCallbackScreen';
 
 const AddClientModal = React.lazy(() => import('./components/AddClientModal').then((module) => ({ default: module.AddClientModal })));
 const AddValeModal = React.lazy(() => import('./components/AddValeModal').then((module) => ({ default: module.AddValeModal })));
@@ -208,6 +209,7 @@ const App: React.FC = () => {
   const publicBookingSlug = getPublicBookingSlugFromPath(pathname);
   const isPublicBookingRoute = pathname === '/book' || pathname === '/agendar' || pathname.startsWith('/book/');
   const isOnboardingRoute = isOwnerOnboardingPath(pathname);
+  const isAuthCallbackRoute = pathname === AUTH_CALLBACK_PATH;
 
   // -- Handle Splash Screen --
   useEffect(() => {
@@ -537,7 +539,7 @@ const App: React.FC = () => {
   }, [authSession, isAuthLoading, isPublicBookingRoute]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured || isAuthLoading || isPublicBookingRoute || !authSession) return;
+    if (!isSupabaseConfigured || isAuthLoading || isPublicBookingRoute || isAuthCallbackRoute || !authSession) return;
 
     if (!authSession.barbershopId && !isOnboardingRoute && authSession.role === 'owner') {
       window.location.replace('/onboarding');
@@ -547,7 +549,7 @@ const App: React.FC = () => {
     if (authSession.barbershopId && isOnboardingRoute) {
       window.location.replace('/');
     }
-  }, [authSession, isAuthLoading, isOnboardingRoute, isPublicBookingRoute]);
+  }, [authSession, isAuthCallbackRoute, isAuthLoading, isOnboardingRoute, isPublicBookingRoute]);
 
   useEffect(() => {
     let active = true;
@@ -1671,6 +1673,10 @@ const App: React.FC = () => {
         />
       </>
     );
+  }
+
+  if (isAuthCallbackRoute) {
+    return <AuthCallbackScreen loading={isAuthLoading} session={authSession} />;
   }
 
   // If authenticated and role is barber, show BarberDashboard

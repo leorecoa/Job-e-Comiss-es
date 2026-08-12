@@ -19,6 +19,7 @@ import { signUpWithPassword } from './services/authRepository';
 describe('owner signup onboarding contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('window', { location: { origin: 'https://app.example.test' } });
   });
 
   it('keeps owner role in auth metadata so onboarding can start', async () => {
@@ -49,12 +50,14 @@ describe('owner signup onboarding contract', () => {
       email: 'owner@example.com',
       password: '123456',
       options: {
+        emailRedirectTo: 'https://app.example.test/auth/callback',
         data: {
           display_name: 'Leo Owner',
           role: 'owner'
         }
       }
     });
+    expect(supabaseMock.auth.signUp.mock.calls[0][0].options.emailRedirectTo).toMatch(/^https:\/\/app\.example\.test\/auth\/callback$/);
     expect(session).toMatchObject({
       email: 'owner@example.com',
       displayName: 'Leo Owner',

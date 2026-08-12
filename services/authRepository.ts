@@ -132,6 +132,7 @@ export const signUpWithPassword = async (
     email,
     password,
     options: {
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
       data: {
         display_name: displayName,
         role

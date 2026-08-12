@@ -47,6 +47,13 @@ export const isSupabaseConfigured = runtimeState.isSupabaseConfigured;
 export const isProductionWithoutSupabase = runtimeState.isProductionWithoutSupabase;
 export const shouldUseLocalFallback = runtimeState.shouldUseLocalFallback;
 
+export const SUPABASE_AUTH_OPTIONS = {
+  flowType: 'implicit' as const,
+  detectSessionInUrl: true,
+  persistSession: true,
+  autoRefreshToken: true
+};
+
 export const assertOperationalSupabase = (): void => {
   if (isProductionWithoutSupabase) {
     throw new Error(PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE);
@@ -54,5 +61,7 @@ export const assertOperationalSupabase = (): void => {
 };
 
 export const supabase = isSupabaseConfigured
-  ? createClient(runtimeState.supabaseUrl as string, runtimeState.supabaseAnonKey as string)
+  ? createClient(runtimeState.supabaseUrl as string, runtimeState.supabaseAnonKey as string, {
+      auth: SUPABASE_AUTH_OPTIONS
+    })
   : null;
