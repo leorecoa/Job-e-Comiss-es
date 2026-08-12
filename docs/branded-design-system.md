@@ -25,4 +25,8 @@ Tokens live in `styles.css`: `background`, `foreground`, `surface`, `surface-mut
 
 ## Gradual migration
 
-Authentication is the first low-risk demonstration. Future PRs should migrate one bounded area at a time, preserve behavior and tests, and remove old page-specific classes only after visual and accessibility review. Dashboard, agenda, finance, onboarding, and public booking remain unchanged until separately scoped.
+Authentication and owner onboarding share `AuthLayout`: a mobile-first ivory workspace with one primary surface, a compact product mark, and stable vertical spacing. Async processing uses `LoadingState`; recoverable feedback uses `InlineNotice` with polite or assertive live regions according to severity.
+
+Forms keep labels above controls, required fields explicit, one primary submit action, and messages associated through IDs. Fraunces is reserved for page and state titles; all controls and operational copy use IBM Plex Sans. At narrow widths the layout becomes one column without hiding actions, and reduced-motion preferences remove the authentication entrance animation.
+
+Future PRs should migrate one bounded area at a time, preserve behavior and tests, and remove old page-specific classes only after visual and accessibility review. Dashboard, agenda, finance, and public booking remain unchanged until separately scoped.
