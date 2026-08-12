@@ -581,7 +581,7 @@ test.describe('owner operational dashboard e2e', () => {
 
     await signInAsOwner(page);
 
-    await expect(page.locator('header h1')).toHaveText(/leo do leo/i);
+    await expect(page.getByText('leo do leo', { exact: true }).first()).toBeVisible();
     await expect(page.getByRole('heading', { name: /Prontidao operacional/i })).toBeVisible();
     await expect(page.getByText(/Booking pronto para receber agendamentos\./i)).toBeVisible();
     await expect(page.getByText('/book/leo-do-leo')).toBeVisible();
@@ -603,6 +603,55 @@ test.describe('owner operational dashboard e2e', () => {
     expect(network.serviceRequests.some((url) => url.includes(`barbershop_id=eq.${OWNER_BARBERSHOP_ID}`))).toBeTruthy();
     expect(network.appointmentReadRequests.some((url) => url.includes(`barbershop_id=eq.${OWNER_BARBERSHOP_ID}`))).toBeTruthy();
     expect(network.appointmentReadRequests.every((url) => !url.includes(`barbershop_id=eq.${OTHER_BARBERSHOP_ID}`))).toBeTruthy();
+  });
+
+  test('owner shell keeps navigation accessible and responsive', async ({ page }) => {
+    await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/, (route) => route.abort());
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await installOwnerSupabaseMocks(page);
+    await signInAsOwner(page);
+
+    const desktopNavigation = page.getByRole('navigation', { name: 'Secoes do painel', exact: true });
+    await expect(page.getByRole('main')).toBeVisible();
+    await expect(desktopNavigation.getByRole('button', { name: 'Agenda' })).toHaveAttribute('aria-current', 'page');
+    await desktopNavigation.getByRole('button', { name: 'Clientes' }).click();
+    await expect(page.getByRole('heading', { name: 'Clientes', exact: true })).toBeVisible();
+    await expect(desktopNavigation.getByRole('button', { name: 'Clientes' })).toHaveAttribute('aria-current', 'page');
+    await desktopNavigation.getByRole('button', { name: 'Relatorios' }).click();
+    await expect(page.getByRole('heading', { name: 'Relatorios', exact: true })).toBeVisible();
+
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 1280, height: 720 },
+      { width: 1024, height: 768 },
+      { width: 768, height: 1024 },
+      { width: 390, height: 844 },
+      { width: 360, height: 800 }
+    ]) {
+      await page.setViewportSize(viewport);
+      const dimensions = await page.evaluate(() => ({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth
+      }));
+      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+      await expect(page.getByRole('heading', { name: 'Relatorios', exact: true })).toBeVisible();
+    }
+
+    await page.getByRole('button', { name: 'Abrir navegacao' }).click();
+    const mobileNavigation = page.getByRole('complementary', { name: 'Navegacao mobile' });
+    await expect(mobileNavigation).toBeVisible();
+    await expect(mobileNavigation.getByRole('button', { name: 'Sair' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(mobileNavigation).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Abrir navegacao' })).toBeFocused();
+
+    await page.setViewportSize({ width: 195, height: 422 });
+    const zoomDimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(zoomDimensions.scrollWidth).toBeLessThanOrEqual(zoomDimensions.clientWidth + 1);
+    await expect(page.getByRole('button', { name: 'Abrir navegacao' })).toBeVisible();
   });
 
   test('owner links a barber profile by email through the tenant-scoped RPC', async ({ page }) => {
