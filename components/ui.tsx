@@ -101,3 +101,37 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ title, description, acti
     {action}
   </div>
 );
+
+export const AuthLayout: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, children, ...props }) => (
+  <main className={cx('ui-auth-shell', className)} {...props}>
+    <div className="ui-auth-panel">{children}</div>
+  </main>
+);
+
+type NoticeTone = 'info' | 'success' | 'error';
+
+export interface InlineNoticeProps extends React.HTMLAttributes<HTMLDivElement> {
+  tone?: NoticeTone;
+}
+
+export const InlineNotice: React.FC<InlineNoticeProps> = ({ tone = 'info', className, ...props }) => (
+  <div
+    className={cx('ui-inline-notice', `ui-inline-notice-${tone}`, className)}
+    role={tone === 'error' ? 'alert' : 'status'}
+    aria-live={tone === 'error' ? 'assertive' : 'polite'}
+    {...props}
+  />
+);
+
+export interface LoadingStateProps extends React.HTMLAttributes<HTMLDivElement> {
+  title: string;
+  description?: string;
+}
+
+export const LoadingState: React.FC<LoadingStateProps> = ({ title, description, className, ...props }) => (
+  <div className={cx('ui-loading-state', className)} role="status" aria-live="polite" aria-busy="true" {...props}>
+    <span className="ui-loading-mark" aria-hidden="true" />
+    <h1>{title}</h1>
+    {description && <p>{description}</p>}
+  </div>
+);

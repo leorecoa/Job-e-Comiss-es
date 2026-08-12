@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Lock, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { AppRole } from '../services/authRepository';
-import { Badge, Button, FieldMessage, Input, Label, PageHeader, Surface } from './ui';
+import { AuthLayout, Button, FieldMessage, Input, Label, PageHeader, Surface } from './ui';
 
 interface AuthScreenProps {
   onSignIn: (email: string, password: string) => Promise<void>;
@@ -12,6 +12,7 @@ interface AuthScreenProps {
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp, loading = false, error }) => {
+  const reduceMotion = useReducedMotion();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,12 +30,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp, load
   };
 
   return (
-    <div className="ui-auth-shell">
+    <AuthLayout>
       <motion.div
-        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-        className="ui-auth-panel"
+        transition={{ duration: reduceMotion ? 0 : 0.22 }}
       >
         <div className="ui-auth-brand" aria-label="Job e Comissoes">
           <span className="ui-auth-mark"><Lock size={22} aria-hidden="true" /></span>
@@ -52,23 +52,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp, load
               <Button variant="ghost" type="button" aria-pressed={mode === 'signup'} onClick={() => setMode('signup')}>Criar acesso</Button>
             </div>
 
-            {error && <FieldMessage id="auth-form-error" tone="error">{error}</FieldMessage>}
+            {error && <FieldMessage id="auth-form-error" tone="error" aria-live="assertive">{error}</FieldMessage>}
 
             {mode === 'signup' && (
               <div className="ui-field">
                 <Label htmlFor="auth-display-name">Nome</Label>
-                <Input id="auth-display-name" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+                <Input id="auth-display-name" autoComplete="name" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
               </div>
             )}
 
             <div className="ui-field">
               <Label htmlFor="auth-email">Email</Label>
-              <Input id="auth-email" type="email" required aria-describedby={error ? 'auth-form-error' : undefined} value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input id="auth-email" type="email" autoComplete="email" required aria-invalid={Boolean(error)} aria-describedby={error ? 'auth-form-error' : undefined} value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
 
             <div className="ui-field">
               <Label htmlFor="auth-password">Senha</Label>
-              <Input id="auth-password" type="password" required minLength={6} aria-describedby={error ? 'auth-form-error' : undefined} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input id="auth-password" type="password" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} required minLength={6} aria-invalid={Boolean(error)} aria-describedby={error ? 'auth-form-error' : undefined} value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
 
             {mode === 'signup' && (
@@ -92,6 +92,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp, load
           </form>
         </Surface>
       </motion.div>
-    </div>
+    </AuthLayout>
   );
 };
