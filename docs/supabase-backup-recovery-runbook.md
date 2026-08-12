@@ -49,26 +49,53 @@ if ($localDbUrl.Host -notin @('127.0.0.1', 'localhost', '::1')) {
 }
 ```
 
-4. From the temporary validated backup directory, restore with the PostgreSQL client in one transaction. Review `roles.sql` first and follow current Supabase guidance for conflicts with managed local roles; do not edit the retained backup copy.
+4. Review `roles.sql` before execution. Never edit the retained backup. Create a temporary derived copy that omits exactly these four known `ALTER ROLE` statements for roles managed by the local Supabase stack:
+
+- `anon`;
+- `authenticated`;
+- `authenticator`;
+- `supabase_admin`.
+
+The derived file must contain no other `ALTER ROLE`. Stop if the source contains another role or command requiring omission, or if the review cannot prove that only those four statements changed. Record only the sanitized review result, never SQL contents or identifiers.
+
+5. From the temporary validated backup directory, restore the derived roles file, schema, and data with the PostgreSQL client in one transaction. Keep commands short to reduce PowerShell paste errors:
 
 ```powershell
 & psql `
   --single-transaction `
   --variable ON_ERROR_STOP=1 `
-  --file '.\roles.sql' `
+  --file '.\roles.local.sql' `
   --file '.\schema.sql' `
   --command 'SET session_replication_role = replica' `
   --file '.\data.sql' `
   --dbname $localDbUrl.AbsoluteUri
 if ($LASTEXITCODE -ne 0) { throw 'Local restore failed.' }
+```
+
+Any failure under `--single-transaction` must roll back the entire restore. Stop, preserve sanitized error evidence, verify rollback, and review the cause; never continue with a partially restored database.
+
+6. The normal dump excludes DDL from the managed Storage schema. For the current application state, restore the canonical branding policies locally only after reconfirming the loopback target and verifying these exact migration hashes:
+
+```text
+20260809000600_storage_policies.sql
+9F2F826D0C0DCA606B0D955F78A5DA7984DDD9BE2E30C817BC41E9753FB07006
+
+20260809000900_consolidate_branding_storage_policies.sql
+70886489E3A694F57F13C577FDFC08FABC75840067E15CFD926538D6BCBA0AB2
+```
+
+Apply those two reviewed files with `psql` only to `$localDbUrl.AbsoluteUri`, in migration order. Stop on a hash mismatch, non-loopback destination, or SQL failure. Do not use `db reset`, `migration repair`, `--linked`, or `--db-url`. The absence of `supabase_migrations` from the logical dump is expected and does not authorize history repair.
+
+7. Run the validation checklist below. A rehearsal is not fully approved if any required check is missing.
+8. Clear connection values from memory, stop without creating a local backup, and securely discard the temporary environment and derived files:
+
+```powershell
 $localDbUrl = $null
 $localStatus = $null
+npx supabase stop --no-backup
 ```
-5. Do not run `db reset` as part of this rehearsal. The restore target must be disposable and contain no needed data.
-6. Run the validation checklist below. A restore is unsuccessful if any check is missing.
-7. Stop the local stack with `npx supabase stop`, then securely delete the disposable local environment and temporary dump copy.
 
-The operator must review SQL before execution. Role restoration can conflict with roles managed by the local stack, so this runbook intentionally does not automate `psql` or bypass errors.
+Keep the original backup intact. This runbook intentionally does not automate restore or bypass review gates.
 
 ## Restore validation
 
@@ -77,15 +104,41 @@ The operator must review SQL before execution. Role restoration can conflict wit
 - Confirm RLS is enabled where versioned and compare policies, grants, and RPC execution privileges with the canonical migrations.
 - Compare per-table row counts with a separately recorded, access-controlled backup inventory; include `appointments`, `profiles`, `barbers`, `services`, and `financial_records`.
 - Confirm each completed financial appointment has exactly one `financial_records` row, the tenant matches, and `appointments.financial_record_id` is linked.
-- Validate Auth users and required Auth metadata separately. The regular schema dump excludes the managed `auth` schema.
-- Confirm `barbershop-branding` bucket metadata, public flag, 5 MB limit, MIME types, and four tenant-scoped policies.
+- Validate Auth users and identities separately. The final aggregate query must report `users_without_identity = 0` and `orphan_identities = 0`:
+
+```sql
+select
+  count(*) filter (where i.user_id is null) as users_without_identity,
+  (select count(*)
+   from auth.identities orphan
+   left join auth.users u on u.id = orphan.user_id
+   where u.id is null) as orphan_identities
+from auth.users u
+left join auth.identities i on i.user_id = u.id;
+```
+
+- Confirm `barbershop-branding` bucket metadata, public flag, 5 MB limit, MIME types, and exactly four canonical tenant-scoped policies on `storage.objects`.
 - Confirm every expected physical branding object exists and its independently recorded hash matches.
 - Run `npx supabase test db --local supabase/tests`, `npm run check`, and a local smoke test without real data.
 - Confirm test fixtures rolled back and no backup files were created inside the repository.
 
+## Verified rehearsal: 2026-08-12
+
+The first real local rehearsal is partially approved. Manifest, sizes, SHA-256, loopback destination, disposable PostgreSQL health, database restore, `public` and `private` schemas, six expected public tables with RLS, RPCs, Auth users, tenant integrity, financial integrity, bucket metadata, and the four canonical branding policies passed. The legacy public view remained absent, and `anon` retained no direct `SELECT` or `INSERT` on `appointments`.
+
+The initial single-transaction attempt failed on `ALTER ROLE` for the four managed roles listed above and rolled back completely. A temporary derived roles file omitted exactly those four reviewed statements and contained no other `ALTER ROLE`; the original backup remained unchanged. The derived roles, schema, and data then restored successfully in one transaction.
+
+The dump did not contain `supabase_migrations`, which is expected, and no repair was performed. The normal structural dump also did not recreate the `storage.objects` policies; after confirming the loopback target and the hashes above, canonical migrations 006 and 009 restored exactly four policies locally.
+
+Auth users were restored, but the final `auth.identities` evidence was not recorded before cleanup. Treat both aggregate Auth results as mandatory gates in every future rehearsal; this rehearsal does not claim they passed. Metadata for six Storage objects was restored, but physical bytes are outside the logical dump and remain an open recovery dependency.
+
+The stack was stopped with `--no-backup`, the temporary environment and derived file were deleted, the retained backup remained intact, and no remote connection was configured. Store only sanitized outcomes like these; never record dump contents or personal data.
+
 ## Storage backup
 
 The database dump can preserve database metadata, but it does not contain the physical objects served by the Storage API. Back up `barbershop-branding` separately to private encrypted off-site storage using a reviewed, operator-run export process outside this repository.
+
+A successful database restore is not a complete recovery. Completion requires the separately exported physical objects, verified against their private encrypted manifest and hashes.
 
 Maintain an encrypted Storage manifest with bucket, object path, byte size, content type, export timestamp, and SHA-256 for each object. Do not include signed URLs, API keys, or credentials. Validate object count and hashes after export and after restore. Restoring metadata without the matching object bytes is an incomplete recovery.
 
