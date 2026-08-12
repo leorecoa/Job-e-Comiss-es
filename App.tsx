@@ -46,7 +46,6 @@ import {
   Pencil,
   Calendar,
   User,
-  LogOut,
   BarChart3,
   ChevronLeft,
   ChevronRight,
@@ -56,6 +55,7 @@ import {
 } from 'lucide-react';
 import { getOperationalErrorMessage, logOperationalError } from './utils/errorHandling';
 import { AUTH_CALLBACK_PATH, AuthCallbackScreen } from './components/AuthCallbackScreen';
+import { DashboardShell, type DashboardNavigationItem } from './components/DashboardShell';
 
 const AddClientModal = React.lazy(() => import('./components/AddClientModal').then((module) => ({ default: module.AddClientModal })));
 const AddValeModal = React.lazy(() => import('./components/AddValeModal').then((module) => ({ default: module.AddValeModal })));
@@ -1609,6 +1609,22 @@ const App: React.FC = () => {
     }
   }
 
+  const ownerNavigationItems: DashboardNavigationItem[] = [
+    { id: 'appointments', label: 'Agenda', description: 'Acompanhe horarios e operacao do dia.', icon: <Calendar size={18} /> },
+    { id: 'clients', label: 'Clientes', description: 'Consulte os atendimentos registrados.', icon: <Users size={18} /> },
+    { id: 'vales', label: 'Vales', description: 'Acompanhe os descontos registrados.', icon: <MinusCircle size={18} /> },
+    { id: 'reports', label: 'Relatorios', description: 'Analise resultados e periodos anteriores.', icon: <BarChart3 size={18} /> }
+  ];
+  const activeOwnerSection = viewMode === 'monthly' ? 'reports' : activeTab;
+  const handleOwnerNavigation = (sectionId: string) => {
+    if (sectionId === 'reports') {
+      setViewMode('monthly');
+      return;
+    }
+    setViewMode('daily');
+    setActiveTab(sectionId as 'appointments' | 'clients' | 'vales');
+  };
+
   const changeDate = (days: number) => {
     const [year, month, day] = selectedDate.split('-').map(Number);
     const d = new Date(year, month - 1, day);
@@ -1758,7 +1774,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-transparent pb-24 font-sans selection:bg-gold-500/30">
+    <div className="font-sans selection:bg-gold-500/30">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       
       {isTourOpen && (
@@ -1772,36 +1788,24 @@ const App: React.FC = () => {
         </React.Suspense>
       )}
 
-      {/* Header */}
-      <header className="border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-gray-900/90">
-         <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-                 <div className="bg-gold-500/10 p-2 rounded-lg">
-                    {/* Header Logo Hexagonal */}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                        <polyline points="7.5 12 10 14.5 16.5 8"></polyline>
-                    </svg>
-                 </div>
-                 <div>
-                    <h1 className="text-white font-bold">{activeShopName}</h1>
-                    <span className="text-[10px] uppercase font-bold text-blue-400">{roleBadgeLabel}</span>
-                 </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
+      <DashboardShell
+        barbershopName={activeShopName}
+        userName={userProfile.ownerName}
+        roleLabel={roleBadgeLabel}
+        activeItemId={activeOwnerSection}
+        items={ownerNavigationItems}
+        onNavigate={handleOwnerNavigation}
+        onLogout={handleLogout}
+        headerAction={(
+          <button
                 type="button"
                 onClick={handleReopenTour}
-                className="rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-bold text-gray-300 transition-colors hover:border-gold-500/40 hover:text-gold-300"
+                className="ui-dashboard-help"
               >
                 Ajuda
               </button>
-              <button onClick={handleLogout} className="text-gray-500 hover:text-red-400" aria-label="Sair"><LogOut size={20}/></button>
-            </div>
-         </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 pt-6 relative z-20">
+        )}
+      >
         
         {viewMode === 'daily' && (
           <div className="animate-slide-in">
@@ -1934,12 +1938,6 @@ const App: React.FC = () => {
                 </div>
               )}
               <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
-                 <div className="flex border-b border-gray-700 bg-gray-900/50">
-                    <button onClick={() => setActiveTab('appointments')} className={`flex-1 py-3 text-sm font-bold ${activeTab === 'appointments' ? 'text-white border-b-2 border-blue-400' : 'text-gray-500'}`}>Agenda</button>
-                     <button onClick={() => setActiveTab('clients')} className={`flex-1 py-3 text-sm font-bold ${activeTab === 'clients' ? 'text-white border-b-2 border-gold-500' : 'text-gray-500'}`}>Clientes</button>
-                     <button onClick={() => setActiveTab('vales')} className={`flex-1 py-3 text-sm font-bold ${activeTab === 'vales' ? 'text-white border-b-2 border-red-500' : 'text-gray-500'}`}>Vales</button>
-                 </div>
-                 
                  <div className="min-h-[200px] bg-gray-900/30">
                     {activeTab === 'appointments' ? (
                       <React.Suspense fallback={<SectionFallback />}>
@@ -2158,7 +2156,7 @@ const App: React.FC = () => {
              <MonthlySummary clients={clients} vales={vales} settings={settings} onBack={() => setViewMode('daily')} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
           </React.Suspense>
         )}
-      </main>
+      </DashboardShell>
 
       <React.Suspense fallback={null}>
         {isClientModalOpen && (
