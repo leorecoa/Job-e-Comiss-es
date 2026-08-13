@@ -399,6 +399,7 @@ test.describe('barber dashboard e2e', () => {
     await expect(page.getByText(/Cliente do Leo/i)).toBeVisible();
     await expect(page.getByText(/Cliente do Outro/i)).toHaveCount(0);
     await expect(page.getByText(/Cliente Outro Tenant/i)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Gestao', exact: true })).toHaveCount(0);
     await expect(page.getByText(/Gest[aã]o M[aá]xima/i)).toHaveCount(0);
 
     expect(network.signInRequests).toHaveLength(1);
