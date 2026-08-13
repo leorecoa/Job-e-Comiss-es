@@ -206,6 +206,25 @@ export const getPublicBookingSlugFromPath = (pathname: string): string | undefin
 
 export const isOwnerOnboardingPath = (pathname: string): boolean => pathname === '/onboarding';
 
+export type InternalAuthView = 'loading' | 'auth' | 'owner-onboarding' | 'owner-dashboard' | 'barber-dashboard';
+
+export const getInternalAuthView = (
+  isLoading: boolean,
+  authSession: AuthSession | null,
+  supabaseConfigured: boolean
+): InternalAuthView => {
+  if (isLoading) return 'loading';
+  if (!supabaseConfigured) return 'owner-dashboard';
+  if (!authSession) return 'auth';
+
+  if (authSession.role === 'owner' && !authSession.barbershopId?.trim()) {
+    return 'owner-onboarding';
+  }
+
+  if (authSession.role === 'barber') return 'barber-dashboard';
+  return canAccessInternalPanel(authSession, true) ? 'owner-dashboard' : 'auth';
+};
+
 const App: React.FC = () => {
   const pathname = window.location.pathname;
   const publicBookingSlug = getPublicBookingSlugFromPath(pathname);
@@ -1698,8 +1717,9 @@ const App: React.FC = () => {
     return <AuthCallbackScreen loading={isAuthLoading} session={authSession} />;
   }
 
-  // If authenticated and role is barber, show BarberDashboard
-  if (isAuthLoading) {
+  const internalAuthView = getInternalAuthView(isAuthLoading, authSession, isSupabaseConfigured);
+
+  if (internalAuthView === 'loading') {
     return (
       <>
         <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -1710,7 +1730,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (isSupabaseConfigured && !canAccessInternalPanel(authSession, true)) {
+  if (internalAuthView === 'auth') {
     return (
       <>
         <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -1726,12 +1746,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (
-    isSupabaseConfigured &&
-    authSession &&
-    authSession.role === 'owner' &&
-    !authSession.barbershopId
-  ) {
+  if (internalAuthView === 'owner-onboarding' && authSession?.role === 'owner') {
     return (
       <>
         <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -1746,7 +1761,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (authSession?.role === 'barber') {
+  if (internalAuthView === 'barber-dashboard' && authSession?.role === 'barber') {
     return (
       <>
         <ToastContainer toasts={toasts} removeToast={removeToast} />
