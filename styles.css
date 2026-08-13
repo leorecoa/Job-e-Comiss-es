@@ -644,6 +644,193 @@
   outline-offset: 2px;
 }
 
+.ui-schedule-host {
+  min-width: 0;
+}
+
+.ui-schedule {
+  display: grid;
+  gap: 1rem;
+}
+
+.ui-schedule-toolbar {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  box-shadow: none;
+}
+
+.ui-schedule-toolbar-copy > span {
+  color: var(--color-accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ui-schedule-toolbar-copy h2 {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  line-height: 1.15;
+}
+
+.ui-schedule-toolbar-copy p {
+  margin: 0.35rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.825rem;
+}
+
+.ui-schedule-controls {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ui-schedule-controls > *,
+.ui-schedule-controls .ui-input,
+.ui-appointment > * {
+  min-width: 0;
+}
+
+.ui-schedule-primary-action {
+  align-self: end;
+}
+
+.ui-schedule-list {
+  display: grid;
+  gap: 0.625rem;
+}
+
+.ui-appointment {
+  display: grid;
+  min-width: 0;
+  gap: 0.875rem;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-control);
+  padding: 1rem;
+  background: var(--color-surface);
+}
+
+.ui-appointment-time {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  color: var(--color-foreground);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.ui-appointment-time svg {
+  align-self: center;
+  color: var(--color-accent);
+}
+
+.ui-appointment-time small {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ui-appointment-details {
+  min-width: 0;
+}
+
+.ui-appointment-heading {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ui-appointment-heading h3 {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.ui-appointment-details > p {
+  margin: 0.3rem 0 0;
+  overflow-wrap: anywhere;
+  color: var(--color-muted);
+  font-size: 0.825rem;
+}
+
+.ui-appointment-details > .ui-appointment-barber {
+  font-size: 0.75rem;
+}
+
+.ui-appointment-notes {
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--color-border);
+  font-style: italic;
+}
+
+.ui-appointment-status {
+  flex: 0 0 auto;
+  letter-spacing: 0.04em;
+}
+
+.ui-appointment-status-scheduled {
+  color: var(--color-accent);
+}
+
+.ui-appointment-status-confirmed,
+.ui-appointment-status-completed {
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+  color: var(--color-success);
+}
+
+.ui-appointment-status-cancelled {
+  border-color: color-mix(in srgb, var(--color-destructive) 35%, transparent);
+  color: var(--color-destructive);
+}
+
+.ui-appointment-status-no_show {
+  color: var(--color-muted);
+}
+
+.ui-appointment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ui-appointment-actions .ui-button,
+.ui-appointment-action {
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.ui-appointment-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-weight: 600;
+}
+
+.ui-appointment-action-success {
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+  color: var(--color-success);
+}
+
+.ui-appointment-action:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-focus-ring) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.ui-schedule-loading {
+  margin-bottom: 1rem;
+  box-shadow: none;
+}
+
 @keyframes ui-spin {
   to { transform: rotate(360deg); }
 }
@@ -664,6 +851,35 @@
 
   .ui-dashboard-section-heading p {
     display: block;
+  }
+
+  .ui-schedule-toolbar {
+    grid-template-columns: minmax(12rem, 1fr) minmax(28rem, auto);
+    align-items: end;
+  }
+
+  .ui-schedule-controls {
+    grid-template-columns: minmax(9rem, 1fr) minmax(10rem, 1fr) auto;
+    align-items: end;
+  }
+
+  .ui-appointment {
+    grid-template-columns: 7rem minmax(12rem, 1fr) minmax(16rem, 24rem);
+    align-items: start;
+  }
+
+  .ui-appointment-time {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+  }
+
+  .ui-appointment-time small {
+    grid-column: 2;
+  }
+
+  .ui-appointment-actions {
+    justify-content: flex-end;
   }
 }
 
