@@ -654,6 +654,53 @@ test.describe('owner operational dashboard e2e', () => {
     await expect(page.getByRole('button', { name: 'Abrir navegacao' })).toBeVisible();
   });
 
+  test('owner scheduling workspace keeps date, filter and appointments usable across viewports', async ({ page }) => {
+    await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/, (route) => route.abort());
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await installOwnerSupabaseMocks(page);
+    await signInAsOwner(page);
+
+    await expect(page.getByRole('heading', { name: 'Agenda do dia' })).toBeVisible();
+    await expect(page.getByLabel('Data da agenda')).toHaveValue('2026-08-12');
+    await expect(page.getByLabel('Barbeiro', { exact: true })).toBeVisible();
+    await expect(page.getByText('Cliente Leo')).toBeVisible();
+    await expect(page.getByText('Agendado', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Dia anterior' }).click();
+    await expect(page.getByLabel('Data operacional')).toHaveValue('2026-08-11');
+    await page.getByRole('button', { name: 'Proximo dia' }).click();
+    await expect(page.getByLabel('Data operacional')).toHaveValue('2026-08-12');
+
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 1280, height: 720 },
+      { width: 1024, height: 768 },
+      { width: 768, height: 1024 },
+      { width: 390, height: 844 },
+      { width: 360, height: 800 }
+    ]) {
+      await page.setViewportSize(viewport);
+      const dimensions = await page.locator('.ui-schedule').evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth
+      }));
+      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+      await expect(page.getByLabel('Data da agenda')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Agendar', exact: true }).last()).toBeVisible();
+      await expect(page.getByText('Cliente Leo')).toBeVisible();
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.setViewportSize({ width: 195, height: 422 });
+    const zoomDimensions = await page.locator('.ui-schedule').evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth
+    }));
+    expect(zoomDimensions.scrollWidth).toBeLessThanOrEqual(zoomDimensions.clientWidth + 1);
+    await expect(page.getByLabel('Data da agenda')).toBeVisible();
+  });
+
   test('owner links a barber profile by email through the tenant-scoped RPC', async ({ page }) => {
     const network = await installOwnerSupabaseMocks(page);
 

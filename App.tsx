@@ -56,6 +56,7 @@ import {
 import { getOperationalErrorMessage, logOperationalError } from './utils/errorHandling';
 import { AUTH_CALLBACK_PATH, AuthCallbackScreen } from './components/AuthCallbackScreen';
 import { DashboardShell, type DashboardNavigationItem } from './components/DashboardShell';
+import { InlineNotice, LoadingState, Surface } from './components/ui';
 
 const AddClientModal = React.lazy(() => import('./components/AddClientModal').then((module) => ({ default: module.AddClientModal })));
 const AddValeModal = React.lazy(() => import('./components/AddValeModal').then((module) => ({ default: module.AddValeModal })));
@@ -1830,9 +1831,9 @@ const App: React.FC = () => {
                         <BarChart3 size={18} />
                     </button>
                     <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5 flex-1 justify-between md:flex-none min-w-[140px]" id="tour-date-picker">
-                        <button onClick={() => changeDate(-1)} className="p-2 text-gray-400 hover:text-white"><ChevronLeft size={20}/></button>
-                        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-transparent border-none text-white text-sm text-center w-full md:w-32 focus:ring-0" />
-                        <button onClick={() => changeDate(1)} className="p-2 text-gray-400 hover:text-white"><ChevronRight size={20}/></button>
+                        <button type="button" aria-label="Dia anterior" onClick={() => changeDate(-1)} className="p-2 text-gray-400 hover:text-white"><ChevronLeft size={20} aria-hidden="true" /></button>
+                        <input aria-label="Data operacional" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-transparent border-none text-white text-sm text-center w-full md:w-32 focus:ring-0" />
+                        <button type="button" aria-label="Proximo dia" onClick={() => changeDate(1)} className="p-2 text-gray-400 hover:text-white"><ChevronRight size={20} aria-hidden="true" /></button>
                     </div>
                     {barberFilterOptions.length > 1 && (
                         <div className="relative shrink-0">
@@ -1927,18 +1928,16 @@ const App: React.FC = () => {
               </div>
 
               {/* Lists */}
-              {isAppointmentsLoading && (
-                <div className="mb-4 bg-blue-500/10 border border-blue-500/20 text-blue-200 text-sm rounded-xl p-3">
-                  Carregando agenda online...
-                </div>
+              {activeTab === 'appointments' && isAppointmentsLoading && (
+                <Surface className="ui-schedule-loading">
+                  <LoadingState title="Carregando agenda online" description="Aguarde enquanto atualizamos os horarios." />
+                </Surface>
               )}
-              {appointmentsError && (
-                <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-200 text-sm rounded-xl p-3">
-                  {appointmentsError}
-                </div>
+              {activeTab === 'appointments' && appointmentsError && (
+                <InlineNotice tone="error" className="mb-4">{appointmentsError}</InlineNotice>
               )}
-              <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
-                 <div className="min-h-[200px] bg-gray-900/30">
+              <div className={activeTab === 'appointments' ? 'ui-schedule-host' : 'bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden'}>
+                 <div className={activeTab === 'appointments' ? 'min-h-[200px]' : 'min-h-[200px] bg-gray-900/30'}>
                     {activeTab === 'appointments' ? (
                       <React.Suspense fallback={<SectionFallback />}>
                         <DailySchedule
