@@ -57,6 +57,7 @@ import { getOperationalErrorMessage, logOperationalError } from './utils/errorHa
 import { AUTH_CALLBACK_PATH, AuthCallbackScreen } from './components/AuthCallbackScreen';
 import { DashboardShell, type DashboardNavigationItem } from './components/DashboardShell';
 import { InlineNotice, LoadingState, Surface } from './components/ui';
+import { SettingsWorkspace } from './components/SettingsWorkspace';
 
 const AddClientModal = React.lazy(() => import('./components/AddClientModal').then((module) => ({ default: module.AddClientModal })));
 const AddValeModal = React.lazy(() => import('./components/AddValeModal').then((module) => ({ default: module.AddValeModal })));
@@ -301,7 +302,7 @@ const App: React.FC = () => {
 
   // -- View State --
   const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
-  const [activeTab, setActiveTab] = useState<'appointments' | 'clients' | 'vales'>('appointments');
+  const [activeTab, setActiveTab] = useState<'appointments' | 'clients' | 'vales' | 'management'>('appointments');
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthString());
   const [selectedBarberFilter, setSelectedBarberFilter] = useState<string>('TODOS');
@@ -1614,7 +1615,8 @@ const App: React.FC = () => {
     { id: 'appointments', label: 'Agenda', description: 'Acompanhe horarios e operacao do dia.', icon: <Calendar size={18} /> },
     { id: 'clients', label: 'Clientes', description: 'Consulte os atendimentos registrados.', icon: <Users size={18} /> },
     { id: 'vales', label: 'Vales', description: 'Acompanhe os descontos registrados.', icon: <MinusCircle size={18} /> },
-    { id: 'reports', label: 'Relatorios', description: 'Analise resultados e periodos anteriores.', icon: <BarChart3 size={18} /> }
+    { id: 'reports', label: 'Relatorios', description: 'Analise resultados e periodos anteriores.', icon: <BarChart3 size={18} /> },
+    { id: 'management', label: 'Gestao', description: 'Configure presenca publica, equipe e catalogo.', icon: <Settings size={18} /> }
   ];
   const activeOwnerSection = viewMode === 'monthly' ? 'reports' : activeTab;
   const handleOwnerNavigation = (sectionId: string) => {
@@ -1623,7 +1625,7 @@ const App: React.FC = () => {
       return;
     }
     setViewMode('daily');
-    setActiveTab(sectionId as 'appointments' | 'clients' | 'vales');
+    setActiveTab(sectionId as 'appointments' | 'clients' | 'vales' | 'management');
   };
 
   const changeDate = (days: number) => {
@@ -1808,7 +1810,56 @@ const App: React.FC = () => {
         )}
       >
         
-        {viewMode === 'daily' && (
+        <div hidden={activeOwnerSection !== 'management'}>
+          <React.Suspense fallback={<SectionFallback />}>
+            <SettingsWorkspace
+              publicPresence={(
+                <BarbershopBrandingSettings
+                  barbershop={ownerBarbershop}
+                  role={authSession?.role || 'owner'}
+                  loading={isOwnerBarbershopLoading}
+                  saving={isSavingOwnerBarbershop}
+                  error={ownerBarbershopError}
+                  success={ownerBarbershopSuccess}
+                  onSave={handleSaveOwnerBarbershopBranding}
+                  onUploadImage={handleUploadOwnerBarbershopBrandingImage}
+                />
+              )}
+              readiness={(
+                <OwnerSetupChecklist
+                  role={authSession?.role || 'owner'}
+                  authSession={authSession}
+                  barbershop={ownerBarbershop}
+                  barbers={ownerCatalogBarbers}
+                  services={ownerCatalogServices}
+                />
+              )}
+              team={(
+                <OwnerBarberProfileLinking
+                  role={authSession?.role || 'owner'}
+                  barbers={ownerCatalogBarbers}
+                  onLinkProfile={handleLinkOwnerBarberProfile}
+                />
+              )}
+              catalog={(
+                <OwnerCatalogManager
+                  barbers={ownerCatalogBarbers}
+                  services={ownerCatalogServices}
+                  loading={isOwnerCatalogLoading}
+                  error={ownerCatalogError}
+                  onCreateBarber={handleCreateOwnerBarber}
+                  onUpdateBarber={handleUpdateOwnerBarber}
+                  onRemoveBarber={handleRemoveOwnerBarber}
+                  onCreateService={handleCreateOwnerService}
+                  onUpdateService={handleUpdateOwnerService}
+                  onRemoveService={handleRemoveOwnerService}
+                />
+              )}
+            />
+          </React.Suspense>
+        </div>
+
+        {viewMode === 'daily' && activeTab !== 'management' && (
           <div className="animate-slide-in">
              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                  <div id="tour-actions" className="flex gap-2 w-full md:w-auto">
@@ -1870,46 +1921,6 @@ const App: React.FC = () => {
                 </div>
              </div>
              
-             <React.Suspense fallback={<SectionFallback />}>
-               <BarbershopBrandingSettings
-                  barbershop={ownerBarbershop}
-                  role={authSession?.role || 'owner'}
-                  loading={isOwnerBarbershopLoading}
-                  saving={isSavingOwnerBarbershop}
-                  error={ownerBarbershopError}
-                  success={ownerBarbershopSuccess}
-                  onSave={handleSaveOwnerBarbershopBranding}
-                  onUploadImage={handleUploadOwnerBarbershopBrandingImage}
-               />
-
-               <OwnerSetupChecklist
-                  role={authSession?.role || 'owner'}
-                  authSession={authSession}
-                  barbershop={ownerBarbershop}
-                  barbers={ownerCatalogBarbers}
-                  services={ownerCatalogServices}
-               />
-
-               <OwnerBarberProfileLinking
-                  role={authSession?.role || 'owner'}
-                  barbers={ownerCatalogBarbers}
-                  onLinkProfile={handleLinkOwnerBarberProfile}
-               />
-
-               <OwnerCatalogManager
-                  barbers={ownerCatalogBarbers}
-                  services={ownerCatalogServices}
-                  loading={isOwnerCatalogLoading}
-                  error={ownerCatalogError}
-                  onCreateBarber={handleCreateOwnerBarber}
-                  onUpdateBarber={handleUpdateOwnerBarber}
-                  onRemoveBarber={handleRemoveOwnerBarber}
-                  onCreateService={handleCreateOwnerService}
-                  onUpdateService={handleUpdateOwnerService}
-                  onRemoveService={handleRemoveOwnerService}
-                />
-             </React.Suspense>
-
              {/* New Dashboard Charts */}
              <div className="mb-6">
                 <React.Suspense fallback={<SectionFallback />}>

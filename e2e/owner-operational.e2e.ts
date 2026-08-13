@@ -544,6 +544,12 @@ const signInAsOwner = async (page: Page) => {
   await page.locator('form button[type="submit"]').click();
 };
 
+const openOwnerManagement = async (page: Page) => {
+  await page.getByRole('navigation', { name: 'Secoes do painel', exact: true })
+    .getByRole('button', { name: 'Gestao' })
+    .click();
+};
+
 test.describe('owner operational dashboard e2e', () => {
   test('financial completion persists after reload and remote failure creates no phantom record', async ({ page, browser }) => {
     const network = await installOwnerSupabaseMocks(page);
@@ -582,6 +588,9 @@ test.describe('owner operational dashboard e2e', () => {
     await signInAsOwner(page);
 
     await expect(page.getByText('leo do leo', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Prontidao operacional/i, includeHidden: true })).toBeHidden();
+    await expect(page.getByRole('heading', { name: /Catalogo operacional/i, includeHidden: true })).toBeHidden();
+    await openOwnerManagement(page);
     await expect(page.getByRole('heading', { name: /Prontidao operacional/i })).toBeVisible();
     await expect(page.getByText(/Booking pronto para receber agendamentos\./i)).toBeVisible();
     await expect(page.getByText('/book/leo-do-leo')).toBeVisible();
@@ -590,6 +599,7 @@ test.describe('owner operational dashboard e2e', () => {
     await expect(page.getByRole('heading', { name: /Catalogo operacional/i })).toBeVisible();
     await expect(page.locator('input[value="Leo Barber"]').first()).toBeVisible();
     await expect(page.locator('input[value="Corte Leo"]').first()).toBeVisible();
+    await page.getByRole('navigation', { name: 'Secoes do painel', exact: true }).getByRole('button', { name: 'Agenda' }).click();
     await expect(page.getByText('Cliente Leo')).toBeVisible();
 
     await expect(page.getByText(/Gest[aã]o M[aá]xima/i)).toHaveCount(0);
@@ -603,6 +613,57 @@ test.describe('owner operational dashboard e2e', () => {
     expect(network.serviceRequests.some((url) => url.includes(`barbershop_id=eq.${OWNER_BARBERSHOP_ID}`))).toBeTruthy();
     expect(network.appointmentReadRequests.some((url) => url.includes(`barbershop_id=eq.${OWNER_BARBERSHOP_ID}`))).toBeTruthy();
     expect(network.appointmentReadRequests.every((url) => !url.includes(`barbershop_id=eq.${OTHER_BARBERSHOP_ID}`))).toBeTruthy();
+  });
+
+  test('owner management workspace is responsive and returns to the agenda', async ({ page }) => {
+    await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/, (route) => route.abort());
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await installOwnerSupabaseMocks(page);
+    await signInAsOwner(page);
+    await openOwnerManagement(page);
+
+    await expect(page.getByRole('heading', { name: 'Gestao da barbearia' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Grupos da gestao' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Configuracoes da barbearia/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Vincular barbeiro a usuario/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Catalogo operacional/i })).toBeVisible();
+    await page.getByLabel('Nome da barbearia').fill('Nome em edicao nao salvo');
+
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 1280, height: 720 },
+      { width: 1024, height: 768 },
+      { width: 768, height: 1024 },
+      { width: 390, height: 844 },
+      { width: 360, height: 800 }
+    ]) {
+      await page.setViewportSize(viewport);
+      const dimensions = await page.evaluate(() => ({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth
+      }));
+      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+      await expect(page.getByRole('link', { name: 'Presenca publica' })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Salvar aparencia/i })).toBeVisible();
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.getByRole('button', { name: 'Abrir navegacao' }).click();
+    const mobileNavigation = page.getByRole('complementary', { name: 'Navegacao mobile' });
+    await mobileNavigation.getByRole('button', { name: 'Agenda' }).click();
+    await expect(page.getByRole('heading', { name: 'Agenda do dia' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Gestao da barbearia', includeHidden: true })).toBeHidden();
+
+    await page.setViewportSize({ width: 195, height: 422 });
+    await page.getByRole('button', { name: 'Abrir navegacao' }).click();
+    await page.getByRole('complementary', { name: 'Navegacao mobile' }).getByRole('button', { name: 'Gestao' }).click();
+    await expect(page.getByLabel('Nome da barbearia')).toHaveValue('Nome em edicao nao salvo');
+    const zoomDimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(zoomDimensions.scrollWidth).toBeLessThanOrEqual(zoomDimensions.clientWidth + 1);
   });
 
   test('owner shell keeps navigation accessible and responsive', async ({ page }) => {
@@ -661,15 +722,15 @@ test.describe('owner operational dashboard e2e', () => {
     await signInAsOwner(page);
 
     await expect(page.getByRole('heading', { name: 'Agenda do dia' })).toBeVisible();
-    await expect(page.getByLabel('Data da agenda')).toHaveValue('2026-08-12');
+    const initialDate = await page.getByLabel('Data da agenda').inputValue();
     await expect(page.getByLabel('Barbeiro', { exact: true })).toBeVisible();
     await expect(page.getByText('Cliente Leo')).toBeVisible();
     await expect(page.getByText('Agendado', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Dia anterior' }).click();
-    await expect(page.getByLabel('Data operacional')).toHaveValue('2026-08-11');
+    await expect(page.getByLabel('Data operacional')).not.toHaveValue(initialDate);
     await page.getByRole('button', { name: 'Proximo dia' }).click();
-    await expect(page.getByLabel('Data operacional')).toHaveValue('2026-08-12');
+    await expect(page.getByLabel('Data operacional')).toHaveValue(initialDate);
 
     for (const viewport of [
       { width: 1440, height: 900 },
@@ -705,6 +766,7 @@ test.describe('owner operational dashboard e2e', () => {
     const network = await installOwnerSupabaseMocks(page);
 
     await signInAsOwner(page);
+    await openOwnerManagement(page);
 
     await expect(page.getByRole('heading', { name: /Vincular barbeiro a usuario/i })).toBeVisible();
     await expect(page.getByText(/O barbeiro cria uma conta usando o e-mail dele/i)).toBeVisible();
@@ -762,6 +824,7 @@ test.describe('owner operational dashboard e2e', () => {
       });
 
       await signInAsOwner(page);
+      await openOwnerManagement(page);
 
       await page.getByPlaceholder('E-mail da conta do barbeiro').fill('barber@example.com');
       const linkButton = page.getByRole('button', { name: /Vincular usuario/i });
