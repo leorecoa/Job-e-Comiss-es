@@ -4,6 +4,29 @@ import { describe, expect, it } from 'vitest';
 const readSource = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 describe('owner workspace contrast regression', () => {
+  it('keeps all administrative surfaces off legacy dark presentation classes', () => {
+    const administrativeFiles = [
+      './App.tsx',
+      './components/AddClientModal.tsx',
+      './components/AddValeModal.tsx',
+      './components/AppointmentModal.tsx',
+      './components/BarberDashboard.tsx',
+      './components/DashboardCharts.tsx',
+      './components/MonthlySummary.tsx',
+      './components/OwnerBarberProfileLinking.tsx',
+      './components/OwnerCatalogManager.tsx',
+      './components/OwnerSetupChecklist.tsx',
+      './components/ReportModal.tsx',
+      './components/SettingsModal.tsx',
+      './components/TourOverlay.tsx'
+    ];
+    const legacyPresentation = /glass-card|(?:bg|text|border)-(?:gray|slate)-(?:[0-9]{2,3})|bg-black\//;
+
+    for (const path of administrativeFiles) {
+      expect(readSource(path), path).not.toMatch(legacyPresentation);
+    }
+  });
+
   it('keeps owner branding fields and uploads off legacy dark utility classes', () => {
     const source = readSource('./components/BarbershopBrandingSettings.tsx');
 
@@ -34,5 +57,16 @@ describe('owner workspace contrast regression', () => {
     expect(css).toContain('.ui-branding-file:disabled');
     expect(css).toContain('.ui-owner-filter:focus-visible');
     expect(css).toContain('.ui-input::placeholder');
+    expect(css).toContain('.ui-button:disabled');
+    expect(css).toContain('background: var(--color-disabled) !important');
+  });
+
+  it('limits intentional dark identity to named public preview surfaces', () => {
+    const booking = readSource('./components/PublicBookingPage.tsx');
+    const branding = readSource('./components/BarbershopBrandingSettings.tsx');
+
+    expect(booking).toContain('ui-public-hero');
+    expect(booking).not.toContain('glass-card');
+    expect(branding).toContain('ui-branding-preview');
   });
 });

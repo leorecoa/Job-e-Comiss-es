@@ -100,12 +100,12 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
   };
 
   return (
-    <section id="owner-catalog-manager" className="mb-6 rounded-3xl border border-gray-700 bg-gray-800/80 p-5 shadow-xl shadow-black/10 scroll-mt-24">
+    <section id="owner-catalog-manager" className="ui-owner-panel mb-6 scroll-mt-24">
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-gold-300">Operacao</p>
-          <h2 className="font-display text-2xl font-bold text-white">Catalogo operacional</h2>
-          <p className="mt-1 text-sm text-gray-400">Cadastre equipe e servicos da sua propria barbearia. Itens com historico sao desativados para preservar agendamentos antigos.</p>
+          <h2 className="font-display text-2xl font-bold text-foreground">Catalogo operacional</h2>
+          <p className="ui-owner-help mt-1">Cadastre equipe e servicos da sua propria barbearia. Itens com historico sao desativados para preservar agendamentos antigos.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:w-[320px]">
@@ -121,15 +121,15 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
       )}
 
       {loading ? (
-        <div className="rounded-2xl border border-gray-700 bg-gray-900/40 px-4 py-5 text-sm text-gray-400">
+        <div className="ui-owner-empty">
           Carregando catalogo da barbearia...
         </div>
       ) : (
         <div className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
-          <div className="space-y-4 rounded-2xl border border-gray-700 bg-gray-900/40 p-4">
+          <div className="ui-owner-card space-y-4">
             <div className="flex items-center gap-2 text-blue-300">
               <Scissors size={18} />
-              <h3 className="font-bold text-white">Barbeiros</h3>
+              <h3 className="font-bold text-foreground">Barbeiros</h3>
             </div>
 
             <div className="flex gap-2">
@@ -137,13 +137,13 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                 value={newBarberName}
                 onChange={(event) => setNewBarberName(event.target.value)}
                 placeholder="Nome do barbeiro"
-                className="flex-1 rounded-xl border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
+                className="ui-input flex-1"
               />
               <button
                 type="button"
                 onClick={handleCreateBarber}
                 disabled={isCreatingBarber}
-                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-3 py-2.5 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="ui-button ui-button-primary"
               >
                 <Plus size={18} />
               </button>
@@ -158,12 +158,12 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                 />
               ) : (
                 barbers.map((barber) => (
-                  <div key={barber.id} className="rounded-2xl border border-gray-700 bg-gray-950/70 p-3">
+                  <div key={barber.id} className="ui-owner-record-card">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                       <input
                         value={barberDrafts[barber.id] || ''}
                         onChange={(event) => setBarberDrafts((prev) => ({ ...prev, [barber.id]: event.target.value }))}
-                        className="flex-1 rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
+                        className="ui-input flex-1"
                       />
                       <StatusBadge active={barber.active !== false} />
                     </div>
@@ -179,7 +179,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                           }
                         }}
                         disabled={pendingBarberId === barber.id}
-                        className="inline-flex items-center gap-2 rounded-xl border border-gray-600 bg-gray-900 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+                        className="ui-button ui-button-secondary"
                       >
                         <Save size={14} />
                         Salvar
@@ -197,8 +197,8 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                         disabled={pendingBarberId === barber.id}
                         className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-50 ${
                           barber.active === false
-                            ? 'bg-green-500/10 text-green-200 border border-green-500/20'
-                            : 'bg-red-500/10 text-red-200 border border-red-500/20'
+                            ? 'ui-button ui-button-secondary'
+                            : 'ui-button ui-button-danger'
                         }`}
                         >
                           <RotateCcw size={14} />
@@ -215,7 +215,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                           }
                         }}
                         disabled={pendingBarberId === barber.id}
-                        className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-bold text-red-200 disabled:opacity-50"
+                        className="ui-button ui-button-danger"
                       >
                         <Trash2 size={14} />
                         Excluir
@@ -227,10 +227,10 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
             </div>
           </div>
 
-          <div className="space-y-4 rounded-2xl border border-gray-700 bg-gray-900/40 p-4">
+          <div className="ui-owner-card space-y-4">
             <div className="flex items-center gap-2 text-gold-300">
               <Package size={18} />
-              <h3 className="font-bold text-white">Servicos</h3>
+              <h3 className="font-bold text-foreground">Servicos</h3>
             </div>
 
             <div className="grid gap-2 md:grid-cols-[1.4fr_0.75fr_0.75fr_0.75fr_auto]">
@@ -238,7 +238,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                 value={newServiceName}
                 onChange={(event) => setNewServiceName(event.target.value)}
                 placeholder="Nome do servico"
-                className="rounded-xl border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                className="ui-input"
               />
               <input
                 value={newServicePrice}
@@ -247,7 +247,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                 type="number"
                 min="0"
                 step="0.01"
-                className="rounded-xl border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                className="ui-input"
               />
               <input
                 value={newServiceDuration}
@@ -256,7 +256,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                 type="number"
                 min="1"
                 step="1"
-                className="rounded-xl border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                className="ui-input"
               />
               <input
                 value={newServiceCommission}
@@ -266,13 +266,13 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                 min="0"
                 max="100"
                 step="0.01"
-                className="rounded-xl border border-gray-700 bg-gray-950 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                className="ui-input"
               />
               <button
                 type="button"
                 onClick={handleCreateService}
                 disabled={isCreatingService}
-                className="inline-flex items-center justify-center rounded-xl bg-gold-500 px-3 py-2.5 font-bold text-black disabled:cursor-not-allowed disabled:opacity-50"
+                className="ui-button ui-button-primary"
               >
                 <Plus size={18} />
               </button>
@@ -295,7 +295,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                   };
 
                   return (
-                    <div key={service.id} className="rounded-2xl border border-gray-700 bg-gray-950/70 p-3">
+                    <div key={service.id} className="ui-owner-record-card">
                       <div className="grid gap-2 md:grid-cols-[1.35fr_0.8fr_0.8fr_0.8fr]">
                         <input
                           value={draft.name}
@@ -303,7 +303,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                             ...prev,
                             [service.id]: { ...draft, name: event.target.value }
                           }))}
-                          className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                          className="ui-input"
                         />
                         <input
                           value={draft.price}
@@ -314,7 +314,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                           type="number"
                           min="0"
                           step="0.01"
-                          className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                          className="ui-input"
                         />
                         <input
                           value={draft.durationMinutes}
@@ -325,7 +325,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                           type="number"
                           min="1"
                           step="1"
-                          className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                          className="ui-input"
                         />
                         <input
                           value={draft.commissionRate}
@@ -337,7 +337,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                           min="0"
                           max="100"
                           step="0.01"
-                          className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-gold-500"
+                          className="ui-input"
                         />
                       </div>
 
@@ -360,7 +360,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                               }
                             }}
                             disabled={pendingServiceId === service.id}
-                            className="inline-flex items-center gap-2 rounded-xl border border-gray-600 bg-gray-900 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+                            className="ui-button ui-button-secondary"
                           >
                             <Save size={14} />
                             Salvar
@@ -378,8 +378,8 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                             disabled={pendingServiceId === service.id}
                             className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-50 ${
                               service.active === false
-                                ? 'bg-green-500/10 text-green-200 border border-green-500/20'
-                                : 'bg-red-500/10 text-red-200 border border-red-500/20'
+                                ? 'ui-button ui-button-secondary'
+                                : 'ui-button ui-button-danger'
                             }`}
                           >
                             <RotateCcw size={14} />
@@ -396,7 +396,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
                               }
                             }}
                             disabled={pendingServiceId === service.id}
-                            className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-bold text-red-200 disabled:opacity-50"
+                            className="ui-button ui-button-danger"
                           >
                             <Trash2 size={14} />
                             Excluir
@@ -416,18 +416,18 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
 };
 
 const SummaryPill: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({ label, value, icon }) => (
-  <div className="rounded-2xl border border-gray-700 bg-gray-900/60 px-4 py-3">
+  <div className="ui-owner-counter">
     <div className="mb-2 text-gold-300">{icon}</div>
-    <p className="text-lg font-bold text-white">{value}</p>
-    <p className="text-xs uppercase tracking-widest text-gray-500">{label}</p>
+    <p className="text-lg font-bold text-foreground">{value}</p>
+    <p className="text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
   </div>
 );
 
 const StatusBadge: React.FC<{ active: boolean }> = ({ active }) => (
   <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
     active
-      ? 'border border-green-400/20 bg-green-500/10 text-green-200'
-      : 'border border-gray-600 bg-gray-800 text-gray-400'
+      ? 'ui-owner-status-success'
+      : 'ui-owner-status-warning'
   }`}>
     <CheckCircle2 size={12} />
     {active ? 'Ativo' : 'Inativo'}
@@ -435,8 +435,8 @@ const StatusBadge: React.FC<{ active: boolean }> = ({ active }) => (
 );
 
 const EmptyState: React.FC<{ title: string; description: string; nextStep?: string }> = ({ title, description, nextStep }) => (
-  <div className="rounded-2xl border border-gray-700 bg-gray-950/70 px-4 py-5 text-sm text-gray-400">
-    <p className="font-bold text-white">{title}</p>
+  <div className="ui-owner-empty">
+    <p className="font-bold text-foreground">{title}</p>
     <p className="mt-1">{description}</p>
     {nextStep && <p className="mt-2 text-xs font-bold uppercase tracking-widest text-gold-300">{nextStep}</p>}
   </div>

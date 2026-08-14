@@ -82,8 +82,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
       
       {/* Revenue Chart */}
-      <div className="bg-gray-800 rounded-2xl border border-gray-700 p-5 shadow-lg flex flex-col">
-        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">
+      <div className="ui-owner-card-solid flex flex-col p-5">
+        <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
             {period === 'monthly' ? 'Faturamento bruto do mes por dia' : 'Faturamento bruto dos ultimos 7 dias'}
         </h3>
         
@@ -93,18 +93,18 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
                 <div key={i} className={`flex flex-col items-center group ${period === 'monthly' ? 'min-w-[12px] flex-1' : 'flex-1'}`}>
                     <div className="relative w-full flex justify-center h-32 items-end">
                         {/* Tooltip */}
-                        <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 border border-gray-600 text-white text-[10px] py-1 px-2 rounded pointer-events-none whitespace-nowrap z-10 shadow-xl">
+                        <div className="ui-chart-tooltip pointer-events-none absolute bottom-full z-10 mb-2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 transition-opacity group-hover:opacity-100">
                             <span className="font-bold block">{d.day}</span>
                             {formatCurrency(d.value)}
                         </div>
                         {/* Bar */}
                         <div 
-                            className={`w-full ${period === 'monthly' ? 'max-w-[8px] rounded-sm' : 'max-w-[24px] rounded-t-sm'} bg-gradient-to-t from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 transition-all opacity-80 hover:opacity-100`}
+                            className={`ui-chart-bar w-full ${period === 'monthly' ? 'max-w-[8px] rounded-sm' : 'max-w-[24px] rounded-t-sm'} transition-opacity opacity-90 hover:opacity-100`}
                             style={{ height: `${(d.value / maxBarValue) * 100}%`, minHeight: d.value > 0 ? '4px' : '0' }}
                         ></div>
                     </div>
                     {/* Labels: Show all for weekly, but skip some for monthly to avoid clutter if screen is small */}
-                    <span className="text-[9px] text-gray-500 mt-2 font-mono truncate w-full text-center">
+                    <span className="mt-2 w-full truncate text-center font-mono text-[9px] text-muted-foreground">
                         {period === 'monthly' ? (i % 2 === 0 ? d.day : '') : d.day}
                     </span>
                 </div>
@@ -113,39 +113,39 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       </div>
 
       {/* Services Chart */}
-      <div className="bg-gray-800 rounded-2xl border border-gray-700 p-5 shadow-lg">
-         <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Mix de servicos por atendimento</h3>
+      <div className="ui-owner-card-solid p-5">
+         <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Mix de servicos por atendimento</h3>
          <div className="space-y-4 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
             {pieData.length === 0 ? (
               <>
-                <div className="pt-4 text-center text-sm text-gray-500">
-                    <p className="font-bold text-white">Ainda sem mix de servicos.</p>
+                <div className="pt-4 text-center text-sm text-muted-foreground">
+                    <p className="font-bold text-foreground">Ainda sem mix de servicos.</p>
                     <p className="mt-1">O grafico aparece depois que houver atendimentos registrados no periodo.</p>
                 </div>
-                <p className="text-gray-500 text-sm text-center py-4">Sem dados no período.</p>
+                <p className="py-4 text-center text-sm text-muted-foreground">Sem dados no período.</p>
               </>
             ) : (
                 pieData.map((d) => (
                     <div key={d.name} className="group">
-                        <div className="flex justify-between text-xs text-gray-300 mb-1.5 font-medium">
+                        <div className="mb-1.5 flex justify-between text-xs font-medium text-foreground">
                             <span className="flex items-center gap-2">
                                 <span className={`w-2 h-2 rounded-full ${
                                     d.name === ServiceType.CUT ? 'bg-blue-500' : 
                                     d.name === ServiceType.BEARD ? 'bg-orange-500' : 
                                     d.name === ServiceType.COMBO ? 'bg-purple-500' : 
-                                    d.name === ServiceType.PRODUCT ? 'bg-green-500' : 'bg-gray-500'
+                                    d.name === ServiceType.PRODUCT ? 'bg-green-600' : 'ui-chart-legend-mark'
                                 }`}></span>
                                 {d.name}
                             </span>
                             <span>{Math.round(d.percent)}%</span>
                         </div>
-                        <div className="w-full bg-gray-900 rounded-full h-2.5 overflow-hidden border border-gray-700/50">
+                        <div className="ui-chart-track h-2.5 w-full overflow-hidden rounded-full">
                             <div 
                                 className={`h-full rounded-full transition-all duration-1000 ease-out ${
                                     d.name === ServiceType.CUT ? 'bg-blue-500' : 
                                     d.name === ServiceType.BEARD ? 'bg-orange-500' : 
                                     d.name === ServiceType.COMBO ? 'bg-purple-500' : 
-                                    d.name === ServiceType.PRODUCT ? 'bg-green-500' : 'bg-gray-500'
+                                    d.name === ServiceType.PRODUCT ? 'bg-green-600' : 'ui-chart-segment'
                                 }`}
                                 style={{ width: `${d.percent}%` }}
                             ></div>

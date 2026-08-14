@@ -17,10 +17,10 @@ export class AppErrorBoundary extends React.Component<React.PropsWithChildren, S
   render(): React.ReactNode {
     if (this.state.hasError) {
       return (
-        <main className="min-h-screen flex items-center justify-center bg-gray-950 px-6 text-center text-white">
-          <div>
+        <main className="ui-auth-shell min-h-screen flex items-center justify-center px-6 text-center">
+          <div className="ui-surface p-8">
             <h1 className="text-2xl font-bold">Nao foi possivel carregar esta tela.</h1>
-            <p className="mt-3 text-gray-400">Recarregue a pagina para tentar novamente.</p>
+            <p className="ui-owner-help mt-3">Recarregue a pagina para tentar novamente.</p>
           </div>
         </main>
       );
