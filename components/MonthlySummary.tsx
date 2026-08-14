@@ -133,30 +133,30 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
   return (
     <div className="animate-slide-in space-y-6 pb-12">
       {/* Header do Relatório */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-800 p-4 rounded-2xl border border-gray-700 sticky top-[72px] z-30 shadow-2xl shadow-gray-950/50">
+      <div className="ui-owner-card-solid sticky top-[72px] z-30 flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
         <div className="flex items-center gap-4 w-full md:w-auto">
           <button 
             onClick={onBack}
-            className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            className="ui-button ui-button-secondary"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h2 className="text-xl font-display font-bold text-white">Resumo financeiro mensal</h2>
-            <p className="text-sm text-gray-400">Periodo analisado: {selectedMonthLabel}</p>
+            <h2 className="font-display text-xl font-bold text-foreground">Resumo financeiro mensal</h2>
+            <p className="text-sm text-muted-foreground">Periodo analisado: {selectedMonthLabel}</p>
           </div>
         </div>
 
         <div className="flex gap-3 w-full md:w-auto items-center justify-end">
             <div className="relative flex-grow md:flex-grow-0">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                     <Calendar size={16} />
                 </div>
                 <input 
                     type="month" 
                     value={selectedMonth}
                     onChange={(e) => onMonthChange(e.target.value)}
-                    className="w-full md:w-40 bg-gray-900 border border-gray-700 text-white text-sm rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent block pl-10 p-2.5 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert cursor-pointer"
+                    className="ui-input block w-full cursor-pointer pl-10 md:w-40"
                 />
             </div>
         </div>
@@ -169,40 +169,40 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
           value={formatCurrency(monthlyData.totalSales)} 
           subtitle={`${monthlyData.totalClients} atendimentos`}
           icon={<DollarSign size={20} />} 
-          colorClass="bg-gradient-to-br from-blue-900/40 to-gray-800 border-blue-500/30 text-blue-400"
+          colorClass="ui-owner-metric"
         />
         <StatsCard
           title="Comissao calculada"
           value={formatCurrency(monthlyData.totalCommission)}
           subtitle="Baseada nos atendimentos"
           icon={<TrendingUp size={20} />}
-          colorClass="bg-gradient-to-br from-gold-500/20 to-gray-800 border-gold-500/50 text-gold-500"
+          colorClass="ui-owner-metric"
         />
         <StatsCard
           title="Liquido estimado da barbearia"
           value={formatCurrency(monthlyData.estimatedShopNet)}
           subtitle="Bruto menos comissao calculada"
           icon={<DollarSign size={20} />}
-          colorClass="bg-gradient-to-br from-green-900/35 to-gray-800 border-green-500/30 text-green-400"
+          colorClass="ui-owner-metric"
         />
         <StatsCard 
           title="Vales / Despesas" 
           value={formatCurrency(monthlyData.totalVales)}
           subtitle="Lancamentos do periodo"
           icon={<MinusCircle size={20} />} 
-          colorClass="bg-gradient-to-br from-red-900/40 to-gray-800 border-red-500/30 text-red-400"
+          colorClass="ui-owner-metric"
         />
         <StatsCard 
           title="Saldo estimado da equipe" 
           value={formatCurrency(monthlyData.netCommission)} 
           subtitle="Comissao calculada menos vales"
           icon={<TrendingUp size={20} />} 
-          colorClass="bg-gradient-to-br from-gold-500/20 to-gray-800 border-gold-500/50 text-gold-500"
+          colorClass="ui-owner-metric"
         />
       </div>
 
-      <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
-        <p className="font-bold text-white">Nota sobre comissoes</p>
+      <div className="ui-owner-info rounded-2xl p-4 text-sm">
+        <p className="font-bold text-foreground">Nota sobre comissoes</p>
         <p className="mt-1">
           Os valores de comissao representam o calculo com base nos atendimentos registrados. Este painel nao controla pagamento de repasse.
           {monthlyData.totalClients > 0 ? ` Ticket medio do periodo: ${formatCurrency(monthlyData.averageTicket)}.` : ''}
@@ -220,9 +220,9 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
 
       {/* TABELA DE EQUIPE (Somente se houver dados de equipe ou múltiplos nomes) */}
       {monthlyData.teamBreakdown.length > 0 && (
-         <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-gray-700 bg-gray-900/50 flex justify-between items-center">
-                <h3 className="font-bold text-white flex items-center gap-2">
+         <div className="ui-owner-list overflow-hidden">
+            <div className="ui-owner-table-head flex items-center justify-between p-4">
+                <h3 className="flex items-center gap-2 font-bold text-foreground">
                     <Users size={18} className="text-blue-400"/>
                     Producao por barbeiro
                 </h3>
@@ -230,7 +230,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                 <thead>
-                    <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
+                    <tr className="ui-owner-table-head text-xs uppercase tracking-wider">
                     <th className="p-4 font-medium">Barbeiro</th>
                     <th className="p-4 font-medium text-center">Atend.</th>
                     <th className="p-4 font-medium text-right text-blue-400">Producao bruta</th>
@@ -239,14 +239,14 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                     <th className="p-4 font-medium text-right text-gold-500">Saldo estimado</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-700/50">
+                <tbody>
                     {monthlyData.teamBreakdown.map((barber) => {
                         const net = barber.commission - barber.vales;
                         return (
-                            <tr key={barber.name} className="hover:bg-gray-700/30 transition-colors">
-                                <td className="p-4 text-white font-bold">{barber.name}</td>
-                                <td className="p-4 text-center text-gray-300">{barber.count}</td>
-                                <td className="p-4 text-right text-gray-300">{formatCurrency(barber.sales)}</td>
+                            <tr key={barber.name} className="ui-owner-table-row transition-colors">
+                                <td className="p-4 font-bold text-foreground">{barber.name}</td>
+                                <td className="p-4 text-center text-foreground">{barber.count}</td>
+                                <td className="p-4 text-right text-foreground">{formatCurrency(barber.sales)}</td>
                                 <td className="p-4 text-right text-gold-300">{formatCurrency(barber.commission)}</td>
                                 <td className="p-4 text-right text-red-300">{barber.vales > 0 ? `- ${formatCurrency(barber.vales)}` : '-'}</td>
                                 <td className="p-4 text-right font-bold text-gold-500 text-lg">{formatCurrency(net)}</td>
@@ -260,18 +260,18 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
       )}
 
       {/* Tabela Detalhada por Dia */}
-      <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-gray-700 bg-gray-900/50">
-          <h3 className="font-bold text-white flex items-center gap-2">
-            <Calendar size={18} className="text-gray-400"/>
+      <div className="ui-owner-list overflow-hidden">
+        <div className="ui-owner-table-head p-4">
+          <h3 className="flex items-center gap-2 font-bold text-foreground">
+            <Calendar size={18} className="text-muted-foreground"/>
             Historico diario da barbearia
           </h3>
         </div>
         
         <div className="overflow-x-auto">
           {monthlyData.dailyBreakdown.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <p className="font-bold text-white">Nenhum registro encontrado neste mes.</p>
+            <div className="ui-owner-empty m-4 text-center">
+              <p className="font-bold text-foreground">Nenhum registro encontrado neste mes.</p>
               <p className="mx-auto mt-2 max-w-md text-sm">
                 Atendimentos concluidos, vendas e vales lancados no periodo aparecerao neste historico.
               </p>
@@ -279,24 +279,24 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
+                <tr className="ui-owner-table-head text-xs uppercase tracking-wider">
                   <th className="p-4 font-medium">Data</th>
                   <th className="p-4 font-medium text-center">Atend.</th>
-                  <th className="p-4 font-medium text-right text-gray-300">Faturamento bruto</th>
+                  <th className="p-4 text-right font-medium text-foreground">Faturamento bruto</th>
                   <th className="p-4 font-medium text-right text-gold-500">Comissao calculada</th>
-                  <th className="p-4 font-medium text-right text-gray-400">Vales</th>
+                  <th className="p-4 text-right font-medium text-muted-foreground">Vales</th>
                   <th className="p-4 font-medium text-right text-gold-500">Saldo estimado</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700/50">
+              <tbody>
                 {monthlyData.dailyBreakdown.map((day) => {
                     return (
-                        <tr key={day.date} className="hover:bg-gray-700/30 transition-colors">
-                            <td className="p-4 text-white font-medium">{day.date}</td>
-                            <td className="p-4 text-center text-gray-300">{day.count}</td>
-                            <td className="p-4 text-right text-gray-300">{formatCurrency(day.sales)}</td>
+                        <tr key={day.date} className="ui-owner-table-row transition-colors">
+                            <td className="p-4 font-medium text-foreground">{day.date}</td>
+                            <td className="p-4 text-center text-foreground">{day.count}</td>
+                            <td className="p-4 text-right text-foreground">{formatCurrency(day.sales)}</td>
                             <td className="p-4 text-right text-gold-300">{formatCurrency(day.commission)}</td>
-                            <td className="p-4 text-right text-gray-400">{day.vales > 0 ? `- ${formatCurrency(day.vales)}` : '-'}</td>
+                            <td className="p-4 text-right text-muted-foreground">{day.vales > 0 ? `- ${formatCurrency(day.vales)}` : '-'}</td>
                             <td className="p-4 text-right text-gold-500 font-bold">{formatCurrency(day.commission - day.vales)}</td>
                         </tr>
                     );

@@ -71,8 +71,8 @@ const SectionTitle: React.FC<SectionTitleProps> = ({ step, title, description })
       {step}
     </span>
     <span>
-      <span className="block font-display text-lg font-bold text-white">{title}</span>
-      <span className="mt-0.5 block text-sm text-gray-500">{description}</span>
+      <span className="block font-display text-lg font-bold text-foreground">{title}</span>
+      <span className="mt-0.5 block text-sm text-muted-foreground">{description}</span>
     </span>
   </div>
 );
@@ -86,7 +86,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ message, tone = 'default' }) =>
   <div className={`rounded-2xl border p-4 text-sm ${
     tone === 'warning'
       ? 'border-amber-500/20 bg-amber-500/10 text-amber-100'
-      : 'border-gray-700 bg-gray-900/60 text-gray-400'
+      : 'ui-owner-empty'
   }`}>
     {message}
   </div>
@@ -99,9 +99,9 @@ type SummaryRowProps = {
 };
 
 const SummaryRow: React.FC<SummaryRowProps> = ({ label, value, highlight = false }) => (
-  <div className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-black/20 px-3 py-2">
-    <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{label}</span>
-    <span className={`text-right text-sm font-bold ${highlight ? 'text-gold-300' : 'text-gray-200'}`}>{value}</span>
+  <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface px-3 py-2">
+    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
+    <span className={`text-right text-sm font-bold ${highlight ? 'text-gold-700' : 'text-foreground'}`}>{value}</span>
   </div>
 );
 
@@ -540,8 +540,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     boxShadow: `0 18px 35px ${primaryColor}1f`
   };
   const subtleAccentStyle = {
-    borderColor: `${secondaryColor}66`,
-    background: `linear-gradient(135deg, ${secondaryColor}18, rgba(17,24,39,0.82))`
+    borderColor: `${secondaryColor}66`
   };
 
   const barberOptions = useMemo(
@@ -855,12 +854,12 @@ const handleSubmit = async (event: React.FormEvent) => {
 
   if (loadingBarbershop) {
     return (
-      <div className="min-h-screen bg-transparent flex items-start justify-center p-4 pt-20 font-sans">
-        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-gray-900/55 p-5 text-center">
+      <div className="ui-public-shell min-h-screen flex items-start justify-center p-4 pt-20 font-sans">
+        <div className="ui-surface w-full max-w-md p-5 text-center">
           <div className="mx-auto mb-4 h-9 w-9 animate-pulse rounded-xl border border-gold-400/20 bg-gold-500/10" />
           <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-gold-300">Reserva publica</p>
-          <h1 className="font-display text-xl font-bold text-white mb-2">Carregando barbearia...</h1>
-          <p className="text-sm text-gray-400">Preparando a agenda.</p>
+          <h1 className="font-display text-xl font-bold mb-2">Carregando barbearia...</h1>
+          <p className="ui-owner-help text-sm">Preparando a agenda.</p>
         </div>
       </div>
     );
@@ -868,14 +867,14 @@ const handleSubmit = async (event: React.FormEvent) => {
 
   if (barbershopError) {
     return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
-        <div className="glass-card w-full max-w-lg rounded-3xl p-7 text-center">
+      <div className="ui-public-shell min-h-screen flex items-center justify-center p-4 font-sans">
+        <div className="ui-surface w-full max-w-lg rounded-3xl p-7 text-center">
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-red-400/20 bg-red-500/10 text-red-300">
             <Scissors size={30} />
           </div>
           <p className="mb-2 text-xs font-bold uppercase tracking-widest text-red-300">Link indisponivel</p>
-          <h1 className="font-display text-2xl font-bold text-white mb-3">{barbershopError}</h1>
-          <p className="text-sm text-gray-400">Confira o link recebido ou fale diretamente com a barbearia.</p>
+          <h1 className="font-display text-2xl font-bold mb-3">{barbershopError}</h1>
+          <p className="ui-owner-help text-sm">Confira o link recebido ou fale diretamente com a barbearia.</p>
         </div>
       </div>
     );
@@ -886,23 +885,23 @@ const handleSubmit = async (event: React.FormEvent) => {
     const whenLabel = formatPublicBookingDateTimeLabel(createdAppointment.startAt);
 
     return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
-        <div className="glass-card w-full max-w-lg rounded-3xl p-7 text-center animate-slide-in">
+      <div className="ui-public-shell min-h-screen flex items-center justify-center p-4 font-sans">
+        <div className="ui-surface w-full max-w-lg rounded-3xl p-7 text-center animate-slide-in">
           <div className="w-20 h-20 mx-auto rounded-2xl bg-green-500/10 border border-green-400/20 flex items-center justify-center text-green-300 mb-5">
             <CheckCircle size={42} />
           </div>
           <p className="mb-2 text-xs font-bold uppercase tracking-widest text-green-300">Reserva confirmada</p>
-          <h1 className="font-display text-2xl font-bold text-white mb-2">Horario reservado com sucesso</h1>
-          <p className="text-gray-400 text-sm mb-6">A barbearia ja recebeu seu agendamento. O pagamento, quando houver, e combinado diretamente no atendimento.</p>
+          <h1 className="font-display text-2xl font-bold mb-2">Horario reservado com sucesso</h1>
+          <p className="ui-owner-help text-sm mb-6">A barbearia ja recebeu seu agendamento. O pagamento, quando houver, e combinado diretamente no atendimento.</p>
 
-          <div className="bg-gray-900/60 border border-gray-700 rounded-2xl p-4 text-left space-y-3 mb-6">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Resumo confirmado</p>
+          <div className="ui-owner-card rounded-2xl p-4 text-left space-y-3 mb-6">
+            <p className="ui-owner-help text-xs font-bold uppercase tracking-widest">Resumo confirmado</p>
             <SummaryRow label="Barbearia" value={branding.shopName} />
             <SummaryRow label="Cliente" value={createdAppointment.clientName} />
             <SummaryRow label="Servico" value={`${createdAppointment.serviceType} · ${formatCurrency(createdAppointment.serviceValue)}`} />
             <SummaryRow label="Barbeiro" value={createdAppointment.barberName} />
             <SummaryRow label="Horario" value={whenLabel} highlight />
-            <p className="inline-flex rounded-full border border-green-400/20 bg-green-500/10 px-3 py-1 text-xs font-bold text-green-200">Status: solicitado</p>
+            <p className="ui-owner-status-success inline-flex rounded-full px-3 py-1 text-xs font-bold">Status: solicitado</p>
           </div>
 
           <div className="flex flex-col xs:flex-row gap-3">
@@ -916,20 +915,20 @@ const handleSubmit = async (event: React.FormEvent) => {
               Nova reserva
             </button>
           </div>
-          <a href="/" className="inline-block text-xs text-gray-500 hover:text-white mt-5">Ir para o painel interno</a>
+          <a href="/" className="mt-5 inline-block text-xs text-muted-foreground hover:text-foreground">Ir para o painel interno</a>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-transparent p-4 md:p-8 font-sans">
+    <div className="ui-public-shell min-h-screen p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto">
         <header className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <img src="/brand-mark.svg" alt={`Marca da ${branding.shopName}`} className="w-12 h-12" decoding="async" />
             <div>
-              <h1 className="text-white font-display font-bold text-lg">{branding.shopName}</h1>
+              <h1 className="font-display font-bold text-lg">{branding.shopName}</h1>
               <p className="text-gold-400 text-[10px] uppercase tracking-widest font-bold">Reserva oficial</p>
             </div>
           </div>
@@ -941,7 +940,7 @@ const handleSubmit = async (event: React.FormEvent) => {
           )}
         </header>
 
-        <section className="glass-card overflow-hidden rounded-3xl mb-5">
+        <section className="ui-public-hero overflow-hidden rounded-3xl mb-5">
           <div className="relative min-h-[300px] md:min-h-[340px]" style={brandingHeaderStyle}>
             {branding.coverImageUrl && (
               <img
@@ -1008,17 +1007,17 @@ const handleSubmit = async (event: React.FormEvent) => {
           </div>
         </section>
 
-        <section className="glass-card rounded-2xl p-2.5 mb-4">
+        <section className="ui-surface mb-4 rounded-2xl p-2.5">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {bookingSteps.map((step, index) => (
               <div
                 key={step.key}
                 className={`rounded-xl border px-2 py-3 text-center transition-all ${
-                  step.active ? 'bg-white/10 text-white' : step.complete ? 'bg-green-500/10 text-green-200 border-green-400/20' : 'bg-gray-900/50 text-gray-500 border-gray-700'
+                  step.active ? 'ui-owner-badge' : step.complete ? 'ui-owner-status-success' : 'ui-owner-card text-muted-foreground'
                 }`}
                 style={step.active ? selectedCardStyle : undefined}
               >
-                <p className="mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/30 text-xs font-bold">{index + 1}</p>
+                <p className="mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface-muted text-xs font-bold">{index + 1}</p>
                 <p className="text-[11px] font-bold uppercase tracking-wide">{step.label}</p>
               </div>
             ))}
@@ -1026,34 +1025,34 @@ const handleSubmit = async (event: React.FormEvent) => {
         </section>
 
         <main id="booking-flow" className="grid scroll-mt-6 lg:grid-cols-[0.82fr_1.18fr] gap-4 items-start">
-          <section className="glass-card rounded-3xl p-5 md:p-6 lg:sticky lg:top-5">
+          <section className="ui-surface rounded-3xl p-5 md:p-6 lg:sticky lg:top-5">
             <div className="flex items-center gap-2 text-gold-400 mb-3">
               <CalendarCheck size={22} />
               <span className="text-xs font-bold uppercase tracking-widest">Reserva em poucos passos</span>
             </div>
-            <h2 className="font-display text-2xl font-bold text-white mb-2">Reserve em poucos segundos</h2>
-            <p className="text-gray-400 text-sm leading-relaxed mb-5">Escolha profissional, servico, data e horario. Antes de confirmar, confira o resumo da reserva.</p>
+            <h2 className="font-display text-2xl font-bold mb-2">Reserve em poucos segundos</h2>
+            <p className="ui-owner-help text-sm leading-relaxed mb-5">Escolha profissional, servico, data e horario. Antes de confirmar, confira o resumo da reserva.</p>
 
             <div className="grid xs:grid-cols-2 gap-3">
-              <div className="bg-gray-900/50 border border-gray-700 rounded-xl p-4">
+              <div className="ui-owner-card rounded-xl p-4">
                 <Clock className="text-blue-300 mb-2" size={20} />
-                <p className="text-white font-bold text-sm">{workdayLabel}</p>
-                <p className="text-gray-500 text-xs">{workdayDescription}</p>
+                <p className="font-bold text-sm">{workdayLabel}</p>
+                <p className="ui-owner-help text-xs">{workdayDescription}</p>
               </div>
-              <div className="bg-gray-900/50 border border-gray-700 rounded-xl p-4">
+              <div className="ui-owner-card rounded-xl p-4">
                 <Scissors className="text-gold-400 mb-2" size={20} />
-                <p className="text-white font-bold text-sm">{services.length} servicos</p>
-                <p className="text-gray-500 text-xs">Agenda por servico</p>
+                <p className="font-bold text-sm">{services.length} servicos</p>
+                <p className="ui-owner-help text-xs">Agenda por servico</p>
               </div>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-gray-700 bg-gray-950/70 p-4">
+            <div className="ui-owner-card mt-4 rounded-2xl p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Sua reserva</p>
-                  <h3 className="font-display text-lg font-bold text-white">Resumo rapido</h3>
+                  <p className="ui-owner-help text-xs font-bold uppercase tracking-widest">Sua reserva</p>
+                  <h3 className="font-display text-lg font-bold">Resumo rapido</h3>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-bold ${bookingSummary.ready ? 'bg-green-500/10 text-green-200 border border-green-400/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>
+                <span className={`rounded-full px-3 py-1 text-xs font-bold ${bookingSummary.ready ? 'ui-owner-status-success' : 'ui-owner-badge'}`}>
                   {bookingSummary.ready ? 'Pronto' : 'Em andamento'}
                 </span>
               </div>
@@ -1067,22 +1066,22 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
           </section>
 
-          <form onSubmit={handleSubmit} className="glass-card rounded-3xl p-5 md:p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="ui-surface rounded-3xl p-5 md:p-6 space-y-5">
             {!bookingReadiness.ready && (
-              <div className="bg-amber-500/10 border border-amber-400/20 text-amber-100 text-sm rounded-xl p-3 space-y-1">
-                <p className="font-semibold text-amber-200">Antes de agendar, esta barbearia precisa concluir a configuracao:</p>
+              <div className="ui-owner-status-warning space-y-1 rounded-xl p-3 text-sm">
+                <p className="font-semibold text-foreground">Antes de agendar, esta barbearia precisa concluir a configuracao:</p>
                 {bookingReadiness.issues.map((issue) => <p key={issue}>{issue}</p>)}
               </div>
             )}
 
             {barberOptions.length === 0 && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-sm rounded-xl p-3">
+              <div className="ui-owner-status-error rounded-xl p-3 text-sm">
                 Esta barbearia ainda nao tem barbeiros ativos. O owner precisa cadastrar ou ativar um barbeiro no painel interno.
               </div>
             )}
 
             {errors.length > 0 && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-200 text-sm rounded-xl p-3 space-y-1">
+              <div className="ui-owner-status-error space-y-1 rounded-xl p-3 text-sm">
                 {errors.map(error => <p key={error}>{error}</p>)}
               </div>
             )}
@@ -1102,14 +1101,14 @@ const handleSubmit = async (event: React.FormEvent) => {
                         aria-pressed={selected}
                         aria-label={`${selected ? 'Barbeiro selecionado' : 'Escolher barbeiro'}: ${barber.name}`}
                         onClick={() => handleBarberChange(barber.value)}
-                        className={`rounded-2xl border p-3.5 text-left transition-all ${selected ? 'bg-white/10 text-white' : 'bg-gray-900/60 text-gray-300 border-gray-700 hover:border-gray-500'}`}
+                        className={`rounded-2xl border p-3.5 text-left text-foreground transition-all ${selected ? 'ui-owner-card-solid' : 'ui-owner-card'}`}
                         style={selected ? selectedCardStyle : undefined}
                       >
-                        <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-black/30 text-gold-300">
+                        <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-surface-muted text-gold-700">
                           <Scissors size={20} />
                         </span>
                         <span className="block font-bold">{barber.name}</span>
-                        <span className="mt-1 block text-xs text-gray-500">{selected ? 'Selecionado' : 'Toque para escolher'}</span>
+                        <span className="mt-1 block text-xs text-muted-foreground">{selected ? 'Selecionado' : 'Toque para escolher'}</span>
                       </button>
                     );
                   })}
@@ -1132,15 +1131,15 @@ const handleSubmit = async (event: React.FormEvent) => {
                         aria-pressed={selected}
                         aria-label={`${selected ? 'Servico selecionado' : 'Escolher servico'}: ${service.name}, ${formatCurrency(service.price)}, ${service.durationMinutes} minutos`}
                         onClick={() => handleServiceChange(service.id)}
-                        className={`rounded-2xl border p-3.5 text-left transition-all ${selected ? 'bg-white/10 text-white' : 'bg-gray-900/60 text-gray-300 border-gray-700 hover:border-gray-500'}`}
+                        className={`rounded-2xl border p-3.5 text-left text-foreground transition-all ${selected ? 'ui-owner-card-solid' : 'ui-owner-card'}`}
                         style={selected ? selectedCardStyle : undefined}
                       >
                         <span className="flex items-start justify-between gap-4">
                           <span>
                             <span className="block font-bold">{service.name}</span>
-                            <span className="mt-1 block text-xs text-gray-500">{service.durationMinutes} min</span>
+                            <span className="mt-1 block text-xs text-muted-foreground">{service.durationMinutes} min</span>
                           </span>
-                          <span className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm font-bold text-white">
+                          <span className="ui-owner-badge rounded-xl px-3 py-2 text-sm font-bold">
                             {formatCurrency(service.price)}
                           </span>
                         </span>
@@ -1153,14 +1152,14 @@ const handleSubmit = async (event: React.FormEvent) => {
 
             <div className="sr-only">
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1.5">Barbeiro</label>
+                <label className="ui-label mb-1.5 block">Barbeiro</label>
                 <select
   id="public-booking-barber"
   name="barberId"
   required
   value={selectedBarber?.value || ''}
   onChange={(e) => handleBarberChange(e.target.value)}
-  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+  className="ui-input w-full"
 >
   <option value="" disabled>
     Selecione um barbeiro
@@ -1174,11 +1173,11 @@ const handleSubmit = async (event: React.FormEvent) => {
 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1.5">Servico</label>
+                <label className="ui-label mb-1.5 block">Servico</label>
                 <select required
                   value={selectedService?.id || ''}
                   onChange={(e) => handleServiceChange(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500">
+                  className="ui-input w-full">
                   {services.map((service: Service) => (
                     <option key={service.id} value={service.id}>{service.name} · {formatCurrency(service.price)}</option>
                   ))}
@@ -1188,16 +1187,16 @@ const handleSubmit = async (event: React.FormEvent) => {
 
             <div className="space-y-3">
               <SectionTitle step="03" title="Horario" description="Escolha data e horario livre." />
-              <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-4" style={subtleAccentStyle}>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Data</label>
-                <input type="date" required min={getTodayString()} value={date} onChange={(e) => { setDate(e.target.value); setSelectedSlot(null); }} className="w-full bg-gray-950/80 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
+              <div className="ui-owner-card rounded-2xl p-4" style={subtleAccentStyle}>
+                <label className="ui-label mb-1.5 block">Data</label>
+                <input type="date" required min={getTodayString()} value={date} onChange={(e) => { setDate(e.target.value); setSelectedSlot(null); }} className="ui-input w-full" />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Horarios disponiveis</label>
+              <label className="ui-label mb-2 block">Horarios disponiveis</label>
               {availableSlots.length === 0 ? (
-                <p className="text-sm text-gray-400 bg-gray-900/50 border border-gray-700 rounded-2xl p-4">
+                <p className="ui-owner-empty text-sm">
   {emptySlotsMessage} {emptySlotsNextStep}
 </p>
               ) : (
@@ -1212,8 +1211,8 @@ const handleSubmit = async (event: React.FormEvent) => {
                       style={selectedSlot?.startAt === slot.startAt ? selectedCardStyle : undefined}
                       className={`py-3.5 rounded-2xl border text-sm font-bold transition-all ${
                         selectedSlot?.startAt === slot.startAt
-                          ? 'bg-white/10 text-white'
-                          : 'bg-gray-900/70 text-gray-300 border-gray-700 hover:border-gold-500/40'
+                          ? 'ui-owner-card-solid text-foreground'
+                          : 'ui-owner-card text-foreground hover:border-gold-700'
                       }`}
                     >
                       {slot.label}
@@ -1227,24 +1226,24 @@ const handleSubmit = async (event: React.FormEvent) => {
               <SectionTitle step="04" title="Seus dados" description="Informe nome e WhatsApp." />
               <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1.5">Seu nome</label>
-                <input required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nome de quem vai ser atendido" className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
+                <label className="ui-label mb-1.5 block">Seu nome</label>
+                <input required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nome de quem vai ser atendido" className="ui-input w-full" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1.5">WhatsApp</label>
-                <input required value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="Ex: 81999999999" className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
+                <label className="ui-label mb-1.5 block">WhatsApp</label>
+                <input required value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="Ex: 81999999999" className="ui-input w-full" />
               </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1.5">Observacoes</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Opcional: detalhe alguma preferencia para o atendimento" className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500" />
+              <label className="ui-label mb-1.5 block">Observacoes</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Opcional: detalhe alguma preferencia para o atendimento" className="ui-textarea w-full" />
             </div>
 
-            <div className="rounded-2xl border border-gray-700 bg-gray-950/70 p-4">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-gray-500">Confira sua reserva</p>
-              <div className="grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
+            <div className="ui-owner-card rounded-2xl p-4">
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">Confira sua reserva</p>
+              <div className="grid gap-2 text-sm text-foreground sm:grid-cols-2">
                 <SummaryRow label="Barbearia" value={branding.shopName} />
                 <SummaryRow label="Barbeiro" value={bookingSummary.barberName} />
                 <SummaryRow label="Servico" value={bookingSummary.serviceName} />
@@ -1255,7 +1254,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                 <SummaryRow label="Cliente" value={clientName.trim() || 'Informe seu nome'} />
                 <SummaryRow label="Status" value={isSubmitDisabled ? 'Faltam dados' : 'Pronto para reservar'} />
               </div>
-              <p className="mt-3 text-xs leading-relaxed text-gray-500">
+              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
                 Revise os dados antes de confirmar. Esta etapa reserva o horario, mas nao confirma pagamento online.
               </p>
             </div>

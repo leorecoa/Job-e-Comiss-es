@@ -78,13 +78,13 @@ const SettingsModal = React.lazy(() => import('./components/SettingsModal').then
 const TourOverlay = React.lazy(() => import('./components/TourOverlay').then((module) => ({ default: module.TourOverlay })));
 
 const ViewFallback = () => (
-  <div className="min-h-screen flex items-center justify-center bg-transparent text-gray-300">
+  <div className="min-h-screen flex items-center justify-center text-muted-foreground">
     Carregando...
   </div>
 );
 
 const SectionFallback = () => (
-  <div className="mb-6 rounded-2xl border border-gray-800 bg-gray-900/40 p-4 text-sm text-gray-400">
+  <div className="ui-owner-card mb-6 text-sm">
     Carregando...
   </div>
 );
@@ -1687,11 +1687,11 @@ const App: React.FC = () => {
     return (
       <>
         <ToastContainer toasts={toasts} removeToast={removeToast} />
-        <div className="min-h-screen flex items-center justify-center bg-transparent px-4 text-gray-200">
-          <div className="max-w-xl rounded-3xl border border-red-500/20 bg-gray-900/85 p-8 text-center shadow-2xl">
+        <div className="min-h-screen flex items-center justify-center px-4 text-foreground">
+          <div className="ui-surface max-w-xl p-8 text-center">
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-red-300">Configuracao indisponivel</p>
-            <h1 className="mb-3 text-2xl font-bold text-white">Supabase obrigatorio em producao</h1>
-            <p className="text-sm text-gray-300">{operationalBlockingMessage}</p>
+            <h1 className="mb-3 text-2xl font-bold text-foreground">Supabase obrigatorio em producao</h1>
+            <p className="text-sm text-muted-foreground">{operationalBlockingMessage}</p>
           </div>
         </div>
       </>
@@ -1723,7 +1723,7 @@ const App: React.FC = () => {
     return (
       <>
         <ToastContainer toasts={toasts} removeToast={removeToast} />
-        <div className="min-h-screen flex items-center justify-center bg-transparent text-gray-300">
+        <div className="min-h-screen flex items-center justify-center text-muted-foreground">
           Validando sessao...
         </div>
       </>
@@ -1878,16 +1878,16 @@ const App: React.FC = () => {
           <div className="animate-slide-in">
              <div className="ui-owner-toolbar flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                  <div id="tour-actions" className="flex gap-2 w-full md:w-auto">
-                    <button onClick={handleOpenAppointment} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-800 border border-gold-500/30 text-gold-400 px-4 py-2.5 rounded-xl font-bold transition-colors active:scale-95">
+                    <button onClick={handleOpenAppointment} className="ui-button ui-button-secondary flex-1 md:flex-none">
                         <Calendar size={18} /> Agendar
                     </button>
                      <button id="tour-new-client-btn" onClick={handleOpenAddClient} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95">
                         <Plus size={18} /> Atendimento
                      </button>
-                    <button onClick={() => setValeModalOpen(true)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-800 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-xl font-medium transition-colors active:scale-95">
+                    <button onClick={() => setValeModalOpen(true)} className="ui-button ui-button-secondary flex-1 md:flex-none">
                         <MinusCircle size={18} /> Vale
                     </button>
-                    <button id="tour-settings-btn" onClick={() => setSettingsModalOpen(true)} className="bg-gray-800 border border-gray-700 text-gray-300 px-3 py-2.5 rounded-xl font-medium transition-colors shrink-0">
+                    <button id="tour-settings-btn" onClick={() => setSettingsModalOpen(true)} className="ui-button ui-button-secondary shrink-0">
                         <Settings size={18} />
                     </button>
                 </div>
@@ -1920,7 +1920,7 @@ const App: React.FC = () => {
                     {/* Botão Baixar Relatório Diário */}
                     <button 
                         onClick={handleDownloadDaily}
-                        className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors shrink-0"
+                        className="ui-button ui-button-secondary shrink-0"
                         title="Baixar Relatório do Dia (PDF)"
                     >
                         <FileText size={18} />
@@ -1928,7 +1928,7 @@ const App: React.FC = () => {
                     {/* Botão Baixar Relatório por Período */}
                     <button 
                         onClick={() => setReportModalOpen(true)} 
-                        className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors shrink-0"
+                        className="ui-button ui-button-secondary shrink-0"
                         title="Exportar Dados (PDF/Excel)"
                     >
                         <Download size={18} />
@@ -1945,8 +1945,8 @@ const App: React.FC = () => {
 
              <div id="tour-stats" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <StatsCard title="Atendimentos" value={stats.totalClients.toString()} icon={<Users size={20} />} />
-                <StatsCard title="Faturamento bruto" value={formatCurrency(stats.totalSales)} icon={<DollarSign size={20} />} colorClass="bg-gray-800 border-gray-700 text-green-400" />
-                <StatsCard title="Saldo estimado de comissao" value={formatCurrency(stats.netCommission)} subtitle="Comissao calculada menos vales" icon={<TrendingUp size={20} />} colorClass="bg-gray-800 border-gold-500/30 text-gold-500" />
+                <StatsCard title="Faturamento bruto" value={formatCurrency(stats.totalSales)} icon={<DollarSign size={20} />} colorClass="ui-owner-metric" />
+                <StatsCard title="Saldo estimado de comissao" value={formatCurrency(stats.netCommission)} subtitle="Comissao calculada menos vales" icon={<TrendingUp size={20} />} colorClass="ui-owner-metric" />
              </div>
 
               <div className="mb-6 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
@@ -1962,8 +1962,8 @@ const App: React.FC = () => {
               {activeTab === 'appointments' && appointmentsError && (
                 <InlineNotice tone="error" className="mb-4">{appointmentsError}</InlineNotice>
               )}
-              <div className={activeTab === 'appointments' ? 'ui-schedule-host' : 'bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden'}>
-                 <div className={activeTab === 'appointments' ? 'min-h-[200px]' : 'min-h-[200px] bg-gray-900/30'}>
+              <div className={activeTab === 'appointments' ? 'ui-schedule-host' : 'ui-owner-list overflow-hidden'}>
+                 <div className="min-h-[200px]">
                     {activeTab === 'appointments' ? (
                       <React.Suspense fallback={<SectionFallback />}>
                         <DailySchedule
@@ -1982,8 +1982,8 @@ const App: React.FC = () => {
                     ) : activeTab === 'clients' ? (
                         <>
                            {filteredClients.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500">
-                              <p className="font-bold text-white">
+                            <div className="ui-owner-empty m-4 text-center">
+                              <p className="font-bold text-foreground">
                                 {selectedBarberFilter === 'TODOS' ? 'Nenhum atendimento registrado ainda.' : `Nenhum atendimento para ${selectedBarberFilter}.`}
                               </p>
                               <p className="mx-auto mt-2 max-w-md text-sm">
@@ -1996,46 +1996,46 @@ const App: React.FC = () => {
                                     {/* Mobile View: Cards */}
                                     <div className="md:hidden p-4 space-y-3">
                                         {filteredClients.map(c => (
-                                            <div key={c.id} className={`bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-sm relative transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20 hover:border-gray-600 ${c.clientType === ClientType.NEW ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gold-500'}`}>
+                                            <div key={c.id} className={`ui-owner-record-card relative transition-colors ${c.clientType === ClientType.NEW ? 'border-l-4 border-l-green-600' : 'border-l-4 border-l-gold-700'}`}>
                                                 
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="bg-gray-900 text-gray-400 text-xs font-mono px-2 py-1 rounded flex items-center gap-1">
+                                                        <span className="ui-owner-badge flex items-center gap-1 rounded px-2 py-1 font-mono text-xs">
                                                             <Clock size={12}/> {formatTime(c.timestamp)}
                                                         </span>
                                                         <span className={`text-[10px] font-bold px-2 py-1 rounded ${c.clientType === ClientType.NEW ? 'bg-green-900/30 text-green-400' : 'bg-gold-500/10 text-gold-500'}`}>
                                                             {c.clientType === ClientType.NEW ? 'NOVO' : 'CASA'}
                                                         </span>
                                                     </div>
-                                                    <span className="text-white font-bold text-lg">
+                                                    <span className="text-lg font-bold text-foreground">
                                                         {formatCurrency(c.totalValue)}
                                                     </span>
                                                 </div>
 
                                                 <div className="mb-4">
-                                                    <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                                                    <h3 className="flex items-center gap-2 text-lg font-bold text-foreground">
                                                         {c.name}
                                                     </h3>
-                                                    <p className="text-gray-300 text-sm mt-1 flex items-center gap-1">
-                                                        <Scissors size={14} className="text-gray-500"/>
+                                                    <p className="mt-1 flex items-center gap-1 text-sm text-foreground">
+                                                        <Scissors size={14} className="text-muted-foreground"/>
                                                         {c.serviceType}
-                                                        {c.extraValue > 0 && <span className="text-gray-500 text-xs ml-1">(+Adic)</span>}
+                                                        {c.extraValue > 0 && <span className="ml-1 text-xs text-muted-foreground">(+Adic)</span>}
                                                     </p>
                                                     {c.products && c.products.length > 0 && (
                                                         <div className="flex flex-wrap gap-1 mt-2">
                                                             {c.products.map(p => (
-                                                                <span key={p.id} className="text-[10px] bg-gray-900 text-gray-400 px-2 py-0.5 rounded border border-gray-700">
+                                                                <span key={p.id} className="ui-owner-badge rounded px-2 py-0.5 text-[10px]">
                                                                     + {p.name}
                                                                 </span>
                                                             ))}
                                                         </div>
                                                     )}
-                                                    <p className="text-gray-500 text-xs mt-2 flex items-center gap-1">
+                                                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
                                                         <User size={12}/> Barbeiro: {c.barberName}
                                                     </p>
                                                 </div>
 
-                                                <div className="flex gap-3 pt-3 border-t border-gray-700/50">
+                                                <div className="flex gap-3 border-t border-border pt-3">
                                                     <button 
                                                         onClick={() => handleEditClient(c)} 
                                                         className="flex-1 flex items-center justify-center gap-2 bg-blue-500/10 text-blue-400 py-2.5 rounded-lg text-sm font-bold active:bg-blue-500/20 transition-colors"
@@ -2056,7 +2056,7 @@ const App: React.FC = () => {
                                     {/* Desktop View: Table */}
                                     <div className="hidden md:block overflow-x-auto">
                                         <table className="w-full text-left">
-                                            <thead className="text-xs text-gray-400 bg-gray-900/50 uppercase">
+                                            <thead className="ui-owner-table-head text-xs uppercase">
                                                 <tr>
                                                     <th className="p-4">Hora</th>
                                                     <th className="p-4">Cliente</th>
@@ -2065,24 +2065,24 @@ const App: React.FC = () => {
                                                     <th className="p-4 w-20"></th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-gray-700/50">
+                                            <tbody>
                                                 {filteredClients.map(c => (
-                                                    <tr key={c.id} className="hover:bg-gray-700/30 group">
-                                                        <td className="p-4 text-gray-400 font-mono text-xs whitespace-nowrap">{formatTime(c.timestamp)}</td>
-                                                        <td className="p-4 font-medium text-white min-w-[100px]">
+                                                    <tr key={c.id} className="ui-owner-table-row group">
+                                                        <td className="p-4 font-mono text-xs whitespace-nowrap text-muted-foreground">{formatTime(c.timestamp)}</td>
+                                                        <td className="min-w-[100px] p-4 font-medium text-foreground">
                                                             {c.name}
                                                             <span className={`block text-[10px] ${c.clientType === ClientType.NEW ? 'text-green-400' : 'text-gold-500'}`}>{c.clientType}</span>
                                                         </td>
-                                                        <td className="p-4 text-gray-300 text-sm whitespace-nowrap">
+                                                        <td className="p-4 text-sm whitespace-nowrap text-foreground">
                                                             {c.serviceType}
                                                             {c.products && c.products.length > 0 && (
                                                                 <span className="text-green-400 text-xs block">
                                                                     + {c.products.length} Prod.
                                                                 </span>
                                                             )}
-                                                            {c.extraValue > 0 && <span className="text-xs ml-1 text-gray-500">+{c.extraValue}</span>}
+                                                            {c.extraValue > 0 && <span className="ml-1 text-xs text-muted-foreground">+{c.extraValue}</span>}
                                                         </td>
-                                                        <td className="p-4 text-right font-bold text-white whitespace-nowrap">{formatCurrency(c.totalValue)}</td>
+                                                        <td className="p-4 text-right font-bold text-foreground whitespace-nowrap">{formatCurrency(c.totalValue)}</td>
                                                         <td className="p-4 flex justify-end gap-2">
                                                             <button onClick={() => handleEditClient(c)} className="text-blue-400 hover:bg-blue-500/10 p-2 rounded"><Pencil size={16}/></button>
                                                             <button onClick={() => handleDeleteClient(c.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>
@@ -2098,8 +2098,8 @@ const App: React.FC = () => {
                     ) : (
                         <>
                            {filteredVales.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500">
-                              <p className="font-bold text-white">
+                            <div className="ui-owner-empty m-4 text-center">
+                              <p className="font-bold text-foreground">
                                 {selectedBarberFilter === 'TODOS' ? 'Nenhum vale registrado ainda.' : `Nenhum vale para ${selectedBarberFilter}.`}
                               </p>
                               <p className="mx-auto mt-2 max-w-md text-sm">
@@ -2112,10 +2112,10 @@ const App: React.FC = () => {
                                     {/* Mobile View: Cards for Vales */}
                                     <div className="md:hidden p-4 space-y-3">
                                         {filteredVales.map(v => (
-                                            <div key={v.id} className="bg-gray-800 p-4 rounded-xl border border-gray-700 border-l-4 border-l-red-500 shadow-sm relative transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20 hover:border-gray-600">
+                                            <div key={v.id} className="ui-owner-record-card relative border-l-4 border-l-red-600 transition-colors">
                                                 <div className="flex justify-between items-start mb-2">
                                                      <div className="flex items-center gap-2">
-                                                        <span className="bg-gray-900 text-gray-400 text-xs font-mono px-2 py-1 rounded flex items-center gap-1">
+                                                        <span className="ui-owner-badge flex items-center gap-1 rounded px-2 py-1 font-mono text-xs">
                                                             <Clock size={12}/> {formatTime(v.timestamp)}
                                                         </span>
                                                         <span className="text-[10px] font-bold px-2 py-1 rounded bg-red-900/30 text-red-400">
@@ -2128,8 +2128,8 @@ const App: React.FC = () => {
                                                 </div>
 
                                                 <div className="mb-4">
-                                                    <h3 className="text-white font-bold text-lg">{v.barberName}</h3>
-                                                    <p className="text-gray-400 text-sm mt-1 italic">"{v.description}"</p>
+                                                    <h3 className="text-lg font-bold text-foreground">{v.barberName}</h3>
+                                                    <p className="mt-1 text-sm italic text-muted-foreground">"{v.description}"</p>
                                                 </div>
 
                                                 <button 
@@ -2145,7 +2145,7 @@ const App: React.FC = () => {
                                     {/* Desktop View: Table for Vales */}
                                     <div className="hidden md:block overflow-x-auto">
                                         <table className="w-full text-left">
-                                            <thead className="text-xs text-gray-400 bg-gray-900/50 uppercase">
+                                            <thead className="ui-owner-table-head text-xs uppercase">
                                                 <tr>
                                                     <th className="p-4">Hora</th>
                                                     <th className="p-4">Descricao</th>
@@ -2153,11 +2153,11 @@ const App: React.FC = () => {
                                                     <th className="p-4 w-16"></th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-gray-700/50">
+                                            <tbody>
                                                 {filteredVales.map(v => (
-                                                    <tr key={v.id} className="hover:bg-gray-700/30">
-                                                        <td className="p-4 text-gray-400 font-mono text-xs whitespace-nowrap">{formatTime(v.timestamp)}</td>
-                                                        <td className="p-4 text-gray-300 min-w-[120px]">{v.description} <span className="text-gray-500 text-xs">({v.barberName})</span></td>
+                                                    <tr key={v.id} className="ui-owner-table-row">
+                                                        <td className="p-4 font-mono text-xs whitespace-nowrap text-muted-foreground">{formatTime(v.timestamp)}</td>
+                                                        <td className="min-w-[120px] p-4 text-foreground">{v.description} <span className="text-xs text-muted-foreground">({v.barberName})</span></td>
                                                         <td className="p-4 text-right font-bold text-red-400 whitespace-nowrap">-{formatCurrency(v.value)}</td>
                                                         <td className="p-4 text-right">
                                                             <button onClick={() => handleDeleteVale(v.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>

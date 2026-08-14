@@ -224,21 +224,21 @@ export const OwnerSetupChecklist: React.FC<OwnerSetupChecklistProps> = ({
   const nextPendingItem = checklist.items.find((item) => !item.complete);
 
   return (
-    <section className="mb-6 rounded-3xl border border-gray-700 bg-gray-800/80 p-5 shadow-xl shadow-black/10">
+    <section className="ui-owner-panel mb-6">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="mb-2 flex items-center gap-2 text-emerald-300">
             <Store size={18} />
             <span className="text-xs font-bold uppercase tracking-widest">Setup do booking</span>
           </div>
-          <h2 className="text-2xl font-bold text-white">Prontidao operacional</h2>
-          <p className="mt-1 text-sm text-gray-400">Confira se sua barbearia ja tem o minimo necessario para receber agendamentos no link publico.</p>
+          <h2 className="text-2xl font-bold text-foreground">Prontidao operacional</h2>
+          <p className="ui-owner-help mt-1">Confira se sua barbearia ja tem o minimo necessario para receber agendamentos no link publico.</p>
         </div>
 
         <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-bold ${
           checklist.ready
-            ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200'
-            : 'border-amber-500/20 bg-amber-500/10 text-amber-200'
+            ? 'ui-owner-status-success'
+            : 'ui-owner-status-warning'
         }`}>
           {checklist.ready ? <CheckCircle2 size={16} /> : <CircleAlert size={16} />}
           {checklist.ready ? 'Booking pronto para receber agendamentos.' : 'Booking incompleto.'}
@@ -249,10 +249,10 @@ export const OwnerSetupChecklist: React.FC<OwnerSetupChecklistProps> = ({
         {checklist.items.map((item) => (
           <div
             key={item.key}
-            className={`rounded-2xl border px-4 py-3 ${
+            className={`rounded-2xl px-4 py-3 ${
               item.complete
-                ? 'border-emerald-500/15 bg-emerald-500/5'
-                : 'border-gray-700 bg-gray-900/50'
+                ? 'ui-owner-status-success'
+                : 'ui-owner-card'
             }`}
           >
             <div className="mb-2 flex items-center gap-2">
@@ -262,12 +262,12 @@ export const OwnerSetupChecklist: React.FC<OwnerSetupChecklistProps> = ({
               {!['active-barbers', 'active-services', 'public-link'].includes(item.key) ? (
                 item.complete ? <CheckCircle2 size={15} className="text-emerald-300" /> : <CircleAlert size={15} className="text-amber-300" />
               ) : null}
-              <span className="text-sm font-semibold text-white">{item.label}</span>
+              <span className="text-sm font-semibold text-foreground">{item.label}</span>
             </div>
-            <p className={`text-xs ${item.complete ? 'text-emerald-200/80' : 'text-gray-400'}`}>
+            <p className={`text-xs ${item.complete ? 'ui-owner-success' : 'text-muted-foreground'}`}>
               {item.complete ? 'OK' : 'Pendente'}
             </p>
-            <p className="mt-2 text-xs leading-relaxed text-gray-400">{item.description}</p>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
             {!item.complete && (
               <p className="mt-2 text-xs leading-relaxed text-amber-100/90">{item.nextStep}</p>
             )}
@@ -276,14 +276,14 @@ export const OwnerSetupChecklist: React.FC<OwnerSetupChecklistProps> = ({
       </div>
 
       {!checklist.ready && nextPendingItem && (
-        <div className="mt-5 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
-          <p className="text-xs font-bold uppercase tracking-widest text-blue-200">Proximo passo</p>
-          <p className="mt-2 text-sm font-bold text-white">{nextPendingItem.label}</p>
-          <p className="mt-1 text-sm text-blue-100/90">{nextPendingItem.nextStep}</p>
+        <div className="ui-owner-info mt-5 rounded-2xl p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Proximo passo</p>
+          <p className="mt-2 text-sm font-bold text-foreground">{nextPendingItem.label}</p>
+          <p className="mt-1 text-sm text-foreground">{nextPendingItem.nextStep}</p>
           {nextPendingItem.actionHref && nextPendingItem.actionLabel && (
             <a
               href={nextPendingItem.actionHref}
-              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-sm font-bold text-blue-100"
+              className="ui-button ui-button-secondary mt-3"
             >
               {nextPendingItem.actionLabel}
             </a>
@@ -292,8 +292,8 @@ export const OwnerSetupChecklist: React.FC<OwnerSetupChecklistProps> = ({
       )}
 
       {checklist.publicBookingPath && (
-        <div className="mt-5 rounded-2xl border border-gray-700 bg-gray-900/50 p-4">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Link publico</p>
+        <div className="ui-owner-card mt-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Link publico</p>
           <p className="mt-2 break-all font-mono text-sm text-gold-300">{checklist.publicBookingPath}</p>
           {!checklist.ready && (
             <p className="mt-2 text-sm text-amber-100/90">
@@ -305,7 +305,7 @@ export const OwnerSetupChecklist: React.FC<OwnerSetupChecklistProps> = ({
               href={checklist.publicBookingPath}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-600 bg-gray-900 px-3 py-2 text-sm font-bold text-white"
+              className="ui-button ui-button-secondary"
             >
               <ExternalLink size={14} />
               Abrir link
@@ -313,14 +313,14 @@ export const OwnerSetupChecklist: React.FC<OwnerSetupChecklistProps> = ({
             <button
               type="button"
               onClick={handleCopyLink}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-600 bg-gray-900 px-3 py-2 text-sm font-bold text-white"
+              className="ui-button ui-button-secondary"
             >
               <Copy size={14} />
               Copiar link
             </button>
           </div>
           {copyFeedback && (
-            <p className="mt-2 text-xs text-gray-400">{copyFeedback}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{copyFeedback}</p>
           )}
         </div>
       )}

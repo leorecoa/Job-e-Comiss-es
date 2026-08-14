@@ -168,21 +168,21 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-slide-in">
-      <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center p-6 border-b border-gray-700">
-          <h2 className="text-xl font-bold text-white font-display">
+    <div className="ui-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 animate-slide-in">
+      <div className="ui-modal rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="ui-modal-header flex justify-between items-center p-6">
+          <h2 className="text-xl font-bold font-display">
             {initialData ? 'Editar agendamento' : 'Novo agendamento'}
           </h2>
 
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-white">
+          <button type="button" onClick={onClose} className="ui-modal-close">
             <X size={24} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label htmlFor="appointment-client-name" className="block text-sm font-medium text-gray-400 mb-1.5">
+            <label htmlFor="appointment-client-name" className="ui-label block mb-1.5">
               Cliente
             </label>
             <input
@@ -191,12 +191,12 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               required
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+              className="ui-input"
             />
           </div>
 
           <div>
-            <label htmlFor="appointment-client-phone" className="block text-sm font-medium text-gray-400 mb-1.5">
+            <label htmlFor="appointment-client-phone" className="ui-label block mb-1.5">
               Telefone WhatsApp
             </label>
             <input
@@ -206,13 +206,13 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               value={clientPhone}
               onChange={(e) => setClientPhone(e.target.value)}
               placeholder="DDD + numero"
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+              className="ui-input"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="appointment-date" className="block text-sm font-medium text-gray-400 mb-1.5">
+              <label htmlFor="appointment-date" className="ui-label block mb-1.5">
                 Data
               </label>
               <input
@@ -222,12 +222,12 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 required
                 value={dateInput}
                 onChange={(e) => setDateInput(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+                className="ui-input"
               />
             </div>
 
             <div>
-              <label htmlFor="appointment-time" className="block text-sm font-medium text-gray-400 mb-1.5">
+              <label htmlFor="appointment-time" className="ui-label block mb-1.5">
                 Hora
               </label>
               <input
@@ -237,13 +237,13 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 required
                 value={timeInput}
                 onChange={(e) => setTimeInput(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+                className="ui-input"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="appointment-barber" className="block text-sm font-medium text-gray-400 mb-1.5">
+            <label htmlFor="appointment-barber" className="ui-label block mb-1.5">
               Barbeiro
             </label>
             <select
@@ -252,7 +252,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               required
               value={barberName}
               onChange={(e) => setBarberName(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+              className="ui-input"
             >
               {barberOptions.map((barber) => (
                 <option key={barber.id} value={barber.name}>
@@ -264,7 +264,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <label htmlFor="appointment-service" className="block text-sm font-medium text-gray-400 mb-1.5">
+              <label htmlFor="appointment-service" className="ui-label block mb-1.5">
                 Servico
               </label>
               <select
@@ -273,7 +273,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 required
                 value={serviceName}
                 onChange={(e) => handleServiceChange(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+                className="ui-input"
               >
                 {settings.services.map((service) => (
                   <option key={service.id} value={service.name}>
@@ -284,7 +284,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
             </div>
 
             <div>
-              <label htmlFor="appointment-duration" className="block text-sm font-medium text-gray-400 mb-1.5">
+              <label htmlFor="appointment-duration" className="ui-label block mb-1.5">
                 Min
               </label>
               <input
@@ -295,13 +295,13 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 required
                 value={durationMinutes}
                 onChange={(e) => setDurationMinutes(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+                className="ui-input"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="appointment-service-value" className="block text-sm font-medium text-gray-400 mb-1.5">
+            <label htmlFor="appointment-service-value" className="ui-label block mb-1.5">
               Valor
             </label>
             <input
@@ -313,12 +313,12 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               required
               value={serviceValue}
               onChange={(e) => setServiceValue(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+              className="ui-input"
             />
           </div>
 
           <div>
-            <label htmlFor="appointment-notes" className="block text-sm font-medium text-gray-400 mb-1.5">
+            <label htmlFor="appointment-notes" className="ui-label block mb-1.5">
               Observacoes
             </label>
             <textarea
@@ -327,13 +327,13 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+              className="ui-textarea"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-black font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-gold-500/20"
+            className="ui-button ui-button-primary w-full"
           >
             <Save size={20} />
             Salvar agendamento

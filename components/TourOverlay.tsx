@@ -186,7 +186,7 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({ steps, isOpen, onCompl
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="absolute flex max-w-[calc(100vw-24px)] flex-col gap-3 overflow-y-auto rounded-2xl border border-gray-700 bg-gray-800 p-4 text-white shadow-2xl outline-none transition-all duration-200 md:p-5"
+        className="ui-surface absolute flex max-w-[calc(100vw-24px)] flex-col gap-3 overflow-y-auto p-4 text-foreground outline-none transition-all duration-200 md:p-5"
         style={{
           top: tooltipPosition.top,
           left: tooltipPosition.left,
@@ -202,18 +202,18 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({ steps, isOpen, onCompl
             type="button"
             onClick={onComplete}
             aria-label="Pular guia"
-            className="rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold-500"
+            className="ui-button ui-button-ghost"
           >
             <X size={16} />
           </button>
         </div>
 
-        <p className="text-sm leading-relaxed text-gray-300">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           {currentStep.content}
         </p>
 
-        <div className="mt-2 flex items-center justify-between gap-3 border-t border-gray-700 pt-3">
-          <span className="font-mono text-xs text-gray-500">
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-border pt-3">
+          <span className="font-mono text-xs text-muted-foreground">
             {currentStepIndex + 1} / {steps.length}
           </span>
           <div className="flex gap-2">
@@ -222,7 +222,7 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({ steps, isOpen, onCompl
                 type="button"
                 onClick={handlePrev}
                 aria-label="Passo anterior"
-                className="rounded-lg bg-gray-700 p-2 text-white transition-colors hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gold-500"
+                className="ui-button ui-button-secondary"
               >
                 <ChevronLeft size={16} />
               </button>

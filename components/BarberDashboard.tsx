@@ -245,21 +245,21 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
 
   if (!barberId || !hasBarbershopLink || !currentBarber) {
     return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center p-4 font-sans">
-        <div className="glass-card w-full max-w-lg rounded-2xl p-7 text-center">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-500/10 text-amber-200">
+      <div className="ui-barber-shell min-h-screen flex items-center justify-center p-4 font-sans">
+        <div className="ui-surface w-full max-w-lg rounded-2xl p-7 text-center">
+          <div className="ui-barber-mark mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl">
             <Scissors size={28} />
           </div>
-          <h1 className="text-white font-display text-2xl font-bold mb-3">
+          <h1 className="font-display text-2xl font-bold mb-3">
             Vinculo pendente
           </h1>
-          <p className="text-gray-400 text-sm leading-relaxed">
+          <p className="ui-owner-help text-sm leading-relaxed">
             Sua conta existe, mas ainda nao esta vinculada a um profissional ativo desta barbearia.
           </p>
-          <p className="mt-3 text-sm text-gray-300 leading-relaxed">
+          <p className="mt-3 text-sm leading-relaxed">
             Envie ao owner o e-mail usado neste login. Ele deve selecionar o profissional correspondente no painel e vincular a sua conta.
           </p>
-          <p className="mt-3 rounded-2xl border border-gray-700 bg-gray-900/60 p-3 text-xs leading-relaxed text-gray-400">
+          <p className="ui-owner-info mt-3 rounded-2xl p-3 text-xs leading-relaxed">
             Se o owner acabou de concluir o vinculo, saia e entre novamente para atualizar a sessao.
           </p>
         </div>
@@ -268,18 +268,18 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-transparent pb-24 font-sans selection:bg-gold-500/30">
-      <header className="border-b border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-gray-900/90">
+    <div className="ui-barber-shell min-h-screen pb-24 font-sans">
+      <header className="ui-barber-header sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <img src="/brand-mark.svg" alt="Marca da barbearia" className="w-12 h-12 shrink-0" />
 
             <div className="min-w-0">
-              <h1 className="text-white font-bold truncate">{barberName}</h1>
-              <span className="text-[10px] uppercase font-bold text-blue-400">
+              <h1 className="font-bold truncate">{barberName}</h1>
+              <span className="ui-barber-role text-[10px] uppercase font-bold">
                 Barbeiro
               </span>
-              <p className="mt-0.5 text-[11px] text-gray-400">
+              <p className="ui-owner-help mt-0.5 text-[11px]">
                 Conta vinculada ao profissional {barberName}
               </p>
             </div>
@@ -288,7 +288,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
           <button
             type="button"
             onClick={onLogout}
-            className="text-gray-500 hover:text-red-400 transition-colors shrink-0"
+            className="ui-button ui-button-ghost shrink-0"
             title="Sair"
             aria-label="Sair"
           >
@@ -310,11 +310,11 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5 flex-1 justify-between md:flex-none min-w-[140px]">
+          <div className="ui-owner-date-control flex items-center rounded-xl p-0.5 flex-1 justify-between md:flex-none min-w-[140px]">
             <button
               type="button"
               onClick={() => changeDate(-1)}
-              className="p-2 text-gray-400 hover:text-white"
+              className="p-2"
             >
               <XCircle size={20} />
             </button>
@@ -323,13 +323,13 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent border-none text-white text-sm text-center w-full md:w-32 focus:ring-0"
+              className="ui-owner-date-input text-sm text-center w-full md:w-32"
             />
 
             <button
               type="button"
               onClick={() => changeDate(1)}
-              className="p-2 text-gray-400 hover:text-white"
+              className="p-2"
             >
               <CheckCircle size={20} />
             </button>
@@ -337,9 +337,9 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="glass-card p-5 rounded-2xl flex items-center justify-between">
+          <div className="ui-owner-metric p-5 rounded-2xl flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Comissao calculada do dia</p>
+              <p className="ui-owner-help text-sm">Comissao calculada do dia</p>
               <p className="text-2xl font-bold text-gold-500">
                 {formatCurrency(dailyCommission)}
               </p>
@@ -348,31 +348,31 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
             <DollarSign size={32} className="text-gold-500" />
           </div>
 
-          <div className="glass-card p-5 rounded-2xl flex items-center justify-between">
+          <div className="ui-owner-metric p-5 rounded-2xl flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Comissao calculada do mes</p>
-              <p className="text-2xl font-bold text-blue-400">
+              <p className="ui-owner-help text-sm">Comissao calculada do mes</p>
+              <p className="text-2xl font-bold text-[var(--color-success)]">
                 {formatCurrency(monthlyCommission)}
               </p>
             </div>
 
-            <TrendingUp size={32} className="text-blue-400" />
+            <TrendingUp size={32} className="text-[var(--color-success)]" />
           </div>
         </div>
 
-        <div className="mb-6 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
+        <div className="ui-owner-info mb-6 rounded-2xl p-4 text-sm">
           Sua comissao e calculada com base nos atendimentos concluidos registrados no sistema. O painel nao confirma pagamento de repasse.
         </div>
 
-        <section className="glass-card p-6 rounded-2xl mb-6">
-          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+        <section className="ui-surface p-6 rounded-2xl mb-6">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <Calendar size={20} />
             Agendamentos de Hoje
           </h2>
 
           {todayAppointments.length === 0 ? (
-            <div className="rounded-2xl border border-gray-700 bg-gray-900/50 p-5 text-sm text-gray-400">
-              <p className="font-bold text-white">Nenhum agendamento para hoje.</p>
+            <div className="ui-owner-empty rounded-2xl p-5 text-sm">
+              <p className="ui-owner-foreground font-bold">Nenhum agendamento para hoje.</p>
               <p className="mt-1">Quando clientes reservarem pelo booking publico ou voce criar um agendamento manual, eles aparecerao nesta lista.</p>
             </div>
           ) : (
@@ -383,11 +383,11 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                 return (
                   <div
                     key={appointment.id}
-                    className="bg-gray-800 p-4 rounded-xl border border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+                    className="ui-owner-card-solid p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
                   >
                     <div>
-                      <p className="text-white font-bold">{appointment.clientName}</p>
-                      <p className="text-sm text-gray-300">
+                      <p className="font-bold">{appointment.clientName}</p>
+                      <p className="text-sm">
                         {appointment.serviceType} · {formatCurrency(appointment.serviceValue)}
                       </p>
                       <p className="text-xs text-gold-400 font-mono">
@@ -422,7 +422,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                       <button
                         type="button"
                         onClick={() => handleEditAppointment(appointment)}
-                        className="p-2 rounded-full bg-gray-700/50 text-gray-300 hover:bg-gray-700"
+                        className="ui-button ui-button-ghost"
                         title="Editar Agendamento"
                       >
                         <Pencil size={18} />
@@ -444,15 +444,15 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
           )}
         </section>
 
-        <section className="glass-card p-6 rounded-2xl">
-          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+        <section className="ui-surface p-6 rounded-2xl">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <Clock size={20} />
             Proximos Agendamentos
           </h2>
 
           {upcomingAppointments.length === 0 ? (
-            <div className="rounded-2xl border border-gray-700 bg-gray-900/50 p-5 text-sm text-gray-400">
-              <p className="font-bold text-white">Nenhum agendamento futuro.</p>
+            <div className="ui-owner-empty rounded-2xl p-5 text-sm">
+              <p className="ui-owner-foreground font-bold">Nenhum agendamento futuro.</p>
               <p className="mt-1">Proximas reservas feitas pelos clientes ou criadas manualmente aparecerao aqui.</p>
             </div>
           ) : (
@@ -463,11 +463,11 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                 return (
                   <div
                     key={appointment.id}
-                    className="bg-gray-800 p-4 rounded-xl border border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+                    className="ui-owner-card-solid p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
                   >
                     <div>
-                      <p className="text-white font-bold">{appointment.clientName}</p>
-                      <p className="text-sm text-gray-300">
+                      <p className="font-bold">{appointment.clientName}</p>
+                      <p className="text-sm">
                         {appointment.serviceType} · {formatCurrency(appointment.serviceValue)}
                       </p>
                       <p className="text-xs text-gold-400 font-mono">
@@ -492,7 +492,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                       <button
                         type="button"
                         onClick={() => handleEditAppointment(appointment)}
-                        className="p-2 rounded-full bg-gray-700/50 text-gray-300 hover:bg-gray-700"
+                        className="ui-button ui-button-ghost"
                         title="Editar Agendamento"
                       >
                         <Pencil size={18} />

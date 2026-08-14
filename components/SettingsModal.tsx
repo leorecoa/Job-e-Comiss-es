@@ -244,18 +244,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-slide-in">
-      <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center p-6 border-b border-gray-700">
-          <h2 className="text-xl font-bold text-white font-display">Configurações</h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-white">
+    <div className="ui-modal-backdrop animate-slide-in">
+      <div className="ui-modal max-h-[90vh] w-full max-w-md overflow-y-auto">
+        <div className="ui-modal-header flex items-center justify-between p-6">
+          <h2 className="font-display text-xl font-bold text-foreground">Configurações</h2>
+          <button type="button" onClick={onClose} className="ui-modal-close">
             <X size={24} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label htmlFor="settings-shop-name" className="block text-sm font-medium text-gray-400 mb-1">
+            <label htmlFor="settings-shop-name" className="ui-label mb-1 block">
               Nome da Barbearia
             </label>
             <input
@@ -264,13 +264,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               type="text"
               value={formData.shopName}
               onChange={(e) => handleChange('shopName', e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none"
+              className="ui-input w-full"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="settings-price-cut" className="block text-xs font-medium text-gray-400 mb-1">
+              <label htmlFor="settings-price-cut" className="ui-label mb-1 block text-xs">
                 Corte (R$)
               </label>
               <input
@@ -281,12 +281,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 step="0.01"
                 value={formData.priceCut}
                 onChange={(e) => handleChange('priceCut', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+                className="ui-input w-full text-sm"
               />
             </div>
 
             <div>
-              <label htmlFor="settings-price-beard" className="block text-xs font-medium text-gray-400 mb-1">
+              <label htmlFor="settings-price-beard" className="ui-label mb-1 block text-xs">
                 Barba (R$)
               </label>
               <input
@@ -297,12 +297,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 step="0.01"
                 value={formData.priceBeard || 0}
                 onChange={(e) => handleChange('priceBeard', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+                className="ui-input w-full text-sm"
               />
             </div>
 
             <div>
-              <label htmlFor="settings-price-combo" className="block text-xs font-medium text-gray-400 mb-1">
+              <label htmlFor="settings-price-combo" className="ui-label mb-1 block text-xs">
                 Combo (R$)
               </label>
               <input
@@ -313,12 +313,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 step="0.01"
                 value={formData.priceCombo}
                 onChange={(e) => handleChange('priceCombo', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+                className="ui-input w-full text-sm"
               />
             </div>
 
             <div>
-              <label htmlFor="settings-price-product" className="block text-xs font-medium text-gray-400 mb-1">
+              <label htmlFor="settings-price-product" className="ui-label mb-1 block text-xs">
                 Produto (Valor Base)
               </label>
               <input
@@ -329,7 +329,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 step="0.01"
                 value={formData.priceProduct || 0}
                 onChange={(e) => handleChange('priceProduct', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none text-sm"
+                className="ui-input w-full text-sm"
               />
             </div>
           </div>
@@ -349,14 +349,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {(formData.services || []).map((service) => (
                 <div
                   key={service.id}
-                  className="grid grid-cols-[1fr_90px_80px] gap-2 items-end bg-gray-900 p-2 rounded-lg border border-gray-700"
+                  className="ui-owner-record-card grid grid-cols-[1fr_90px_80px] items-end gap-2"
                 >
                   <div className="min-w-0">
-                    <span className="block text-white text-sm font-medium truncate">{service.name}</span>
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wider">Agenda</span>
+                    <span className="block truncate text-sm font-medium text-foreground">{service.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Agenda</span>
                   </div>
 
-                  <label className="text-xs text-gray-400">
+                  <label className="text-xs text-muted-foreground">
                     Valor
                     <input
                       type="number"
@@ -364,11 +364,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       step="0.01"
                       value={service.price}
                       onChange={(e) => handleServiceChange(service.id, 'price', e.target.value)}
-                      className="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-white text-xs focus:ring-1 focus:ring-gold-500 outline-none"
+                      className="ui-input mt-1 w-full text-xs"
                     />
                   </label>
 
-                  <label className="text-xs text-gray-400">
+                  <label className="text-xs text-muted-foreground">
                     Min
                     <input
                       type="number"
@@ -376,7 +376,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       step="1"
                       value={service.durationMinutes}
                       onChange={(e) => handleServiceChange(service.id, 'durationMinutes', e.target.value)}
-                      className="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-white text-xs focus:ring-1 focus:ring-gold-500 outline-none"
+                      className="ui-input mt-1 w-full text-xs"
                     />
                   </label>
                 </div>
@@ -386,7 +386,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           )}
 
           {/* Products List Section */}
-          <div className="p-4 rounded-xl border border-gray-700 bg-gray-900/30 space-y-3">
+          <div className="ui-owner-card space-y-3 rounded-xl p-4">
             <div className="flex items-center gap-2 text-green-400 mb-2">
               <Package size={18} />
               <h3 className="font-bold text-sm">Catálogo de Produtos</h3>
@@ -394,9 +394,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1 custom-scrollbar">
               {(formData.products || []).map((product) => (
-                <div key={product.id} className="flex justify-between items-center bg-gray-900 p-2 rounded-lg border border-gray-700">
+                <div key={product.id} className="ui-owner-record-card flex items-center justify-between rounded-lg p-2">
                   <div className="flex-1 overflow-hidden">
-                    <span className="text-white text-sm block truncate">{product.name}</span>
+                    <span className="block truncate text-sm text-foreground">{product.name}</span>
                   </div>
 
                   <span className="text-green-400 text-xs font-bold mr-3">
@@ -414,7 +414,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
 
               {(formData.products || []).length === 0 && (
-                <p className="text-xs text-gray-500 text-center italic">Nenhum produto cadastrado.</p>
+                <p className="text-center text-xs italic text-muted-foreground">Nenhum produto cadastrado.</p>
               )}
             </div>
 
@@ -426,7 +426,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 value={newProductName}
                 onChange={(e) => setNewProductName(e.target.value)}
                 placeholder="Nome"
-                className="flex-[2] bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none w-full"
+                className="ui-input w-full flex-[2] text-sm"
               />
 
               <div className="flex-1 flex gap-1">
@@ -439,14 +439,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   value={newProductPrice}
                   onChange={(e) => setNewProductPrice(e.target.value)}
                   placeholder="$$"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-2 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none"
+                  className="ui-input w-full text-sm"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={handleAddProduct}
-                className="bg-green-600 hover:bg-green-500 text-white p-2 rounded-lg shrink-0"
+                className="ui-button ui-button-primary shrink-0"
               >
                 <Plus size={18} />
               </button>
@@ -465,9 +465,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {(formData.barbers || []).map((barber) => (
                   <div
                     key={barber.id}
-                    className="flex justify-between items-center bg-gray-900 p-2 rounded-lg border border-gray-700"
+                    className="ui-owner-record-card flex items-center justify-between rounded-lg p-2"
                   >
-                    <span className="text-white text-sm">{barber.name}</span>
+                    <span className="text-sm text-foreground">{barber.name}</span>
 
                     <button
                       type="button"
@@ -489,26 +489,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     value={newBarberName}
                     onChange={(e) => setNewBarberName(e.target.value)}
                     placeholder="Nome do Barbeiro"
-                    className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="ui-input flex-1 text-sm"
                   />
 
                   <button
                     type="button"
                     onClick={handleAddBarber}
-                    className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg"
+                    className="ui-button ui-button-primary"
                   >
                     <Plus size={18} />
                   </button>
                 </div>
               ) : (
-                <p className="text-xs text-gray-500 text-center">Limite de 4 barbeiros atingido.</p>
+                <p className="text-center text-xs text-muted-foreground">Limite de 4 barbeiros atingido.</p>
               )}
             </div>
           )}
 
           <div className="mt-2">
             <div>
-              <label htmlFor="settings-commission-rate" className="block text-sm font-medium text-gray-400 mb-1">
+              <label htmlFor="settings-commission-rate" className="ui-label mb-1 block">
                 Comissão Serviços (%)
               </label>
               <input
@@ -520,23 +520,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 step="0.01"
                 value={formData.commissionRate}
                 onChange={(e) => handleChange('commissionRate', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 outline-none"
+                className="ui-input w-full"
               />
             </div>
 
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="mt-1 text-xs text-muted-foreground">
               A comissão se aplica estritamente a serviços. Produtos não geram comissão.
             </p>
           </div>
 
           {/* Backup & Security Section */}
-          <div className="mt-6 border-t border-gray-700 pt-6">
-            <div className="flex items-center gap-2 mb-3 text-white">
+          <div className="mt-6 border-t border-border pt-6">
+            <div className="mb-3 flex items-center gap-2 text-foreground">
               <ShieldCheck size={18} className="text-gold-500" />
               <h3 className="font-bold text-sm">Segurança de Dados</h3>
             </div>
 
-            <p className="text-xs text-gray-400 mb-4">
+            <p className="mb-4 text-xs text-muted-foreground">
               Faça backups regulares para garantir que nunca perca seus dados, mesmo trocando de dispositivo.
             </p>
 
@@ -544,15 +544,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={handleBackup}
-                className="flex flex-col items-center justify-center gap-2 p-3 bg-gray-900 border border-gray-600 rounded-xl hover:bg-gray-700 transition-colors"
+                className="ui-button ui-button-secondary flex flex-col gap-2 p-3"
               >
                 <Download size={20} className="text-blue-400" />
-                <span className="text-xs font-bold text-white">Baixar Backup</span>
+                <span className="text-xs font-bold text-foreground">Baixar Backup</span>
               </button>
 
-              <label className="flex flex-col items-center justify-center gap-2 p-3 bg-gray-900 border border-gray-600 rounded-xl hover:bg-gray-700 transition-colors cursor-pointer">
+              <label className="ui-button ui-button-secondary flex cursor-pointer flex-col gap-2 p-3">
                 <Upload size={20} className="text-green-400" />
-                <span className="text-xs font-bold text-white">Restaurar Dados</span>
+                <span className="text-xs font-bold text-foreground">Restaurar Dados</span>
                 <input
                   type="file"
                   accept=".json"
@@ -566,7 +566,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="pt-4 mt-2">
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded-xl transition-colors"
+              className="ui-button ui-button-secondary w-full"
             >
               <Save size={20} />
               Salvar Alterações
