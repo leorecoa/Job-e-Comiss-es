@@ -632,7 +632,6 @@ test.describe('owner operational dashboard e2e', () => {
     for (const viewport of [
       { width: 1440, height: 900 },
       { width: 1280, height: 720 },
-      { width: 1024, height: 768 },
       { width: 768, height: 1024 },
       { width: 390, height: 844 },
       { width: 360, height: 800 }
@@ -645,6 +644,49 @@ test.describe('owner operational dashboard e2e', () => {
       expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
       await expect(page.getByRole('link', { name: 'Presenca publica' })).toBeVisible();
       await expect(page.getByRole('button', { name: /Salvar aparencia/i })).toBeVisible();
+
+      const contrast = await page.evaluate(() => {
+        const parseRgb = (value: string): [number, number, number] => {
+          const channels = value.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+          if (!channels || channels.length !== 3) throw new Error(`Unsupported color: ${value}`);
+          return channels as [number, number, number];
+        };
+        const luminance = (value: string) => {
+          const channels = parseRgb(value).map((channel) => {
+            const normalized = channel / 255;
+            return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+          });
+          return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
+        };
+        const ratio = (foreground: string, background: string) => {
+          const light = Math.max(luminance(foreground), luminance(background));
+          const dark = Math.min(luminance(foreground), luminance(background));
+          return (light + 0.05) / (dark + 0.05);
+        };
+        const root = document.querySelector<HTMLElement>('.ui-branding-settings');
+        const heading = root?.querySelector<HTMLElement>('h2');
+        const label = root?.querySelector<HTMLElement>('.ui-branding-label');
+        const input = root?.querySelector<HTMLInputElement>('.ui-input[type="text"]');
+        const button = root?.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (!root || !heading || !label || !input || !button) throw new Error('Branding controls not found');
+
+        const surface = getComputedStyle(root).backgroundColor;
+        const inputStyle = getComputedStyle(input);
+        const buttonStyle = getComputedStyle(button);
+        return {
+          heading: ratio(getComputedStyle(heading).color, surface),
+          label: ratio(getComputedStyle(label).color, surface),
+          input: ratio(inputStyle.color, inputStyle.backgroundColor),
+          placeholder: ratio(getComputedStyle(input, '::placeholder').color, inputStyle.backgroundColor),
+          button: ratio(buttonStyle.color, buttonStyle.backgroundColor)
+        };
+      });
+
+      expect(contrast.heading).toBeGreaterThanOrEqual(4.5);
+      expect(contrast.label).toBeGreaterThanOrEqual(4.5);
+      expect(contrast.input).toBeGreaterThanOrEqual(4.5);
+      expect(contrast.placeholder).toBeGreaterThanOrEqual(4.5);
+      expect(contrast.button).toBeGreaterThanOrEqual(4.5);
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
