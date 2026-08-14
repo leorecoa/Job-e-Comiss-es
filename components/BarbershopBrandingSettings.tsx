@@ -211,19 +211,19 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
   };
 
   return (
-    <section id="owner-barbershop-settings" className="glass-card rounded-2xl p-5 md:p-6 mb-6 scroll-mt-24">
+    <section id="owner-barbershop-settings" className="ui-branding-settings p-5 md:p-6 mb-6 scroll-mt-24">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
         <div>
-          <div className="flex items-center gap-2 text-gold-400 mb-2">
+          <div className="ui-branding-eyebrow flex items-center gap-2 mb-2">
             <Globe2 size={20} />
             <span className="text-xs font-bold uppercase tracking-widest">Aparencia publica</span>
           </div>
-          <h2 className="font-display text-2xl font-bold text-white">Configuracoes da barbearia</h2>
-          <p className="text-sm text-gray-400 mt-1">Personalize como sua barbearia aparece no link publico de agendamento.</p>
+          <h2 className="font-display text-2xl font-bold">Configuracoes da barbearia</h2>
+          <p className="ui-branding-help text-sm mt-1">Personalize como sua barbearia aparece no link publico de agendamento.</p>
         </div>
         {barbershop?.slug && (
-          <div className="rounded-xl border border-gray-700 bg-gray-900/60 px-3 py-2 text-xs text-gray-400">
-            Slug somente leitura: <span className="font-mono text-gray-200">{barbershop.slug}</span>
+          <div className="ui-branding-readonly rounded-xl px-3 py-2 text-xs">
+            Slug somente leitura: <span className="font-mono">{barbershop.slug}</span>
           </div>
         )}
       </div>
@@ -236,7 +236,7 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
       {operationalError && <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{operationalError}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="ui-branding-form space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <ImageUploadField
               label="Upload da logo"
@@ -267,28 +267,28 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
           </div>
 
           <label className="block">
-            <span className="block text-sm font-medium text-gray-400 mb-1.5">Descricao curta</span>
+            <span className="ui-branding-label block text-sm font-medium mb-1.5">Descricao curta</span>
             <textarea
               value={formData.description}
               onChange={(event) => handleChange('description', event.target.value)}
               rows={3}
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+              className="ui-textarea"
             />
           </label>
 
-          <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-4">
+          <div className="ui-branding-hours rounded-2xl p-4">
             <div className="mb-4">
-              <h3 className="text-base font-bold text-white">Dias e horarios de funcionamento</h3>
-              <p className="mt-1 text-sm text-gray-400">Cada dia pode ficar aberto ou fechado. O booking publico da sua barbearia usa somente esta configuracao.</p>
+              <h3 className="text-base font-bold">Dias e horarios de funcionamento</h3>
+              <p className="ui-branding-help mt-1 text-sm">Cada dia pode ficar aberto ou fechado. O booking publico da sua barbearia usa somente esta configuracao.</p>
             </div>
 
             <div className="mb-4 max-w-xs">
               <label className="block">
-                <span className="block text-sm font-medium text-gray-400 mb-1.5">Intervalo entre horarios</span>
+                <span className="ui-branding-label block text-sm font-medium mb-1.5">Intervalo entre horarios</span>
                 <select
                   value={String(formData.slotStepMinutes)}
                   onChange={(event) => handleSlotStepMinutesChange(event.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+                  className="ui-input"
                 >
                   {SLOT_STEP_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -304,14 +304,14 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
                 const dayConfig = formData.businessHours[day.key];
 
                 return (
-                  <div key={day.key} className="rounded-2xl border border-gray-800 bg-black/20 p-3">
+                  <div key={day.key} className="ui-branding-day rounded-2xl p-3">
                     <div className="grid gap-3 md:grid-cols-[1.1fr_1fr_1fr] md:items-end">
-                      <label className="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-950/70 px-3 py-3 text-sm text-gray-200">
+                      <label className="ui-branding-day-toggle flex items-center gap-3 rounded-xl px-3 py-3 text-sm">
                         <input
                           type="checkbox"
                           checked={dayConfig.active}
                           onChange={(event) => handleBusinessDayChange(day.key, 'active', event.target.checked)}
-                          className="h-4 w-4 rounded border-gray-600 bg-gray-900 text-gold-500 focus:ring-gold-500"
+                          className="ui-branding-checkbox h-4 w-4 rounded"
                         />
                         <span className="font-medium">{day.label}</span>
                       </label>
@@ -336,13 +336,13 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
             </div>
           </div>
 
-          <button type="submit" disabled={saving || loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-gold-500 px-4 py-3 font-bold text-black shadow-lg shadow-gold-500/20 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="submit" disabled={saving || loading} className="ui-button ui-button-primary">
             <Save size={18} />
             {saving ? 'Salvando...' : 'Salvar aparencia'}
           </button>
         </form>
 
-        <div className="rounded-2xl border bg-gray-950/80 p-4" style={previewStyle}>
+        <div className="ui-branding-preview rounded-2xl border bg-gray-950/80 p-4" style={previewStyle}>
           <div className="flex items-center gap-2 text-white/80 mb-4">
             <Eye size={18} />
             <span className="text-xs font-bold uppercase tracking-widest">Preview publico</span>
@@ -382,17 +382,17 @@ type ImageUploadFieldProps = {
 };
 
 const ImageUploadField: React.FC<ImageUploadFieldProps> = ({ label, helpText, previewUrl, uploading, onChange }) => (
-  <label className="block rounded-2xl border border-gray-700 bg-gray-900/70 p-4">
+  <label className="ui-branding-upload block rounded-2xl p-4">
     <span className="mb-3 flex items-center justify-between gap-3">
       <span>
-        <span className="block text-sm font-bold text-gray-200">{label}</span>
-        <span className="block text-xs text-gray-500">{helpText}</span>
+        <span className="block text-sm font-bold">{label}</span>
+        <span className="ui-branding-help block text-xs">{helpText}</span>
       </span>
-      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-gold-300">
+      <span className="ui-branding-upload-icon inline-flex h-9 w-9 items-center justify-center rounded-xl">
         <Upload size={17} />
       </span>
     </span>
-    <span className="mb-3 flex h-28 items-center justify-center overflow-hidden rounded-xl border border-dashed border-gray-700 bg-black/30 text-xs text-gray-500">
+    <span className="ui-branding-upload-preview mb-3 flex h-28 items-center justify-center overflow-hidden rounded-xl border border-dashed text-xs">
       {previewUrl ? <img src={previewUrl} alt="" className="h-full w-full object-cover" /> : 'Sem imagem'}
     </span>
     <input
@@ -400,9 +400,9 @@ const ImageUploadField: React.FC<ImageUploadFieldProps> = ({ label, helpText, pr
       accept="image/png,image/jpeg,image/webp"
       disabled={uploading}
       onChange={onChange}
-      className="block w-full text-sm text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-gold-500 file:px-3 file:py-2 file:text-sm file:font-bold file:text-black disabled:cursor-not-allowed disabled:opacity-60"
+      className="ui-branding-file block w-full text-sm"
     />
-    {uploading && <span className="mt-2 block text-xs text-blue-200">Enviando imagem...</span>}
+    {uploading && <span className="ui-branding-help mt-2 block text-xs">Enviando imagem...</span>}
   </label>
 );
 
@@ -416,13 +416,13 @@ type FieldProps = {
 
 const Field: React.FC<FieldProps> = ({ label, value, type = 'text', required = false, onChange }) => (
   <label className="block">
-    <span className="block text-sm font-medium text-gray-400 mb-1.5">{label}</span>
+    <span className="ui-branding-label block text-sm font-medium mb-1.5">{label}</span>
     <input
       type={type}
       required={required}
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-gold-500"
+      className="ui-input"
     />
   </label>
 );

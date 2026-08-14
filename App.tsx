@@ -1876,7 +1876,7 @@ const App: React.FC = () => {
 
         {viewMode === 'daily' && activeTab !== 'management' && (
           <div className="animate-slide-in">
-             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+             <div className="ui-owner-toolbar flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                  <div id="tour-actions" className="flex gap-2 w-full md:w-auto">
                     <button onClick={handleOpenAppointment} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-800 border border-gold-500/30 text-gold-400 px-4 py-2.5 rounded-xl font-bold transition-colors active:scale-95">
                         <Calendar size={18} /> Agendar
@@ -1893,21 +1893,21 @@ const App: React.FC = () => {
                 </div>
 
                 <div id="tour-filters" className="flex gap-2 w-full md:w-auto items-center overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-                    <button onClick={() => setViewMode('monthly')} className="bg-gray-800 text-blue-400 px-4 py-2.5 rounded-xl border border-gray-700 shrink-0">
+                    <button onClick={() => setViewMode('monthly')} className="ui-owner-toolbar-button px-4 py-2.5 rounded-xl shrink-0">
                         <BarChart3 size={18} />
                     </button>
-                    <div className="flex items-center bg-gray-900 rounded-xl border border-gray-700 p-0.5 flex-1 justify-between md:flex-none min-w-[140px]" id="tour-date-picker">
-                        <button type="button" aria-label="Dia anterior" onClick={() => changeDate(-1)} className="p-2 text-gray-400 hover:text-white"><ChevronLeft size={20} aria-hidden="true" /></button>
-                        <input aria-label="Data operacional" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-transparent border-none text-white text-sm text-center w-full md:w-32 focus:ring-0" />
-                        <button type="button" aria-label="Proximo dia" onClick={() => changeDate(1)} className="p-2 text-gray-400 hover:text-white"><ChevronRight size={20} aria-hidden="true" /></button>
+                    <div className="ui-owner-date-control flex items-center rounded-xl p-0.5 flex-1 justify-between md:flex-none min-w-[140px]" id="tour-date-picker">
+                        <button type="button" aria-label="Dia anterior" onClick={() => changeDate(-1)} className="p-2"><ChevronLeft size={20} aria-hidden="true" /></button>
+                        <input aria-label="Data operacional" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="ui-owner-date-input text-sm text-center w-full md:w-32" />
+                        <button type="button" aria-label="Proximo dia" onClick={() => changeDate(1)} className="p-2"><ChevronRight size={20} aria-hidden="true" /></button>
                     </div>
                     {barberFilterOptions.length > 1 && (
                         <div className="relative shrink-0">
-                            <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                            <Filter size={16} className="ui-owner-filter-icon absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <select
                                 value={selectedBarberFilter}
                                 onChange={(e) => setSelectedBarberFilter(e.target.value)}
-                                className="bg-gray-900 border border-gray-700 text-white text-sm rounded-xl pl-9 pr-3 py-2.5 appearance-none min-w-[180px] focus:ring-2 focus:ring-gold-500 outline-none"
+                                className="ui-owner-filter text-sm rounded-xl pl-9 pr-3 py-2.5 appearance-none min-w-[180px]"
                             > {/* This filter still uses names, which is fine for display */}
                                 {barberFilterOptions.map((barber) => (
                                     <option key={barber} value={barber}>
