@@ -581,7 +581,7 @@ const signInAsOwner = async (page: Page) => {
 
 const openOwnerManagement = async (page: Page) => {
   await page.getByRole('navigation', { name: 'Secoes do painel', exact: true })
-    .getByRole('button', { name: 'Gestao' })
+    .getByRole('button', { name: 'Gestão' })
     .click();
 };
 
@@ -679,15 +679,15 @@ test.describe('owner operational dashboard e2e', () => {
     await signInAsOwner(page);
 
     await expect(page.getByText('leo do leo', { exact: true }).first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Prontidao operacional/i, includeHidden: true })).toBeHidden();
-    await expect(page.getByRole('heading', { name: /Catalogo operacional/i, includeHidden: true })).toBeHidden();
+    await expect(page.getByRole('heading', { name: /Prontidão operacional/i, includeHidden: true })).toBeHidden();
+    await expect(page.getByRole('heading', { name: /Catálogo operacional/i, includeHidden: true })).toBeHidden();
     await openOwnerManagement(page);
-    await expect(page.getByRole('heading', { name: /Prontidao operacional/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Prontidão operacional/i })).toBeVisible();
     await expect(page.getByText(/Booking pronto para receber agendamentos\./i)).toBeVisible();
     await expect(page.getByText('/book/leo-do-leo')).toBeVisible();
     await expect(page.getByRole('link', { name: /Abrir link/i })).toHaveAttribute('href', '/book/leo-do-leo');
 
-    await expect(page.getByRole('heading', { name: /Catalogo operacional/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Catálogo operacional/i })).toBeVisible();
     await expect(page.locator('input[value="Leo Barber"]').first()).toBeVisible();
     await expect(page.locator('input[value="Corte Leo"]').first()).toBeVisible();
     await page.getByRole('navigation', { name: 'Secoes do painel', exact: true }).getByRole('button', { name: 'Agenda' }).click();
@@ -713,11 +713,14 @@ test.describe('owner operational dashboard e2e', () => {
     await signInAsOwner(page);
     await openOwnerManagement(page);
 
-    await expect(page.getByRole('heading', { name: 'Gestao da barbearia' })).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Grupos da gestao' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Configuracoes da barbearia/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Vincular barbeiro a usuario/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Catalogo operacional/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Gestão da barbearia' })).toBeVisible();
+    await expect(page.getByText('Prévia pública')).toBeVisible();
+    await expect(page.getByText('Capa da barbearia')).toBeVisible();
+    await expect(page.locator('.ui-branding-preview[class~="bg-gray-950/80"]')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Grupos da gestão' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Configurações da barbearia/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Vincular barbeiro a usuário/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Catálogo operacional/i })).toBeVisible();
     await page.getByLabel('Nome da barbearia').fill('Nome em edicao nao salvo');
 
     for (const viewport of [
@@ -733,8 +736,8 @@ test.describe('owner operational dashboard e2e', () => {
         scrollWidth: document.documentElement.scrollWidth
       }));
       expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
-      await expect(page.getByRole('link', { name: 'Presenca publica' })).toBeVisible();
-      await expect(page.getByRole('button', { name: /Salvar aparencia/i })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Presença pública' })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Salvar aparência/i })).toBeVisible();
 
       const contrast = await page.evaluate(() => {
         const parseRgb = (value: string): [number, number, number] => {
@@ -759,7 +762,12 @@ test.describe('owner operational dashboard e2e', () => {
         const label = root?.querySelector<HTMLElement>('.ui-branding-label');
         const input = root?.querySelector<HTMLInputElement>('.ui-input[type="text"]');
         const button = root?.querySelector<HTMLButtonElement>('button[type="submit"]');
-        if (!root || !heading || !label || !input || !button) throw new Error('Branding controls not found');
+        const preview = root?.querySelector<HTMLElement>('.ui-branding-preview-card');
+        const previewHeading = preview?.querySelector<HTMLElement>('h3');
+        const previewDescription = preview?.querySelector<HTMLElement>('p');
+        if (!root || !heading || !label || !input || !button || !preview || !previewHeading || !previewDescription) {
+          throw new Error('Branding controls not found');
+        }
 
         const surface = getComputedStyle(root).backgroundColor;
         const inputStyle = getComputedStyle(input);
@@ -769,7 +777,9 @@ test.describe('owner operational dashboard e2e', () => {
           label: ratio(getComputedStyle(label).color, surface),
           input: ratio(inputStyle.color, inputStyle.backgroundColor),
           placeholder: ratio(getComputedStyle(input, '::placeholder').color, inputStyle.backgroundColor),
-          button: ratio(buttonStyle.color, buttonStyle.backgroundColor)
+          button: ratio(buttonStyle.color, buttonStyle.backgroundColor),
+          previewHeading: ratio(getComputedStyle(previewHeading).color, getComputedStyle(preview).backgroundColor),
+          previewDescription: ratio(getComputedStyle(previewDescription).color, getComputedStyle(preview).backgroundColor)
         };
       });
 
@@ -778,6 +788,8 @@ test.describe('owner operational dashboard e2e', () => {
       expect(contrast.input).toBeGreaterThanOrEqual(4.5);
       expect(contrast.placeholder).toBeGreaterThanOrEqual(4.5);
       expect(contrast.button).toBeGreaterThanOrEqual(4.5);
+      expect(contrast.previewHeading).toBeGreaterThanOrEqual(4.5);
+      expect(contrast.previewDescription).toBeGreaterThanOrEqual(4.5);
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -786,11 +798,11 @@ test.describe('owner operational dashboard e2e', () => {
     const mobileNavigation = page.getByRole('complementary', { name: 'Navegacao mobile' });
     await mobileNavigation.getByRole('button', { name: 'Agenda' }).click();
     await expect(page.getByRole('heading', { name: 'Agenda do dia' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Gestao da barbearia', includeHidden: true })).toBeHidden();
+    await expect(page.getByRole('heading', { name: 'Gestão da barbearia', includeHidden: true })).toBeHidden();
 
     await page.setViewportSize({ width: 195, height: 422 });
     await page.getByRole('button', { name: 'Abrir navegacao' }).click();
-    await page.getByRole('complementary', { name: 'Navegacao mobile' }).getByRole('button', { name: 'Gestao' }).click();
+    await page.getByRole('complementary', { name: 'Navegacao mobile' }).getByRole('button', { name: 'Gestão' }).click();
     await expect(page.getByLabel('Nome da barbearia')).toHaveValue('Nome em edicao nao salvo');
     const zoomDimensions = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
@@ -811,8 +823,8 @@ test.describe('owner operational dashboard e2e', () => {
     await desktopNavigation.getByRole('button', { name: 'Clientes' }).click();
     await expect(page.getByRole('heading', { name: 'Clientes', exact: true })).toBeVisible();
     await expect(desktopNavigation.getByRole('button', { name: 'Clientes' })).toHaveAttribute('aria-current', 'page');
-    await desktopNavigation.getByRole('button', { name: 'Relatorios' }).click();
-    await expect(page.getByRole('heading', { name: 'Relatorios', exact: true })).toBeVisible();
+    await desktopNavigation.getByRole('button', { name: 'Relatórios' }).click();
+    await expect(page.getByRole('heading', { name: 'Relatórios', exact: true })).toBeVisible();
 
     for (const viewport of [
       { width: 1440, height: 900 },
@@ -828,7 +840,7 @@ test.describe('owner operational dashboard e2e', () => {
         scrollWidth: document.documentElement.scrollWidth
       }));
       expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
-      await expect(page.getByRole('heading', { name: 'Relatorios', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Relatórios', exact: true })).toBeVisible();
     }
 
     await page.getByRole('button', { name: 'Abrir navegacao' }).click();
@@ -901,12 +913,12 @@ test.describe('owner operational dashboard e2e', () => {
     await signInAsOwner(page);
     await openOwnerManagement(page);
 
-    await expect(page.getByRole('heading', { name: /Vincular barbeiro a usuario/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Vincular barbeiro a usuário/i })).toBeVisible();
     await expect(page.getByText(/O barbeiro cria uma conta usando o e-mail dele/i)).toBeVisible();
-    await expect(page.getByText(/Este fluxo nao envia convite automatico por e-mail/i)).toBeVisible();
+    await expect(page.getByText(/Este fluxo não envia convite automático por e-mail/i)).toBeVisible();
     await expect(page.getByText(OWNER_BARBER_ID)).toHaveCount(0);
     await page.getByPlaceholder('E-mail da conta do barbeiro').fill('  BARBER@EXAMPLE.COM  ');
-    const linkButton = page.getByRole('button', { name: /Vincular usuario/i });
+    const linkButton = page.getByRole('button', { name: /Vincular usuário/i });
     await expect(linkButton).toBeEnabled();
     await linkButton.evaluate((button: HTMLButtonElement) => button.click());
 
@@ -960,7 +972,7 @@ test.describe('owner operational dashboard e2e', () => {
       await openOwnerManagement(page);
 
       await page.getByPlaceholder('E-mail da conta do barbeiro').fill('barber@example.com');
-      const linkButton = page.getByRole('button', { name: /Vincular usuario/i });
+      const linkButton = page.getByRole('button', { name: /Vincular usuário/i });
       await expect(linkButton).toBeEnabled();
       await linkButton.evaluate((button: HTMLButtonElement) => button.click());
 

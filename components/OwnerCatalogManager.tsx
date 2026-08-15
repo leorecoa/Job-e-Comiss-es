@@ -103,31 +103,31 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
     <section id="owner-catalog-manager" className="ui-owner-panel mb-6 scroll-mt-24">
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-gold-300">Operacao</p>
-          <h2 className="font-display text-2xl font-bold text-foreground">Catalogo operacional</h2>
-          <p className="ui-owner-help mt-1">Cadastre equipe e servicos da sua propria barbearia. Itens com historico sao desativados para preservar agendamentos antigos.</p>
+          <p className="ui-owner-warning text-xs font-bold uppercase tracking-widest">Operação</p>
+          <h2 className="font-display text-2xl font-bold text-foreground">Catálogo operacional</h2>
+          <p className="ui-owner-help mt-1">Cadastre equipe e serviços da sua própria barbearia. Itens com histórico são desativados para preservar agendamentos antigos.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:w-[320px]">
           <SummaryPill label="Barbeiros ativos" value={activeSnapshot.barbers.length.toString()} icon={<Scissors size={16} />} />
-          <SummaryPill label="Servicos ativos" value={activeSnapshot.services.length.toString()} icon={<Package size={16} />} />
+          <SummaryPill label="Serviços ativos" value={activeSnapshot.services.length.toString()} icon={<Package size={16} />} />
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="ui-owner-status-error mb-4 rounded-2xl px-4 py-3 text-sm">
           {error}
         </div>
       )}
 
       {loading ? (
         <div className="ui-owner-empty">
-          Carregando catalogo da barbearia...
+          Carregando catálogo da barbearia...
         </div>
       ) : (
         <div className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
           <div className="ui-owner-card space-y-4">
-            <div className="flex items-center gap-2 text-blue-300">
+            <div className="flex items-center gap-2 text-foreground">
               <Scissors size={18} />
               <h3 className="font-bold text-foreground">Barbeiros</h3>
             </div>
@@ -153,7 +153,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
               {barbers.length === 0 ? (
                 <EmptyState
                   title="Nenhum barbeiro cadastrado ainda."
-                  description="Cadastre pelo menos um barbeiro para liberar profissionais no booking publico."
+                  description="Cadastre pelo menos um barbeiro para liberar profissionais no booking público."
                   nextStep="Use o campo acima para adicionar o primeiro barbeiro."
                 />
               ) : (
@@ -228,16 +228,16 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
           </div>
 
           <div className="ui-owner-card space-y-4">
-            <div className="flex items-center gap-2 text-gold-300">
+            <div className="flex items-center gap-2 text-foreground">
               <Package size={18} />
-              <h3 className="font-bold text-foreground">Servicos</h3>
+              <h3 className="font-bold text-foreground">Serviços</h3>
             </div>
 
             <div className="grid gap-2 md:grid-cols-[1.4fr_0.75fr_0.75fr_0.75fr_auto]">
               <input
                 value={newServiceName}
                 onChange={(event) => setNewServiceName(event.target.value)}
-                placeholder="Nome do servico"
+                placeholder="Nome do serviço"
                 className="ui-input"
               />
               <input
@@ -281,9 +281,9 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
             <div className="space-y-3">
               {services.length === 0 ? (
                 <EmptyState
-                  title="Nenhum servico cadastrado ainda."
-                  description="Cadastre pelo menos um servico com valor e duracao para permitir agendamentos."
-                  nextStep="Use os campos acima para criar o primeiro servico."
+                  title="Nenhum serviço cadastrado ainda."
+                  description="Cadastre pelo menos um serviço com valor e duração para permitir agendamentos."
+                  nextStep="Use os campos acima para criar o primeiro serviço."
                 />
               ) : (
                 services.map((service) => {
@@ -417,7 +417,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
 
 const SummaryPill: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({ label, value, icon }) => (
   <div className="ui-owner-counter">
-    <div className="mb-2 text-gold-300">{icon}</div>
+    <div className="ui-owner-warning mb-2">{icon}</div>
     <p className="text-lg font-bold text-foreground">{value}</p>
     <p className="text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
   </div>
@@ -438,6 +438,6 @@ const EmptyState: React.FC<{ title: string; description: string; nextStep?: stri
   <div className="ui-owner-empty">
     <p className="font-bold text-foreground">{title}</p>
     <p className="mt-1">{description}</p>
-    {nextStep && <p className="mt-2 text-xs font-bold uppercase tracking-widest text-gold-300">{nextStep}</p>}
+    {nextStep && <p className="ui-owner-pending-copy mt-2 text-xs font-bold uppercase tracking-widest">{nextStep}</p>}
   </div>
 );

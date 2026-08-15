@@ -960,7 +960,7 @@ const App: React.FC = () => {
       planType: 'trial'
     }));
 
-    addToast(`Barbearia criada. Link publico: ${getBarbershopPublicBookingPath(createdBarbershop.slug)}`, 'success');
+    addToast(`Barbearia criada. Link público: ${getBarbershopPublicBookingPath(createdBarbershop.slug)}`, 'success');
 
     return createdBarbershop;
   };
@@ -996,7 +996,7 @@ const App: React.FC = () => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
     if (!barbershopId) {
-      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para cadastrar barbeiro.');
+      setOwnerCatalogError('Sua conta não possui uma barbearia válida para cadastrar barbeiro.');
       return;
     }
 
@@ -1009,7 +1009,7 @@ const App: React.FC = () => {
       syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
       addToast('Barbeiro cadastrado!', 'success');
     } catch (error) {
-      handleOwnerCatalogOperationError('owner-catalog:create-barber', error, 'Nao foi possivel cadastrar o barbeiro. Tente novamente.');
+      handleOwnerCatalogOperationError('owner-catalog:create-barber', error, 'Não foi possível cadastrar o barbeiro. Tente novamente.');
     }
   };
 
@@ -1020,7 +1020,7 @@ const App: React.FC = () => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
     if (!barbershopId) {
-      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para atualizar barbeiro.');
+      setOwnerCatalogError('Sua conta não possui uma barbearia válida para atualizar barbeiro.');
       return;
     }
 
@@ -1034,7 +1034,7 @@ const App: React.FC = () => {
       syncActiveCatalogIntoSettings(nextBarbers, ownerCatalogServices);
       addToast(updated.active === false ? 'Barbeiro desativado.' : 'Barbeiro atualizado.', 'success');
     } catch (error) {
-      handleOwnerCatalogOperationError('owner-catalog:update-barber', error, 'Nao foi possivel atualizar o barbeiro. Tente novamente.');
+      handleOwnerCatalogOperationError('owner-catalog:update-barber', error, 'Não foi possível atualizar o barbeiro. Tente novamente.');
     }
   };
 
@@ -1042,7 +1042,7 @@ const App: React.FC = () => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
     if (!barbershopId) {
-      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para remover barbeiro.');
+      setOwnerCatalogError('Sua conta não possui uma barbearia válida para remover barbeiro.');
       return;
     }
 
@@ -1062,11 +1062,11 @@ const App: React.FC = () => {
       addToast(
         result.action === 'deleted'
           ? 'Barbeiro removido.'
-          : 'Barbeiro com historico foi desativado para preservar a agenda.',
+          : 'Barbeiro com histórico foi desativado para preservar a agenda.',
         'success'
       );
     } catch (error) {
-      handleOwnerCatalogOperationError('owner-catalog:remove-barber', error, 'Nao foi possivel remover ou desativar o barbeiro. Tente novamente.');
+      handleOwnerCatalogOperationError('owner-catalog:remove-barber', error, 'Não foi possível remover ou desativar o barbeiro. Tente novamente.');
     }
   };
 
@@ -1079,7 +1079,7 @@ const App: React.FC = () => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
     if (!barbershopId) {
-      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para cadastrar servico.');
+      setOwnerCatalogError('Sua conta não possui uma barbearia válida para cadastrar serviço.');
       return;
     }
 
@@ -1096,7 +1096,7 @@ const App: React.FC = () => {
       syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
       addToast('Servico cadastrado!', 'success');
     } catch (error) {
-      handleOwnerCatalogOperationError('owner-catalog:create-service', error, 'Nao foi possivel cadastrar o servico. Tente novamente.');
+      handleOwnerCatalogOperationError('owner-catalog:create-service', error, 'Não foi possível cadastrar o serviço. Tente novamente.');
     }
   };
 
@@ -1107,7 +1107,7 @@ const App: React.FC = () => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
     if (!barbershopId) {
-      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para atualizar servico.');
+      setOwnerCatalogError('Sua conta não possui uma barbearia válida para atualizar serviço.');
       return;
     }
 
@@ -1119,9 +1119,9 @@ const App: React.FC = () => {
         .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
       setOwnerCatalogServices(nextServices);
       syncActiveCatalogIntoSettings(ownerCatalogBarbers, nextServices);
-      addToast(updated.active === false ? 'Servico desativado.' : 'Servico atualizado.', 'success');
+      addToast(updated.active === false ? 'Serviço desativado.' : 'Serviço atualizado.', 'success');
     } catch (error) {
-      handleOwnerCatalogOperationError('owner-catalog:update-service', error, 'Nao foi possivel atualizar o servico. Tente novamente.');
+      handleOwnerCatalogOperationError('owner-catalog:update-service', error, 'Não foi possível atualizar o serviço. Tente novamente.');
     }
   };
 
@@ -1129,7 +1129,7 @@ const App: React.FC = () => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
     if (!barbershopId) {
-      setOwnerCatalogError('Sua conta nao possui uma barbearia valida para remover servico.');
+      setOwnerCatalogError('Sua conta não possui uma barbearia válida para remover serviço.');
       return;
     }
 
@@ -1149,11 +1149,11 @@ const App: React.FC = () => {
       addToast(
         result.action === 'deleted'
           ? 'Servico removido.'
-          : 'Servico com historico foi desativado para preservar os agendamentos.',
+          : 'Serviço com histórico foi desativado para preservar os agendamentos.',
         'success'
       );
     } catch (error) {
-      handleOwnerCatalogOperationError('owner-catalog:remove-service', error, 'Nao foi possivel remover ou desativar o servico. Tente novamente.');
+      handleOwnerCatalogOperationError('owner-catalog:remove-service', error, 'Não foi possível remover ou desativar o serviço. Tente novamente.');
     }
   };
 
@@ -1185,7 +1185,7 @@ const App: React.FC = () => {
     });
 
     if (!barbershopId) {
-      setOwnerBarbershopError('Barbearia nao encontrada para atualizar.');
+      setOwnerBarbershopError('Barbearia não encontrada para atualizar.');
       return;
     }
 
@@ -1200,16 +1200,16 @@ const App: React.FC = () => {
         ...prev,
         shopName: updatedBarbershop.name
       }));
-      setOwnerBarbershopSuccess('Aparencia publica salva com sucesso.');
-      addToast('Aparencia publica salva.', 'success');
+      setOwnerBarbershopSuccess('Aparência pública salva com sucesso.');
+      addToast('Aparência pública salva.', 'success');
     } catch (error) {
       logOperationalError('owner:save-barbershop-settings', error);
       setOwnerBarbershopError(getOperationalErrorMessage(
         error,
-        'Nao foi possivel salvar as configuracoes da barbearia.',
+        'Não foi possível salvar as configurações da barbearia.',
         {
-          authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de salvar.',
-          networkMessage: 'Nao foi possivel conectar ao Supabase para salvar as configuracoes.'
+          authExpiredMessage: 'Sua sessão pode ter expirado. Entre novamente antes de salvar.',
+          networkMessage: 'Não foi possível conectar ao Supabase para salvar as configurações.'
         }
       ));
     } finally {
@@ -1219,7 +1219,7 @@ const App: React.FC = () => {
 
   const handleUploadOwnerBarbershopBrandingImage = async (file: File, type: BarbershopBrandingImageType): Promise<string> => {
     if (authSession?.role === 'barber') {
-      throw new Error('Barbeiro nao pode alterar a identidade da barbearia.');
+      throw new Error('Barbeiro não pode alterar a identidade da barbearia.');
     }
 
     const barbershopId = resolveOwnerScopedBarbershopId({
@@ -1230,7 +1230,7 @@ const App: React.FC = () => {
     });
 
     if (!barbershopId) {
-      throw new Error('Barbearia nao encontrada para upload.');
+      throw new Error('Barbearia não encontrada para upload.');
     }
 
     return uploadBarbershopBrandingImage({ barbershopId, file, type });
@@ -1640,8 +1640,8 @@ const App: React.FC = () => {
     { id: 'appointments', label: 'Agenda', description: 'Acompanhe horarios e operacao do dia.', icon: <Calendar size={18} /> },
     { id: 'clients', label: 'Clientes', description: 'Consulte os atendimentos registrados.', icon: <Users size={18} /> },
     { id: 'vales', label: 'Vales', description: 'Acompanhe os descontos registrados.', icon: <MinusCircle size={18} /> },
-    { id: 'reports', label: 'Relatorios', description: 'Analise resultados e periodos anteriores.', icon: <BarChart3 size={18} /> },
-    { id: 'management', label: 'Gestao', description: 'Configure presenca publica, equipe e catalogo.', icon: <Settings size={18} /> }
+    { id: 'reports', label: 'Relatórios', description: 'Analise resultados e períodos anteriores.', icon: <BarChart3 size={18} /> },
+    { id: 'management', label: 'Gestão', description: 'Configure presença pública, equipe e catálogo.', icon: <Settings size={18} /> }
   ];
   const activeOwnerSection = viewMode === 'monthly' ? 'reports' : activeTab;
   const handleOwnerNavigation = (sectionId: string) => {

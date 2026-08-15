@@ -24,11 +24,11 @@ export type BarbershopBrandingFormData = {
 const BUSINESS_DAY_FIELDS: Array<{ key: BarbershopBusinessDayKey; label: string }> = [
   { key: 'sunday', label: 'Domingo' },
   { key: 'monday', label: 'Segunda' },
-  { key: 'tuesday', label: 'Terca' },
+  { key: 'tuesday', label: 'Terça' },
   { key: 'wednesday', label: 'Quarta' },
   { key: 'thursday', label: 'Quinta' },
   { key: 'friday', label: 'Sexta' },
-  { key: 'saturday', label: 'Sabado' }
+  { key: 'saturday', label: 'Sábado' }
 ];
 
 const SLOT_STEP_OPTIONS = [15, 30, 45, 60] as const;
@@ -106,19 +106,18 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
   const primaryColor = isSafeHexColor(formData.primaryColor) ? formData.primaryColor : '#f59e0b';
   const secondaryColor = isSafeHexColor(formData.secondaryColor) ? formData.secondaryColor : '#0ea5e9';
   const previewStyle = useMemo(() => ({
-    borderColor: primaryColor,
-    background: `linear-gradient(135deg, ${primaryColor}33, rgba(17,24,39,0.92) 45%, ${secondaryColor}26)`
+    borderColor: primaryColor
   }), [primaryColor, secondaryColor]);
 
   const primaryButtonStyle = useMemo(() => ({
-    backgroundColor: primaryColor,
-    borderColor: primaryColor
+    backgroundColor: 'var(--color-surface-muted)',
+    borderColor: primaryColor,
+    color: 'var(--color-foreground)'
   }), [primaryColor]);
 
   const secondaryButtonStyle = useMemo(() => ({
-    backgroundColor: `${secondaryColor}26`,
-    borderColor: `${secondaryColor}80`,
-    color: '#f8fafc'
+    borderColor: secondaryColor,
+    color: 'var(--color-foreground)'
   }), [secondaryColor]);
 
   if (!canManage) return null;
@@ -162,7 +161,7 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
     setUploadSuccess(null);
 
     if (!onUploadImage) {
-      setUploadError('Upload de imagens nao esta disponivel neste ambiente.');
+      setUploadError('Upload de imagens não está disponível neste ambiente.');
       input.value = '';
       return;
     }
@@ -172,7 +171,7 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
     try {
       const publicUrl = await onUploadImage(file, type);
       handleChange(getBarbershopBrandingImageField(type), publicUrl);
-      setUploadSuccess(type === 'logo' ? 'Logo enviada. Salve a aparencia para publicar.' : 'Capa enviada. Salve a aparencia para publicar.');
+      setUploadSuccess(type === 'logo' ? 'Logo enviada. Salve a aparência para publicar.' : 'Capa enviada. Salve a aparência para publicar.');
     } catch (uploadFailure) {
       logOperationalError('owner:upload-branding-image', uploadFailure);
       const uploadMessage = uploadFailure instanceof Error ? uploadFailure.message : '';
@@ -181,10 +180,10 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
           ? uploadMessage
           : getOperationalErrorMessage(
             uploadFailure,
-            'Nao foi possivel enviar a imagem. Tente novamente.',
+            'Não foi possível enviar a imagem. Tente novamente.',
             {
-              authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de enviar a imagem.',
-              networkMessage: 'Nao foi possivel conectar ao Supabase para enviar a imagem.'
+              authExpiredMessage: 'Sua sessão pode ter expirado. Entre novamente antes de enviar a imagem.',
+              networkMessage: 'Não foi possível conectar ao Supabase para enviar a imagem.'
             }
           )
       );
@@ -202,7 +201,7 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
     });
 
     if (invalidDay) {
-      setOperationalError(`Revise o horario de ${invalidDay.label}. O fechamento precisa ser maior que a abertura.`);
+      setOperationalError(`Revise o horário de ${invalidDay.label}. O fechamento precisa ser maior que a abertura.`);
       return;
     }
 
@@ -216,10 +215,10 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
         <div>
           <div className="ui-branding-eyebrow flex items-center gap-2 mb-2">
             <Globe2 size={20} />
-            <span className="text-xs font-bold uppercase tracking-widest">Aparencia publica</span>
+            <span className="text-xs font-bold uppercase tracking-widest">Aparência pública</span>
           </div>
-          <h2 className="font-display text-2xl font-bold">Configuracoes da barbearia</h2>
-          <p className="ui-branding-help text-sm mt-1">Personalize como sua barbearia aparece no link publico de agendamento.</p>
+          <h2 className="font-display text-2xl font-bold">Configurações da barbearia</h2>
+          <p className="ui-branding-help text-sm mt-1">Personalize como sua barbearia aparece no link público de agendamento.</p>
         </div>
         {barbershop?.slug && (
           <div className="ui-branding-readonly rounded-xl px-3 py-2 text-xs">
@@ -228,26 +227,26 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
         )}
       </div>
 
-      {loading && <p className="mb-4 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-sm text-blue-200">Carregando dados da barbearia...</p>}
-      {error && <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
-      {success && <p className="mb-4 rounded-xl border border-green-500/20 bg-green-500/10 p-3 text-sm text-green-200">{success}</p>}
-      {uploadError && <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{uploadError}</p>}
-      {uploadSuccess && <p className="mb-4 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-sm text-blue-200">{uploadSuccess}</p>}
-      {operationalError && <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{operationalError}</p>}
+      {loading && <p className="ui-owner-info mb-4 rounded-xl p-3 text-sm">Carregando dados da barbearia...</p>}
+      {error && <p className="ui-owner-status-error mb-4 rounded-xl p-3 text-sm">{error}</p>}
+      {success && <p className="ui-owner-status-success mb-4 rounded-xl p-3 text-sm">{success}</p>}
+      {uploadError && <p className="ui-owner-status-error mb-4 rounded-xl p-3 text-sm">{uploadError}</p>}
+      {uploadSuccess && <p className="ui-owner-info mb-4 rounded-xl p-3 text-sm">{uploadSuccess}</p>}
+      {operationalError && <p className="ui-owner-status-error mb-4 rounded-xl p-3 text-sm">{operationalError}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
         <form onSubmit={handleSubmit} className="ui-branding-form space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <ImageUploadField
               label="Upload da logo"
-              helpText="PNG, JPG ou WEBP ate 2MB"
+              helpText="PNG, JPG ou WEBP até 2MB"
               previewUrl={formData.logoUrl}
               uploading={uploadingType === 'logo'}
               onChange={(event) => handleImageUpload('logo', event)}
             />
             <ImageUploadField
               label="Upload da capa"
-              helpText="PNG, JPG ou WEBP ate 5MB"
+              helpText="PNG, JPG ou WEBP até 5MB"
               previewUrl={formData.coverImageUrl}
               uploading={uploadingType === 'cover'}
               onChange={(event) => handleImageUpload('cover', event)}
@@ -257,17 +256,17 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="Nome da barbearia" value={formData.name} onChange={(value) => handleChange('name', value)} required />
             <Field label="Telefone" value={formData.phone} onChange={(value) => handleChange('phone', value)} />
-            <Field label="Endereco" value={formData.address} onChange={(value) => handleChange('address', value)} />
+            <Field label="Endereço" value={formData.address} onChange={(value) => handleChange('address', value)} />
             <Field label="WhatsApp" value={formData.whatsapp} onChange={(value) => handleChange('whatsapp', value)} />
             <Field label="Instagram" value={formData.instagramUrl} onChange={(value) => handleChange('instagramUrl', value)} />
             <Field label="URL da logo" value={formData.logoUrl} onChange={(value) => handleChange('logoUrl', value)} />
             <Field label="URL da imagem de capa" value={formData.coverImageUrl} onChange={(value) => handleChange('coverImageUrl', value)} />
             <Field label="Cor principal" type="color" value={formData.primaryColor} onChange={(value) => handleChange('primaryColor', value)} />
-            <Field label="Cor secundaria" type="color" value={formData.secondaryColor} onChange={(value) => handleChange('secondaryColor', value)} />
+            <Field label="Cor secundária" type="color" value={formData.secondaryColor} onChange={(value) => handleChange('secondaryColor', value)} />
           </div>
 
           <label className="block">
-            <span className="ui-branding-label block text-sm font-medium mb-1.5">Descricao curta</span>
+            <span className="ui-branding-label block text-sm font-medium mb-1.5">Descrição curta</span>
             <textarea
               value={formData.description}
               onChange={(event) => handleChange('description', event.target.value)}
@@ -278,13 +277,13 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
 
           <div className="ui-branding-hours rounded-2xl p-4">
             <div className="mb-4">
-              <h3 className="text-base font-bold">Dias e horarios de funcionamento</h3>
-              <p className="ui-branding-help mt-1 text-sm">Cada dia pode ficar aberto ou fechado. O booking publico da sua barbearia usa somente esta configuracao.</p>
+              <h3 className="text-base font-bold">Dias e horários de funcionamento</h3>
+              <p className="ui-branding-help mt-1 text-sm">Cada dia pode ficar aberto ou fechado. O booking público da sua barbearia usa somente esta configuração.</p>
             </div>
 
             <div className="mb-4 max-w-xs">
               <label className="block">
-                <span className="ui-branding-label block text-sm font-medium mb-1.5">Intervalo entre horarios</span>
+                <span className="ui-branding-label block text-sm font-medium mb-1.5">Intervalo entre horários</span>
                 <select
                   value={String(formData.slotStepMinutes)}
                   onChange={(event) => handleSlotStepMinutesChange(event.target.value)}
@@ -338,32 +337,34 @@ export const BarbershopBrandingSettings: React.FC<BarbershopBrandingSettingsProp
 
           <button type="submit" disabled={saving || loading} className="ui-button ui-button-primary">
             <Save size={18} />
-            {saving ? 'Salvando...' : 'Salvar aparencia'}
+            {saving ? 'Salvando...' : 'Salvar aparência'}
           </button>
         </form>
 
-        <div className="ui-branding-preview rounded-2xl border bg-gray-950/80 p-4" style={previewStyle}>
-          <div className="flex items-center gap-2 text-white/80 mb-4">
+        <div className="ui-branding-preview rounded-2xl border p-4" style={previewStyle}>
+          <div className="ui-branding-preview-heading mb-3 flex items-center gap-2">
             <Eye size={18} />
-            <span className="text-xs font-bold uppercase tracking-widest">Preview publico</span>
+            <span className="text-xs font-bold uppercase tracking-widest">Prévia pública</span>
           </div>
-          <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/35">
-            <div className="h-24 bg-gray-900 relative">
-              {formData.coverImageUrl && <img src={formData.coverImageUrl} alt="" className="h-full w-full object-cover opacity-80" />}
+          <div className="ui-branding-preview-card overflow-hidden rounded-2xl border">
+            <div className="ui-branding-preview-cover relative flex h-20 items-center justify-center">
+              {formData.coverImageUrl
+                ? <img src={formData.coverImageUrl} alt="" className="h-full w-full object-cover" />
+                : <span className="text-xs font-medium">Capa da barbearia</span>}
             </div>
-            <div className="p-4 -mt-8 relative">
-              <div className="h-16 w-16 rounded-2xl border border-white/20 bg-gray-950 overflow-hidden flex items-center justify-center text-gold-300 mb-3">
+            <div className="relative p-4">
+              <div className="ui-branding-preview-logo mb-3 flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border">
                 {formData.logoUrl ? <img src={formData.logoUrl} alt="" className="h-full w-full object-cover" /> : <Globe2 size={26} />}
               </div>
-              <h3 className="font-display text-xl font-bold text-white">{formData.name || 'Nome da barbearia'}</h3>
-              <p className="text-sm text-gray-300 mt-2">{formData.description || 'Descricao curta da experiencia publica.'}</p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-200">
-                {formData.address && <span className="rounded-lg bg-white/10 px-2 py-1">{formData.address}</span>}
+              <h3 className="font-display text-xl font-bold text-foreground">{formData.name || 'Nome da barbearia'}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{formData.description || 'Descrição curta da experiência pública.'}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-foreground">
+                {formData.address && <span className="ui-branding-preview-detail rounded-lg px-2 py-1">{formData.address}</span>}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <span className="rounded-xl border px-3 py-2 text-xs font-bold text-black" style={primaryButtonStyle}>Agendar agora</span>
+                <span className="rounded-xl border px-3 py-2 text-xs font-bold" style={primaryButtonStyle}>Agendar agora</span>
                 {formData.whatsapp && <span className="rounded-xl border px-3 py-2 text-xs font-bold" style={secondaryButtonStyle}>WhatsApp</span>}
-                {formData.instagramUrl && <span className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-white">Instagram</span>}
+                {formData.instagramUrl && <span className="ui-branding-preview-action rounded-xl border px-3 py-2 text-xs font-bold">Instagram</span>}
               </div>
             </div>
           </div>

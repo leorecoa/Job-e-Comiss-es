@@ -10,10 +10,10 @@ type SettingsWorkspaceProps = {
 };
 
 const workspaceLinks = [
-  { href: '#management-public-presence', label: 'Presenca publica', icon: Globe2 },
-  { href: '#management-readiness', label: 'Prontidao', icon: BookOpen },
+  { href: '#management-public-presence', label: 'Presença pública', icon: Globe2 },
+  { href: '#management-readiness', label: 'Prontidão', icon: BookOpen },
   { href: '#management-team', label: 'Equipe', icon: Users },
-  { href: '#management-catalog', label: 'Catalogo', icon: Scissors }
+  { href: '#management-catalog', label: 'Catálogo', icon: Scissors }
 ];
 
 export const SettingsWorkspace: React.FC<SettingsWorkspaceProps> = ({
@@ -25,11 +25,11 @@ export const SettingsWorkspace: React.FC<SettingsWorkspaceProps> = ({
   <div className="ui-settings-workspace">
     <Surface className="ui-settings-intro">
       <PageHeader
-        title="Gestao da barbearia"
-        description="Organize sua presenca publica, equipe e catalogo sem interromper a agenda do dia."
-        eyebrow="Area administrativa"
+        title="Gestão da barbearia"
+        description="Organize sua presença pública, equipe e catálogo sem interromper a agenda do dia."
+        eyebrow="Área administrativa"
       />
-      <nav className="ui-settings-navigation" aria-label="Grupos da gestao">
+      <nav className="ui-settings-navigation" aria-label="Grupos da gestão">
         {workspaceLinks.map(({ href, label, icon: Icon }) => (
           <a key={href} href={href}>
             <Icon size={17} aria-hidden="true" />

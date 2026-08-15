@@ -26,7 +26,7 @@ describe('owner barber profile linking', () => {
       />
     );
 
-    expect(html).toContain('Vincular barbeiro a usuario');
+    expect(html).toContain('Vincular barbeiro a usuário');
     expect(html).toContain('Como funciona');
     expect(html).toContain('O barbeiro cria uma conta usando o e-mail dele.');
     expect(html).toContain('E-mail da conta do barbeiro');
