@@ -15,7 +15,7 @@ type ErrorLike = {
   hint?: unknown;
 };
 
-const PUBLIC_CODE_PATTERN = /(PUBLIC_APPOINTMENT_[A-Z_]+|FINANCIAL_COMPLETION_[A-Z_]+|APPOINTMENT_ACTIVE_SLOT_CONFLICT)/;
+const PUBLIC_CODE_PATTERN = /(PUBLIC_APPOINTMENT_[A-Z_]+|FINANCIAL_COMPLETION_[A-Z_]+|OWNER_ONBOARDING_[A-Z_]+|APPOINTMENT_ACTIVE_SLOT_CONFLICT)/;
 const SENSITIVE_TEXT_PATTERN = /(bearer\s+[a-z0-9._~+/=-]+|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|\b(?:\+?\d[\s().-]*){8,}\b|(?:access_token|refresh_token|authorization|apikey|client_name|client_phone|telefone|e-?mail|notes?)\s*[:=]\s*[^\s,;]+)/gi;
 const FALLBACK_RELEASE = 'job-e-comissoes@unversioned';
 
@@ -95,6 +95,7 @@ const getPublicCode = (error: unknown): string | undefined => {
 export const isExpectedOperationalError = (error: unknown): boolean => {
   const code = getPublicCode(error);
   if (code?.startsWith('PUBLIC_APPOINTMENT_') || code === 'APPOINTMENT_ACTIVE_SLOT_CONFLICT') return true;
+  if (code?.startsWith('OWNER_ONBOARDING_')) return true;
 
   const message = String((error as ErrorLike)?.message || '').toLowerCase();
   return [

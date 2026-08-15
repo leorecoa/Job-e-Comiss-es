@@ -1,5 +1,4 @@
 import { assertOperationalSupabase, shouldUseLocalFallback, supabase } from '../lib/supabase';
-import { getUserProfileName, upsertOwnerProfileForBarbershop } from './authRepository';
 import { Barbershop, BarbershopBusinessHours } from '../types';
 import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES, normalizeBarbershopBusinessHours, normalizeBarbershopSlotStepMinutes } from '../scheduling';
 
@@ -222,9 +221,25 @@ export const normalizeBarbershopSlug = (value: string): string => {
 
 export const getBarbershopPublicBookingPath = (slug: string): string => `/book/${slug}`;
 
-const isDuplicateSlugError = (error: { code?: string; message?: string }): boolean => {
-  const message = error.message || '';
-  return error.code === '23505' || /slug/i.test(message);
+const OWNER_ONBOARDING_ERROR_MESSAGES: Record<string, string> = {
+  OWNER_ONBOARDING_AUTH_REQUIRED: 'Entre novamente para criar sua barbearia.',
+  OWNER_ONBOARDING_PROFILE_NOT_FOUND: 'Seu perfil ainda nao esta disponivel. Entre novamente e tente outra vez.',
+  OWNER_ONBOARDING_NOT_AUTHORIZED: 'Esta conta nao possui permissao para criar uma barbearia.',
+  OWNER_ONBOARDING_ALREADY_CONFIGURED: 'Esta conta owner ja possui uma barbearia configurada.',
+  OWNER_ONBOARDING_SLUG_TAKEN: 'Este slug ja esta em uso. Escolha outro.',
+  OWNER_ONBOARDING_INVALID_INPUT: 'Revise os dados da barbearia e tente novamente.'
+};
+
+const mapOwnerOnboardingError = (error: { message?: string; details?: string; hint?: string }): Error => {
+  const searchable = [error.message, error.details, error.hint].filter(Boolean).join(' ');
+  const code = Object.keys(OWNER_ONBOARDING_ERROR_MESSAGES).find((candidate) => searchable.includes(candidate));
+  const mapped = new Error(code ? OWNER_ONBOARDING_ERROR_MESSAGES[code] : 'Nao foi possivel criar a barbearia. Tente novamente.');
+
+  if (code) {
+    (mapped as Error & { code?: string }).code = code;
+  }
+
+  return mapped;
 };
 
 export const getBarbershopBrandingImageExtension = (fileName: string): string => {
@@ -336,58 +351,24 @@ export const createBarbershopForCurrentOwner = async (
   }
   assertOperationalSupabase();
 
-  const { data: authData, error: authError } = await supabase.auth.getUser();
-
-  if (authError) throw authError;
-  if (!authData.user) {
-    throw new Error('Usuario nao autenticado para criar barbearia.');
-  }
-
-  const existingSlug = await supabase
-    .from('barbershops')
-    .select('id')
-    .eq('slug', normalizedSlug)
-    .maybeSingle();
-
-  if (existingSlug.error && !isDuplicateSlugError(existingSlug.error)) {
-    throw existingSlug.error;
-  }
-
-  if (existingSlug.data?.id) {
-    throw new Error('Este slug ja esta em uso. Escolha outro.');
-  }
-
   const payload = {
-    name: normalizedName,
-    slug: normalizedSlug,
-    phone: cleanOptional(input.phone),
-    address: cleanOptional(input.address),
-    whatsapp: cleanOptional(input.whatsapp),
-    description: cleanOptional(input.description),
-    business_hours: normalizeBarbershopBusinessHours(input.businessHours),
-    slot_step_minutes: normalizeBarbershopSlotStepMinutes(input.slotStepMinutes),
-    active: true
+    p_name: normalizedName,
+    p_slug: normalizedSlug,
+    p_phone: cleanOptional(input.phone),
+    p_address: cleanOptional(input.address),
+    p_whatsapp: cleanOptional(input.whatsapp),
+    p_description: cleanOptional(input.description),
+    p_business_hours: normalizeBarbershopBusinessHours(input.businessHours),
+    p_slot_step_minutes: normalizeBarbershopSlotStepMinutes(input.slotStepMinutes)
   };
 
   const { data, error } = await supabase
-    .from('barbershops')
-    .insert(payload)
-    .select(BRANDING_WITH_HOURS_SELECT)
+    .rpc('create_owner_barbershop', payload)
     .single<DatabaseBarbershopBrandingRow>();
 
   if (error) {
-    if (isDuplicateSlugError(error)) {
-      throw new Error('Este slug ja esta em uso. Escolha outro.');
-    }
-
-    throw error;
+    throw mapOwnerOnboardingError(error);
   }
-
-  const displayName = normalizeWhitespace(
-    String(authData.user.user_metadata?.display_name || getUserProfileName(authData.user))
-  );
-
-  await upsertOwnerProfileForBarbershop(authData.user.id, displayName, data.id);
 
   return mapBarbershopRow(data);
 };

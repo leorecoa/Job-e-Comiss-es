@@ -114,6 +114,7 @@ type MockScenario = {
   financialRecords?: MockFinancialRecord[];
   rpcResponse?: MockRpcResponse;
   completionRpcResponse?: MockRpcResponse;
+  onboardingRpcResponse?: MockRpcResponse;
 };
 
 const ownerBusinessHours = {
@@ -307,6 +308,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
   const appointmentReadRequests: string[] = [];
   const rpcRequests: CapturedRequest[] = [];
   const completionRequests: CapturedRequest[] = [];
+  const onboardingRequests: CapturedRequest[] = [];
 
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
     const request = route.request();
@@ -519,6 +521,38 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
       return;
     }
 
+    if (url.pathname === '/rest/v1/rpc/create_owner_barbershop') {
+      const body = parseRequestBody(route) as Record<string, unknown>;
+      onboardingRequests.push({ method: request.method(), url: request.url(), body });
+
+      if (scenario.onboardingRpcResponse) {
+        await fulfillJson(route, scenario.onboardingRpcResponse.status, scenario.onboardingRpcResponse.body);
+        return;
+      }
+
+      const created: MockBarbershop = {
+        id: '01300000-0000-4000-8000-000000000010',
+        name: String(body.p_name),
+        slug: String(body.p_slug),
+        phone: body.p_phone as string | null,
+        address: body.p_address as string | null,
+        logo_url: null,
+        cover_image_url: null,
+        description: body.p_description as string | null,
+        instagram_url: null,
+        whatsapp: body.p_whatsapp as string | null,
+        primary_color: null,
+        secondary_color: null,
+        business_hours: body.p_business_hours as MockBarbershop['business_hours'],
+        slot_step_minutes: Number(body.p_slot_step_minutes),
+        active: true
+      };
+      profile.barbershop_id = created.id;
+      barbershops.push(created);
+      await fulfillJson(route, 200, [created]);
+      return;
+    }
+
     await fulfillJson(route, 404, { message: `Unhandled mock path: ${url.pathname}` });
   });
 
@@ -529,7 +563,8 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
     serviceRequests,
     appointmentReadRequests,
     rpcRequests,
-    completionRequests
+    completionRequests,
+    onboardingRequests
   };
 };
 
@@ -551,6 +586,62 @@ const openOwnerManagement = async (page: Page) => {
 };
 
 test.describe('owner operational dashboard e2e', () => {
+  test('new owner completes onboarding atomically and reaches dashboard without reload', async ({ page }) => {
+    const network = await installOwnerSupabaseMocks(page, {
+      profile: {
+        id: OWNER_USER_ID,
+        display_name: OWNER_DISPLAY_NAME,
+        role: 'owner',
+        active: true,
+        barbershop_id: null,
+        barber_id: null
+      },
+      barbershops: []
+    });
+
+    await signInAsOwner(page);
+    await expect(page.getByRole('heading', { name: 'Crie sua barbearia' })).toBeVisible();
+    await page.getByLabel('Nome da barbearia').fill('Barbearia Atomic');
+    await page.getByLabel('Slug').fill('barbearia-atomic');
+    await page.getByLabel('Telefone').fill('81999999999');
+    await page.getByLabel('WhatsApp').fill('81999999999');
+    await page.getByRole('button', { name: 'Criar barbearia' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Agenda do dia' })).toBeVisible();
+    expect(network.onboardingRequests).toHaveLength(1);
+    expect(network.onboardingRequests[0].body).toMatchObject({
+      p_name: 'Barbearia Atomic',
+      p_slug: 'barbearia-atomic'
+    });
+  });
+
+  test('failed owner onboarding shows friendly error and creates no phantom tenant', async ({ page }) => {
+    const network = await installOwnerSupabaseMocks(page, {
+      profile: {
+        id: OWNER_USER_ID,
+        display_name: OWNER_DISPLAY_NAME,
+        role: 'owner',
+        active: true,
+        barbershop_id: null,
+        barber_id: null
+      },
+      barbershops: [],
+      onboardingRpcResponse: {
+        status: 400,
+        body: { message: 'OWNER_ONBOARDING_SLUG_TAKEN' }
+      }
+    });
+
+    await signInAsOwner(page);
+    await page.getByLabel('Nome da barbearia').fill('Duplicate Shop');
+    await page.getByLabel('Slug').fill('duplicate-shop');
+    await page.getByRole('button', { name: 'Criar barbearia' }).click();
+
+    await expect(page.getByText('Este slug ja esta em uso. Escolha outro.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Crie sua barbearia' })).toBeVisible();
+    expect(network.onboardingRequests).toHaveLength(1);
+  });
+
   test('financial completion persists after reload and remote failure creates no phantom record', async ({ page, browser }) => {
     const network = await installOwnerSupabaseMocks(page);
     await signInAsOwner(page);

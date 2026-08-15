@@ -141,6 +141,24 @@ describe('privacy-safe production observability', () => {
     expect(sentry.captureException).not.toHaveBeenCalled();
   });
 
+  it('does not report controlled owner onboarding outcomes', () => {
+    initializeObservability({ dsn: 'https://public@example.invalid/1' });
+
+    for (const code of [
+      'OWNER_ONBOARDING_AUTH_REQUIRED',
+      'OWNER_ONBOARDING_PROFILE_NOT_FOUND',
+      'OWNER_ONBOARDING_NOT_AUTHORIZED',
+      'OWNER_ONBOARDING_ALREADY_CONFIGURED',
+      'OWNER_ONBOARDING_SLUG_TAKEN',
+      'OWNER_ONBOARDING_INVALID_INPUT'
+    ]) {
+      expect(isExpectedOperationalError({ message: code })).toBe(true);
+      expect(reportUnexpectedError('owner:onboarding', { message: code })).toBeUndefined();
+    }
+
+    expect(sentry.captureException).not.toHaveBeenCalled();
+  });
+
   it('reports unexpected errors with a non-persistent correlation id', () => {
     initializeObservability({ dsn: 'https://public@example.invalid/1' });
     const correlationId = reportUnexpectedError('owner:load-catalog', { message: 'database unavailable', status: 503 });
