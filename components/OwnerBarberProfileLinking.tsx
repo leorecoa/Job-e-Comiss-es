@@ -131,8 +131,8 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
             <Link2 size={18} />
             <span className="text-xs font-bold uppercase tracking-widest">Acesso do barbeiro</span>
           </div>
-          <h2 className="text-2xl font-bold">Vincular barbeiro a usuario</h2>
-          <p className="ui-owner-help mt-1 text-sm">Conecte a conta de login do barbeiro ao profissional cadastrado. Depois do vinculo, ele acessa somente a propria agenda.</p>
+          <h2 className="text-2xl font-bold">Vincular barbeiro a usuário</h2>
+          <p className="ui-owner-help mt-1 text-sm">Conecte a conta de login do barbeiro ao profissional cadastrado. Depois do vínculo, ele acessa somente a própria agenda.</p>
         </div>
         <div className="ui-owner-badge inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-widest">
           <Mail size={14} />
@@ -144,15 +144,15 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
         <p className="font-bold">Como funciona</p>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
           <li>O barbeiro cria uma conta usando o e-mail dele.</li>
-          <li>Voce informa aqui o mesmo e-mail usado no login.</li>
+          <li>Você informa aqui o mesmo e-mail usado no login.</li>
           <li>Escolha o profissional correspondente e clique em vincular.</li>
         </ol>
-        <p className="ui-owner-help mt-3 text-xs">Este fluxo nao envia convite automatico por e-mail. Depois de vincular, avise o barbeiro para entrar novamente se a agenda ainda nao aparecer.</p>
+        <p className="ui-owner-help mt-3 text-xs">Este fluxo não envia convite automático por e-mail. Depois de vincular, avise o barbeiro para entrar novamente se a agenda ainda não aparecer.</p>
       </div>
 
       {sortedBarbers.length === 0 ? (
         <div className="ui-owner-empty rounded-2xl px-4 py-5 text-sm">
-          Cadastre pelo menos um barbeiro na sua barbearia para liberar o vinculo com usuario.
+          Cadastre pelo menos um barbeiro na sua barbearia para liberar o vínculo com usuário.
         </div>
       ) : (
         <div className="space-y-3">
@@ -169,7 +169,7 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
               <div key={barber.id} className="ui-owner-card-solid rounded-2xl p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-blue-300">
+                    <div className="flex items-center gap-2 text-foreground">
                       <Scissors size={16} />
                       <p className="truncate text-sm font-bold">{barber.name}</p>
                     </div>
@@ -177,12 +177,12 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
                       <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-bold ${
                         barber.active === false
                           ? 'ui-owner-status-warning'
-                          : 'border border-green-500/20 bg-green-500/10 text-green-200'
+                          : 'ui-owner-status-success'
                       }`}>
                         <CheckCircle2 size={11} />
                         {barber.active === false ? 'Inativo' : 'Ativo'}
                       </span>
-                      <span>Conta de usuario ainda precisa ser vinculada pelo e-mail de login.</span>
+                      <span>Conta de usuário ainda precisa ser vinculada pelo e-mail de login.</span>
                     </div>
                   </div>
 
@@ -204,7 +204,7 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
                       disabled={disabled}
                       className="ui-owner-button ui-owner-button-primary inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-bold"
                     >
-                      {isSubmitting ? 'Vinculando...' : 'Vincular usuario'}
+                      {isSubmitting ? 'Vinculando...' : 'Vincular usuário'}
                     </button>
                   </div>
                 </div>
@@ -212,8 +212,8 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
                 {feedback && (
                   <div className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
                     feedback.type === 'success'
-                      ? 'border-green-500/20 bg-green-500/10 text-green-200'
-                      : 'border-red-500/20 bg-red-500/10 text-red-200'
+                      ? 'ui-owner-status-success'
+                      : 'ui-owner-status-error'
                   }`}>
                     <div className="flex items-start gap-2">
                       {feedback.type === 'success'

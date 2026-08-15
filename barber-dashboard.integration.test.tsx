@@ -1203,6 +1203,29 @@ describe('Public Booking Page Logic', () => {
     expect(html).toContain('Agendar agora');
     expect(html).toContain('WhatsApp');
     expect(html).toContain('Instagram');
+    expect(html).toContain('Prévia pública');
+    expect(html).toContain('border-color:#111111');
+    expect(html).not.toMatch(/bg-gray-950|bg-black|text-white|text-gray-300/);
+  });
+
+  it('branding preview uses compact light placeholders without logo or cover', () => {
+    const html = renderToStaticMarkup(
+      <BarbershopBrandingSettings
+        barbershop={{
+          id: DEFAULT_BARBERSHOP_ID,
+          name: 'Gestão Máxima',
+          slug: DEFAULT_BARBERSHOP_SLUG,
+          active: true
+        }}
+        role="owner"
+        onSave={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('Capa da barbearia');
+    expect(html).toContain('ui-branding-preview-cover');
+    expect(html).toContain('ui-branding-preview-logo');
+    expect(html).not.toMatch(/linear-gradient|bg-gray-950|bg-gray-900|bg-black/);
   });
 
   it('/book/barbearia-inexistente uses the invalid slug without fallback', async () => {
