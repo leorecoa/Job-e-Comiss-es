@@ -1,15 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const supabaseMock = vi.hoisted(() => ({
-  auth: {
-    getUser: vi.fn()
-  },
-  from: vi.fn()
-}));
-
-const authRepositoryMock = vi.hoisted(() => ({
-  getUserProfileName: vi.fn(),
-  upsertOwnerProfileForBarbershop: vi.fn()
+  from: vi.fn(),
+  rpc: vi.fn()
 }));
 
 vi.mock('./lib/supabase', () => ({
@@ -19,8 +12,6 @@ vi.mock('./lib/supabase', () => ({
   assertOperationalSupabase: vi.fn(),
   supabase: supabaseMock
 }));
-
-vi.mock('./services/authRepository', () => authRepositoryMock);
 
 import {
   createBarbershopForCurrentOwner,
@@ -33,7 +24,6 @@ import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
 describe('barbershop onboarding repository', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    authRepositoryMock.getUserProfileName.mockReturnValue('Leo Owner');
   });
 
   it('normalizes the onboarding slug into a public-friendly path', () => {
@@ -41,10 +31,12 @@ describe('barbershop onboarding repository', () => {
     expect(getBarbershopPublicBookingPath('barbearia-sao-joao-premium')).toBe('/book/barbearia-sao-joao-premium');
   });
 
-  it('rejects onboarding without an authenticated user', async () => {
-    supabaseMock.auth.getUser.mockResolvedValue({
-      data: { user: null },
-      error: null
+  it('maps an unauthenticated RPC response to a friendly error', async () => {
+    supabaseMock.rpc.mockReturnValue({
+      single: vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'OWNER_ONBOARDING_AUTH_REQUIRED' }
+      })
     });
 
     await expect(
@@ -52,36 +44,16 @@ describe('barbershop onboarding repository', () => {
         name: 'Barbearia Premium',
         slug: 'barbearia-premium'
       })
-    ).rejects.toThrow('Usuario nao autenticado para criar barbearia.');
+    ).rejects.toThrow('Entre novamente para criar sua barbearia.');
   });
 
-  it('surfaces a friendly duplicate slug error before insert', async () => {
-    supabaseMock.auth.getUser.mockResolvedValue({
-      data: {
-        user: {
-          id: 'owner-1',
-          email: 'owner@example.com',
-          user_metadata: {
-            display_name: 'Leo Owner'
-          }
-        }
-      },
-      error: null
+  it('maps a duplicate slug RPC response without querying tables directly', async () => {
+    supabaseMock.rpc.mockReturnValue({
+      single: vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'OWNER_ONBOARDING_SLUG_TAKEN' }
+      })
     });
-
-    const maybeSingle = vi.fn().mockResolvedValue({
-      data: { id: 'existing-shop' },
-      error: null
-    });
-
-    supabaseMock.from.mockImplementation(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle
-        }))
-      })),
-      insert: vi.fn()
-    }));
 
     await expect(
       createBarbershopForCurrentOwner({
@@ -89,26 +61,10 @@ describe('barbershop onboarding repository', () => {
         slug: 'barbearia-premium'
       })
     ).rejects.toThrow('Este slug ja esta em uso. Escolha outro.');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
   });
 
-  it('creates the barbershop and links the current owner profile', async () => {
-    supabaseMock.auth.getUser.mockResolvedValue({
-      data: {
-        user: {
-          id: 'owner-1',
-          email: 'owner@example.com',
-          user_metadata: {
-            display_name: 'Leo Owner'
-          }
-        }
-      },
-      error: null
-    });
-
-    const maybeSingle = vi.fn().mockResolvedValue({
-      data: null,
-      error: null
-    });
+  it('creates and links through the transactional RPC only', async () => {
     const single = vi.fn().mockResolvedValue({
       data: {
         id: 'shop-1',
@@ -129,29 +85,7 @@ describe('barbershop onboarding repository', () => {
       },
       error: null
     });
-    const insert = vi.fn((payload) => ({
-      select: vi.fn(() => ({
-        single: vi.fn(() => single())
-      }))
-    }));
-
-    supabaseMock.from.mockImplementation(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle
-        }))
-      })),
-      insert
-    }));
-
-    authRepositoryMock.upsertOwnerProfileForBarbershop.mockResolvedValue({
-      id: 'owner-1',
-      display_name: 'Leo Owner',
-      role: 'owner',
-      active: true,
-      barbershop_id: 'shop-1',
-      barber_id: null
-    });
+    supabaseMock.rpc.mockReturnValue({ single });
 
     const created = await createBarbershopForCurrentOwner({
       name: '  Barbearia Premium  ',
@@ -162,18 +96,17 @@ describe('barbershop onboarding repository', () => {
       description: ' Agenda premium '
     });
 
-    expect(insert).toHaveBeenCalledWith({
-      name: 'Barbearia Premium',
-      slug: 'barbearia-sao-joao',
-      phone: '558500000000',
-      address: 'Rua Central',
-      whatsapp: '5585999999999',
-      description: 'Agenda premium',
-      business_hours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
-      slot_step_minutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
-      active: true
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('create_owner_barbershop', {
+      p_name: 'Barbearia Premium',
+      p_slug: 'barbearia-sao-joao',
+      p_phone: '558500000000',
+      p_address: 'Rua Central',
+      p_whatsapp: '5585999999999',
+      p_description: 'Agenda premium',
+      p_business_hours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
+      p_slot_step_minutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     });
-    expect(authRepositoryMock.upsertOwnerProfileForBarbershop).toHaveBeenCalledWith('owner-1', 'Leo Owner', 'shop-1');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
     expect(created).toMatchObject({
       id: 'shop-1',
       name: 'Barbearia Premium',

@@ -924,8 +924,14 @@ const App: React.FC = () => {
     whatsapp?: string | null;
     description?: string | null;
   }) => {
-    const createdBarbershop = await createBarbershopForCurrentOwner(input);
-    const refreshedSession = await getCurrentAuthSession();
+    const createdBarbershop = await createBarbershopForCurrentOwner(input).catch((error) => {
+      logOperationalError('owner:create-barbershop', error);
+      throw error;
+    });
+    const refreshedSession = await getCurrentAuthSession().catch((error) => {
+      logOperationalError('owner:refresh-profile-after-onboarding', error);
+      return null;
+    });
 
     setOwnerBarbershop(createdBarbershop);
     setSettings(prev => normalizeSettings({

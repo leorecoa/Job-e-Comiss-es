@@ -44,7 +44,7 @@ select ok(not has_table_privilege('authenticated', 'public.profiles', 'reference
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'trigger'), 'authenticated has no profiles trigger privilege');
 select ok(has_table_privilege('service_role', 'public.profiles', 'select') and has_table_privilege('service_role', 'public.profiles', 'insert') and has_table_privilege('service_role', 'public.profiles', 'update') and has_table_privilege('service_role', 'public.profiles', 'delete') and has_table_privilege('service_role', 'public.profiles', 'truncate') and has_table_privilege('service_role', 'public.profiles', 'references') and has_table_privilege('service_role', 'public.profiles', 'trigger'), 'service_role retains all profiles privileges');
 select ok((select relrowsecurity from pg_class where oid = 'public.profiles'::regclass), 'profiles RLS remains enabled');
-select is((select count(*) from pg_policies where schemaname = 'public' and tablename = 'profiles'), 9::bigint, 'profiles policies remain unchanged');
+select is((select count(*) from pg_policies where schemaname = 'public' and tablename = 'profiles'), 7::bigint, 'legacy direct onboarding profile policies are removed');
 select ok(has_function_privilege('authenticated', 'public.link_barber_profile_by_email(text,uuid)', 'execute'), 'authenticated can execute profile linking RPC');
 
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'private' and routine_name = 'current_user_barber_id' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC has no direct execute on barber helper');
@@ -169,9 +169,9 @@ select ok(private.current_user_role() <> 'owner', 'Barber A does not satisfy bra
 reset role;
 set local role authenticated;
 set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000004","role":"authenticated"}';
-select lives_ok($test$insert into public.profiles (id, display_name, role, active, barbershop_id, barber_id) values ('aaaa0000-0000-4000-8000-000000000004', 'Self Profile', 'owner', true, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', null)$test$, 'authenticated owner can create own onboarding profile');
-select lives_ok($test$update public.profiles set display_name = 'Self Profile Updated' where id = 'aaaa0000-0000-4000-8000-000000000004'$test$, 'authenticated owner can update own onboarding profile');
-select is((select display_name from public.profiles where id = 'aaaa0000-0000-4000-8000-000000000004'), 'Self Profile Updated', 'authenticated user reads updated own profile');
+select throws_ok($test$insert into public.profiles (id, display_name, role, active, barbershop_id, barber_id) values ('aaaa0000-0000-4000-8000-000000000004', 'Self Profile', 'owner', true, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', null)$test$, '42501'::char(5), null, 'authenticated user cannot create an owner profile with an arbitrary tenant');
+select is((select count(*) from public.profiles where id = 'aaaa0000-0000-4000-8000-000000000004'), 0::bigint, 'blocked direct onboarding leaves no profile');
+select is((select count(*) from public.barbershops where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'), 0::bigint, 'profile without tenant cannot read a tenant before provisioning');
 
 reset role;
 select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Cross Barber', '0000000000', '22222222-2222-4222-8222-222222222222', 'Barber Beta', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '10 days', now() + interval '10 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '23503'::char(5), null, 'cross-tenant barber FK rejects appointment');
