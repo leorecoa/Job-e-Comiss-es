@@ -78,6 +78,10 @@ type MockScenario = {
     status: number;
     body: unknown;
   };
+  signOutResponse?: {
+    status: number;
+    delayMs?: number;
+  };
 };
 
 const toEqValue = (value: string | null): string | null => {
@@ -216,6 +220,7 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
   const signInRequests: CapturedRequest[] = [];
   const appointmentReadRequests: string[] = [];
   const appointmentCreateRequests: CapturedRequest[] = [];
+  const signOutRequests: CapturedRequest[] = [];
 
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
     const request = route.request();
@@ -263,6 +268,19 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
           display_name: BARBER_DISPLAY_NAME
         }
       });
+      return;
+    }
+
+    if (url.pathname === '/auth/v1/logout') {
+      signOutRequests.push({
+        method: request.method(),
+        url: request.url(),
+        body: parseRequestBody(route)
+      });
+      if (scenario.signOutResponse?.delayMs) {
+        await new Promise((resolve) => setTimeout(resolve, scenario.signOutResponse?.delayMs));
+      }
+      await fulfillJson(route, scenario.signOutResponse?.status ?? 204, {});
       return;
     }
 
@@ -359,6 +377,7 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
 
   return {
     signInRequests,
+    signOutRequests,
     appointmentReadRequests,
     appointmentCreateRequests
   };
@@ -468,8 +487,8 @@ test.describe('barber dashboard e2e', () => {
     expect(payload.barber_name).not.toBe('Barber Hack');
   });
 
-  test.fixme('barber without barberId should receive the incomplete profile message', async ({ page }) => {
-    await installBarberSupabaseMocks(page, {
+  test('barber without barberId can sign out once from the pending link state', async ({ page }) => {
+    const network = await installBarberSupabaseMocks(page, {
       profile: {
         id: BARBER_USER_ID,
         display_name: BARBER_DISPLAY_NAME,
@@ -477,16 +496,26 @@ test.describe('barber dashboard e2e', () => {
         active: true,
         barbershop_id: BARBERSHOP_ID,
         barber_id: null
-      }
+      },
+      signOutResponse: { status: 204, delayMs: 300 }
     });
 
     await signInAsBarber(page);
-    await expect(page.getByText(/Vinculo pendente/i)).toBeVisible();
-    await expect(page.getByText(/ainda nao esta vinculada a um profissional ativo/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Vínculo pendente' })).toBeVisible();
+    await expect(page.getByText(/ainda não está vinculada a um profissional ativo/i)).toBeVisible();
+    const signOutButton = page.getByRole('button', { name: 'Sair e voltar ao login' });
+    await expect(signOutButton).toBeVisible();
+    await signOutButton.evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+    await expect(page.getByRole('button', { name: 'Saindo...' })).toBeDisabled();
+    await expect(page.getByRole('heading', { name: /Painel interno/i })).toBeVisible();
+    expect(network.signOutRequests).toHaveLength(1);
   });
 
-  test.fixme('barber without barbershopId should receive the incomplete profile message', async ({ page }) => {
-    await installBarberSupabaseMocks(page, {
+  test('barber without barbershopId sees a friendly error when sign out fails', async ({ page }) => {
+    const network = await installBarberSupabaseMocks(page, {
       profile: {
         id: BARBER_USER_ID,
         display_name: BARBER_DISPLAY_NAME,
@@ -494,11 +523,17 @@ test.describe('barber dashboard e2e', () => {
         active: true,
         barbershop_id: null,
         barber_id: BARBER_ID
-      }
+      },
+      signOutResponse: { status: 500 }
     });
 
     await signInAsBarber(page);
-    await expect(page.getByText(/Vinculo pendente/i)).toBeVisible();
-    await expect(page.getByText(/sair e entrar novamente/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Vínculo pendente' })).toBeVisible();
+    const signOutButton = page.getByRole('button', { name: 'Sair e voltar ao login' });
+    await signOutButton.click();
+    await expect(page.getByRole('alert')).toContainText('Não foi possível sair agora. Tente novamente.');
+    await expect(signOutButton).toBeEnabled();
+    await expect(page.getByRole('heading', { name: 'Vínculo pendente' })).toBeVisible();
+    expect(network.signOutRequests).toHaveLength(1);
   });
 });

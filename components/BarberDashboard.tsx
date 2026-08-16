@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Appointment, AppSettings } from '../types';
 import { AuthSession } from '../services/authRepository';
 import {
@@ -24,6 +24,7 @@ import {
   Scissors
 } from 'lucide-react';
 import { AppointmentModal } from './AppointmentModal';
+import { Button, InlineNotice, Surface } from './ui';
 
 type BarberDashboardProps = {
   authSession: AuthSession;
@@ -33,10 +34,10 @@ type BarberDashboardProps = {
   onUpdateAppointment: (id: string, patch: Partial<Appointment>) => Promise<void> | void;
   onCancelAppointment: (appointment: Appointment) => void;
   addToast: (message: string, type?: 'success' | 'error' | 'info') => void;
-  onLogout: () => void;
+  onSignOut: (confirmLogout?: boolean) => Promise<void>;
 };
 
-export const BARBER_PROFILE_INCOMPLETE_MESSAGE = 'Seu perfil de barbeiro ainda nao esta vinculado a um profissional. Peca ao owner para revisar o vinculo da sua conta.';
+export const BARBER_PROFILE_INCOMPLETE_MESSAGE = 'Seu perfil de barbeiro ainda não está vinculado a um profissional. Peça ao owner para revisar o vínculo da sua conta.';
 
 const getTodayString = (): string => {
   const d = new Date();
@@ -92,11 +93,14 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   onUpdateAppointment,
   onCancelAppointment,
   addToast,
-  onLogout
+  onSignOut
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [isAppointmentModalOpen, setAppointmentModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [isSigningOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const signOutInFlightRef = useRef(false);
 
   const barberId = authSession.barberId;
   const hasBarbershopLink = Boolean(authSession.barbershopId?.trim());
@@ -243,26 +247,52 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
     setSelectedDate(`${newYear}-${newMonth}-${newDay}`);
   };
 
+  const handlePendingSignOut = async () => {
+    if (signOutInFlightRef.current) return;
+
+    signOutInFlightRef.current = true;
+    setSigningOut(true);
+    setSignOutError(null);
+    try {
+      await onSignOut(false);
+    } catch {
+      signOutInFlightRef.current = false;
+      setSignOutError('Não foi possível sair agora. Tente novamente.');
+      setSigningOut(false);
+    }
+  };
+
   if (!barberId || !hasBarbershopLink || !currentBarber) {
     return (
       <div className="ui-barber-shell min-h-screen flex items-center justify-center p-4 font-sans">
-        <div className="ui-surface w-full max-w-lg rounded-2xl p-7 text-center">
+        <Surface className="w-full max-w-lg rounded-2xl p-7 text-center">
           <div className="ui-barber-mark mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl">
             <Scissors size={28} />
           </div>
           <h1 className="font-display text-2xl font-bold mb-3">
-            Vinculo pendente
+            Vínculo pendente
           </h1>
           <p className="ui-owner-help text-sm leading-relaxed">
-            Sua conta existe, mas ainda nao esta vinculada a um profissional ativo desta barbearia.
+            Sua conta existe, mas ainda não está vinculada a um profissional ativo desta barbearia.
           </p>
           <p className="mt-3 text-sm leading-relaxed">
             Envie ao owner o e-mail usado neste login. Ele deve selecionar o profissional correspondente no painel e vincular a sua conta.
           </p>
           <p className="ui-owner-info mt-3 rounded-2xl p-3 text-xs leading-relaxed">
-            Se o owner acabou de concluir o vinculo, saia e entre novamente para atualizar a sessao.
+            Se o owner acabou de concluir o vínculo, saia e entre novamente para atualizar a sessão.
           </p>
-        </div>
+          {signOutError && <InlineNotice tone="error" className="mt-4 text-left">{signOutError}</InlineNotice>}
+          <Button
+            type="button"
+            variant="secondary"
+            loading={isSigningOut}
+            onClick={handlePendingSignOut}
+            className="mt-5 min-h-11 w-full justify-center"
+          >
+            <LogOut size={18} aria-hidden="true" />
+            {isSigningOut ? 'Saindo...' : 'Sair e voltar ao login'}
+          </Button>
+        </Surface>
       </div>
     );
   }
@@ -287,7 +317,11 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
 
           <button
             type="button"
-            onClick={onLogout}
+            onClick={() => {
+              void onSignOut().catch(() => {
+                addToast('Não foi possível sair agora. Tente novamente.', 'error');
+              });
+            }}
             className="ui-button ui-button-ghost shrink-0"
             title="Sair"
             aria-label="Sair"
