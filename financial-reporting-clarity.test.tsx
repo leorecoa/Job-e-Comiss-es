@@ -148,7 +148,7 @@ describe('financial reporting clarity', () => {
         onUpdateAppointment={vi.fn()}
         onCancelAppointment={vi.fn()}
         addToast={vi.fn()}
-        onLogout={vi.fn()}
+        onSignOut={vi.fn()}
       />
     );
 

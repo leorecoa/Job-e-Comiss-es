@@ -1622,19 +1622,21 @@ const App: React.FC = () => {
     setClientModalOpen(true);
   };
   
-  const handleLogout = async () => {
-    if(window.confirm("Deseja sair?")) {
-       if (isSupabaseConfigured) {
-         try {
-           await signOutAuth();
-         } catch (error) {
-           logOperationalError('auth:sign-out', error);
-         }
-       }
-       setAuthSession(null);
-       setUserProfile(null);
+  const handleLogout = async (confirmLogout = true) => {
+    if (confirmLogout && !window.confirm('Deseja sair?')) return;
+
+    if (isSupabaseConfigured) {
+      try {
+        await signOutAuth();
+      } catch (error) {
+        logOperationalError('auth:sign-out', error);
+        throw error;
+      }
     }
-  }
+
+    setAuthSession(null);
+    setUserProfile(null);
+  };
 
   const ownerNavigationItems: DashboardNavigationItem[] = [
     { id: 'appointments', label: 'Agenda', description: 'Acompanhe horarios e operacao do dia.', icon: <Calendar size={18} /> },
@@ -1780,7 +1782,7 @@ const App: React.FC = () => {
             onUpdateAppointment={handleUpdateAppointmentPatch}
             onCancelAppointment={handleCancelAppointment}
             addToast={addToast}
-            onLogout={handleLogout}
+            onSignOut={handleLogout}
           />
         </React.Suspense>
       </>
