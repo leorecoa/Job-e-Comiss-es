@@ -2,8 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   OwnerBarberProfileLinking,
+  BARBER_SIGNUP_PATH,
+  BARBER_SIGNUP_SHARE_TEXT,
+  BARBER_SIGNUP_SHARE_TITLE,
   canManageOwnerBarberProfileLinking,
+  getBarberSignupUrl,
   isOwnerBarberProfileLinkingSubmitDisabled,
+  shareBarberSignup,
   submitOwnerBarberProfileLinking
 } from './components/OwnerBarberProfileLinking';
 import { BarberOption } from './types';
@@ -30,7 +35,43 @@ describe('owner barber profile linking', () => {
     expect(html).toContain('Como funciona');
     expect(html).toContain('O barbeiro cria uma conta usando o e-mail dele.');
     expect(html).toContain('E-mail da conta do barbeiro');
+    expect(html).toContain('Enviar link de cadastro');
+    expect(html.indexOf('Enviar link de cadastro')).toBeLessThan(html.indexOf('Como funciona'));
+    expect(html.indexOf('Enviar link de cadastro')).toBeLessThan(html.indexOf('Leo'));
     expect(html).not.toContain('barber-1');
+  });
+
+  it('renders the signup action without registered professionals', () => {
+    const html = renderToStaticMarkup(
+      <OwnerBarberProfileLinking role="owner" barbers={[]} onLinkProfile={vi.fn()} />
+    );
+
+    expect(html).toContain('Enviar link de cadastro');
+    expect(html).toContain('O barbeiro precisa criar a conta antes do vínculo.');
+  });
+
+  it('shares only the dedicated public URL without tenant or personal data', async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+
+    await expect(shareBarberSignup({ share }, 'https://job-e-comiss-es.vercel.app')).resolves.toBe('shared');
+    expect(share).toHaveBeenCalledWith({
+      title: BARBER_SIGNUP_SHARE_TITLE,
+      text: BARBER_SIGNUP_SHARE_TEXT,
+      url: 'https://job-e-comiss-es.vercel.app/cadastro/barbeiro'
+    });
+    expect(share.mock.calls[0][0].url).not.toMatch(/[?#]|email|userId|barberId|barbershopId|token/i);
+    expect(getBarberSignupUrl('https://job-e-comiss-es.vercel.app')).toBe(`https://job-e-comiss-es.vercel.app${BARBER_SIGNUP_PATH}`);
+  });
+
+  it('copies the public signup URL when Web Share is unavailable', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    await expect(shareBarberSignup({ clipboard: { writeText } }, 'https://app.example.test')).resolves.toBe('copied');
+    expect(writeText).toHaveBeenCalledWith('https://app.example.test/cadastro/barbeiro');
+  });
+
+  it('reports an unavailable sharing mechanism as a controlled failure', async () => {
+    await expect(shareBarberSignup({}, 'https://app.example.test')).rejects.toThrow('Share unavailable');
   });
 
   it('barber does not see the linking UI', () => {

@@ -935,6 +935,50 @@ test.describe('owner operational dashboard e2e', () => {
     });
   });
 
+  test('owner shares the public barber signup link without leaving the team section', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'share', {
+        configurable: true,
+        value: async (data: ShareData) => {
+          (window as typeof window & { __sharedSignup?: ShareData }).__sharedSignup = data;
+        }
+      });
+    });
+    await installOwnerSupabaseMocks(page);
+    await signInAsOwner(page);
+    await openOwnerManagement(page);
+    await page.getByRole('link', { name: 'Equipe' }).click();
+
+    const team = page.locator('#management-team');
+    const shareButton = team.getByRole('button', { name: 'Enviar link de cadastro' });
+    await expect(shareButton).toBeVisible();
+    await shareButton.click();
+    await expect(team.getByText('Link de cadastro compartilhado.')).toBeVisible();
+    await expect(page).toHaveURL(/#management-team$/);
+    const shared = await page.evaluate(() => (window as typeof window & { __sharedSignup?: ShareData }).__sharedSignup);
+    expect(shared).toMatchObject({
+      title: 'Cadastro de barbeiro — Job e Comissões',
+      url: 'http://127.0.0.1:4173/cadastro/barbeiro'
+    });
+    expect(shared?.url).not.toMatch(/[?#]|user|barberId|barbershopId|token/i);
+  });
+
+  test('owner sees friendly feedback when sharing the signup link fails', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'share', {
+        configurable: true,
+        value: async () => { throw new Error('share failed'); }
+      });
+    });
+    await installOwnerSupabaseMocks(page);
+    await signInAsOwner(page);
+    await openOwnerManagement(page);
+
+    const team = page.locator('#management-team');
+    await team.getByRole('button', { name: 'Enviar link de cadastro' }).click();
+    await expect(team.getByRole('alert')).toContainText('Não foi possível compartilhar o link. Tente novamente.');
+  });
+
   for (const { code, message } of [
     {
       code: 'TARGET_USER_NOT_FOUND',
