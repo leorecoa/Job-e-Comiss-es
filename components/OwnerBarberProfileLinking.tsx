@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle2, CircleAlert, Link2, Mail, Scissors, UserRound } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Link2, Send, Scissors, UserRound } from 'lucide-react';
 import { AppRole } from '../services/authRepository';
 import {
   getBarberProfileLinkingSuccessMessage,
@@ -8,6 +8,40 @@ import {
 } from '../services/profileLinkingRepository';
 import { BarberOption } from '../types';
 import { logOperationalError } from '../utils/errorHandling';
+import { Button, InlineNotice } from './ui';
+
+export const BARBER_SIGNUP_PATH = '/cadastro/barbeiro';
+export const BARBER_SIGNUP_SHARE_TITLE = 'Cadastro de barbeiro — Job e Comissões';
+export const BARBER_SIGNUP_SHARE_TEXT = 'Crie sua conta de barbeiro usando seu próprio e-mail. Depois do cadastro, informe o e-mail ao responsável pela barbearia para concluir o vínculo.';
+
+type ShareNavigator = {
+  share?: (data: ShareData) => Promise<void>;
+  clipboard?: { writeText: (text: string) => Promise<void> };
+};
+
+export const getBarberSignupUrl = (origin: string): string => new URL(BARBER_SIGNUP_PATH, origin).toString();
+
+export const shareBarberSignup = async (
+  shareNavigator: ShareNavigator,
+  origin: string
+): Promise<'shared' | 'copied'> => {
+  const url = getBarberSignupUrl(origin);
+  if (shareNavigator.share) {
+    await shareNavigator.share({
+      title: BARBER_SIGNUP_SHARE_TITLE,
+      text: BARBER_SIGNUP_SHARE_TEXT,
+      url
+    });
+    return 'shared';
+  }
+
+  if (!shareNavigator.clipboard?.writeText) {
+    throw new Error('Share unavailable');
+  }
+
+  await shareNavigator.clipboard.writeText(url);
+  return 'copied';
+};
 
 type OwnerBarberProfileLinkingProps = {
   role?: AppRole | null;
@@ -83,6 +117,8 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
   const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
   const [pendingBarberId, setPendingBarberId] = useState<string | null>(null);
   const [feedbackByBarberId, setFeedbackByBarberId] = useState<Record<string, FeedbackState | null>>({});
+  const [shareFeedback, setShareFeedback] = useState<FeedbackState | null>(null);
+  const [isSharing, setSharing] = useState(false);
 
   const sortedBarbers = useMemo(
     () => [...barbers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
@@ -123,6 +159,26 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
     }
   };
 
+  const handleShareSignup = async () => {
+    if (isSharing) return;
+    setSharing(true);
+    setShareFeedback(null);
+    try {
+      const result = await shareBarberSignup(navigator, window.location.origin);
+      setShareFeedback({
+        type: 'success',
+        message: result === 'shared' ? 'Link de cadastro compartilhado.' : 'Link de cadastro copiado.'
+      });
+    } catch {
+      setShareFeedback({
+        type: 'error',
+        message: 'Não foi possível compartilhar o link. Tente novamente.'
+      });
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <section className="ui-owner-panel mb-6 rounded-3xl p-5">
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -134,9 +190,26 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
           <h2 className="text-2xl font-bold">Vincular barbeiro a usuário</h2>
           <p className="ui-owner-help mt-1 text-sm">Conecte a conta de login do barbeiro ao profissional cadastrado. Depois do vínculo, ele acessa somente a própria agenda.</p>
         </div>
-        <div className="ui-owner-badge inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-widest">
-          <Mail size={14} />
-          O barbeiro precisa criar conta antes
+        <div className="flex flex-col items-start gap-2 md:items-end">
+          <p className="ui-owner-help text-sm">O barbeiro precisa criar a conta antes do vínculo.</p>
+          <Button
+            type="button"
+            variant="secondary"
+            loading={isSharing}
+            onClick={handleShareSignup}
+            className="min-h-11"
+          >
+            <Send size={16} aria-hidden="true" />
+            {isSharing ? 'Compartilhando...' : 'Enviar link de cadastro'}
+          </Button>
+          {shareFeedback && (
+            <InlineNotice
+              tone={shareFeedback.type}
+              className="max-w-sm text-left text-sm"
+            >
+              {shareFeedback.message}
+            </InlineNotice>
+          )}
         </div>
       </div>
 
