@@ -719,7 +719,7 @@ test.describe('owner operational dashboard e2e', () => {
     await expect(page.locator('.ui-branding-preview[class~="bg-gray-950/80"]')).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: 'Grupos da gestão' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Configurações da barbearia/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Vincular barbeiro a usuário/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Vincular barbeiro à equipe/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Catálogo operacional/i })).toBeVisible();
     await page.getByLabel('Nome da barbearia').fill('Nome em edicao nao salvo');
 
@@ -913,19 +913,33 @@ test.describe('owner operational dashboard e2e', () => {
     await signInAsOwner(page);
     await openOwnerManagement(page);
 
-    await expect(page.getByRole('heading', { name: /Vincular barbeiro a usuário/i })).toBeVisible();
+    const team = page.locator('#management-team');
+    await expect(team.getByRole('heading', { name: /Vincular barbeiro à equipe/i })).toBeVisible();
     await expect(page.getByText(/O barbeiro cria uma conta usando o e-mail dele/i)).toBeVisible();
-    await expect(page.getByText(/Este fluxo não envia convite automático por e-mail/i)).toBeVisible();
     await expect(page.getByText(OWNER_BARBER_ID)).toHaveCount(0);
-    await page.getByPlaceholder('E-mail da conta do barbeiro').fill('  BARBER@EXAMPLE.COM  ');
-    const linkButton = page.getByRole('button', { name: /Vincular usuário/i });
+    await expect(team.getByLabel('E-mail usado no login')).toHaveCount(1);
+    await expect(team.getByLabel('Profissional correspondente')).toHaveCount(1);
+    await team.getByRole('button', { name: /Vincular usuário/i }).click();
+    await expect(team.getByRole('alert')).toContainText('Informe o e-mail usado pelo barbeiro no login.');
+    await team.getByLabel('E-mail usado no login').fill('  BARBER@EXAMPLE.COM  ');
+    await team.getByRole('button', { name: /Vincular usuário/i }).click();
+    await expect(team.getByRole('alert')).toContainText('Escolha o profissional correspondente.');
+    await team.getByLabel('Profissional correspondente').selectOption(OWNER_BARBER_ID);
+    const linkButton = team.getByRole('button', { name: /Vincular usuário/i });
     await expect(linkButton).toBeEnabled();
-    await linkButton.evaluate((button: HTMLButtonElement) => button.click());
+    await linkButton.evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
 
     await expect.poll(() => network.rpcRequests.length).toBe(1);
     await expect(page.getByText(/Conta vinculada ao profissional Leo Barber/i)).toBeVisible();
     await expect(page.getByText(/E-mail usado: barber@example\.com/i)).toBeVisible();
     await expect(page.getByText(/sair e entrar novamente/i)).toBeVisible();
+    await expect(team.getByLabel('E-mail usado no login')).toHaveValue('');
+    await expect(team.getByLabel('Profissional correspondente')).toHaveValue('');
+    await expect(team.getByLabel('Profissional correspondente').locator(`option[value="${OWNER_BARBER_ID}"]`)).toHaveCount(0);
+    await expect(team.getByText('Vinculado', { exact: true })).toBeVisible();
 
     const [{ method, body }] = network.rpcRequests;
     expect(method).toBe('POST');
@@ -933,50 +947,6 @@ test.describe('owner operational dashboard e2e', () => {
       p_target_email: 'barber@example.com',
       p_target_barber_id: OWNER_BARBER_ID
     });
-  });
-
-  test('owner shares the public barber signup link without leaving the team section', async ({ page }) => {
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'share', {
-        configurable: true,
-        value: async (data: ShareData) => {
-          (window as typeof window & { __sharedSignup?: ShareData }).__sharedSignup = data;
-        }
-      });
-    });
-    await installOwnerSupabaseMocks(page);
-    await signInAsOwner(page);
-    await openOwnerManagement(page);
-    await page.getByRole('link', { name: 'Equipe' }).click();
-
-    const team = page.locator('#management-team');
-    const shareButton = team.getByRole('button', { name: 'Enviar link de cadastro' });
-    await expect(shareButton).toBeVisible();
-    await shareButton.click();
-    await expect(team.getByText('Link de cadastro compartilhado.')).toBeVisible();
-    await expect(page).toHaveURL(/#management-team$/);
-    const shared = await page.evaluate(() => (window as typeof window & { __sharedSignup?: ShareData }).__sharedSignup);
-    expect(shared).toMatchObject({
-      title: 'Cadastro de barbeiro — Job e Comissões',
-      url: 'http://127.0.0.1:4173/cadastro/barbeiro'
-    });
-    expect(shared?.url).not.toMatch(/[?#]|user|barberId|barbershopId|token/i);
-  });
-
-  test('owner sees friendly feedback when sharing the signup link fails', async ({ page }) => {
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'share', {
-        configurable: true,
-        value: async () => { throw new Error('share failed'); }
-      });
-    });
-    await installOwnerSupabaseMocks(page);
-    await signInAsOwner(page);
-    await openOwnerManagement(page);
-
-    const team = page.locator('#management-team');
-    await team.getByRole('button', { name: 'Enviar link de cadastro' }).click();
-    await expect(team.getByRole('alert')).toContainText('Não foi possível compartilhar o link. Tente novamente.');
   });
 
   for (const { code, message } of [
@@ -1015,13 +985,16 @@ test.describe('owner operational dashboard e2e', () => {
       await signInAsOwner(page);
       await openOwnerManagement(page);
 
-      await page.getByPlaceholder('E-mail da conta do barbeiro').fill('barber@example.com');
+      await page.getByLabel('E-mail usado no login').fill('barber@example.com');
+      await page.getByLabel('Profissional correspondente').selectOption(OWNER_BARBER_ID);
       const linkButton = page.getByRole('button', { name: /Vincular usuário/i });
       await expect(linkButton).toBeEnabled();
       await linkButton.evaluate((button: HTMLButtonElement) => button.click());
 
       await expect.poll(() => network.rpcRequests.length).toBe(1);
       await expect(page.getByText(message)).toBeVisible();
+      await expect(page.getByLabel('E-mail usado no login')).toHaveValue('barber@example.com');
+      await expect(page.getByLabel('Profissional correspondente')).toHaveValue(OWNER_BARBER_ID);
     });
   }
 });

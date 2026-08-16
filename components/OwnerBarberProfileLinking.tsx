@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { CheckCircle2, CircleAlert, Link2, Send, Scissors, UserRound } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { CheckCircle2, CircleAlert, Link2, Scissors } from 'lucide-react';
 import { AppRole } from '../services/authRepository';
 import {
   getBarberProfileLinkingSuccessMessage,
@@ -8,40 +8,7 @@ import {
 } from '../services/profileLinkingRepository';
 import { BarberOption } from '../types';
 import { logOperationalError } from '../utils/errorHandling';
-import { Button, InlineNotice } from './ui';
-
-export const BARBER_SIGNUP_PATH = '/cadastro/barbeiro';
-export const BARBER_SIGNUP_SHARE_TITLE = 'Cadastro de barbeiro — Job e Comissões';
-export const BARBER_SIGNUP_SHARE_TEXT = 'Crie sua conta de barbeiro usando seu próprio e-mail. Depois do cadastro, informe o e-mail ao responsável pela barbearia para concluir o vínculo.';
-
-type ShareNavigator = {
-  share?: (data: ShareData) => Promise<void>;
-  clipboard?: { writeText: (text: string) => Promise<void> };
-};
-
-export const getBarberSignupUrl = (origin: string): string => new URL(BARBER_SIGNUP_PATH, origin).toString();
-
-export const shareBarberSignup = async (
-  shareNavigator: ShareNavigator,
-  origin: string
-): Promise<'shared' | 'copied'> => {
-  const url = getBarberSignupUrl(origin);
-  if (shareNavigator.share) {
-    await shareNavigator.share({
-      title: BARBER_SIGNUP_SHARE_TITLE,
-      text: BARBER_SIGNUP_SHARE_TEXT,
-      url
-    });
-    return 'shared';
-  }
-
-  if (!shareNavigator.clipboard?.writeText) {
-    throw new Error('Share unavailable');
-  }
-
-  await shareNavigator.clipboard.writeText(url);
-  return 'copied';
-};
+import { Button, InlineNotice, Input, Label } from './ui';
 
 type OwnerBarberProfileLinkingProps = {
   role?: AppRole | null;
@@ -58,6 +25,18 @@ export type OwnerBarberProfileLinkingSubmitResult = FeedbackState;
 
 export const canManageOwnerBarberProfileLinking = (role?: AppRole | null): boolean => role === 'owner';
 
+export const isBasicEmailValid = (email?: string): boolean => {
+  const normalizedEmail = normalizeBarberProfileLinkingEmail(email);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+};
+
+export const getAvailableBarbersForProfileLinking = (
+  barbers: BarberOption[],
+  linkedBarberIds: ReadonlySet<string> = new Set()
+): BarberOption[] => barbers
+  .filter((barber) => barber.active !== false && !linkedBarberIds.has(barber.id))
+  .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
 export const isOwnerBarberProfileLinkingSubmitDisabled = ({
   barber,
   email,
@@ -66,11 +45,7 @@ export const isOwnerBarberProfileLinkingSubmitDisabled = ({
   barber?: BarberOption | null;
   email?: string;
   isSubmitting?: boolean;
-}): boolean => (
-  Boolean(isSubmitting)
-  || !barber?.id?.trim()
-  || !normalizeBarberProfileLinkingEmail(email)
-);
+}): boolean => Boolean(isSubmitting) || !barber?.id?.trim() || !isBasicEmailValid(email);
 
 export const submitOwnerBarberProfileLinking = async ({
   barber,
@@ -83,9 +58,7 @@ export const submitOwnerBarberProfileLinking = async ({
 }): Promise<OwnerBarberProfileLinkingSubmitResult | null> => {
   const normalizedEmail = normalizeBarberProfileLinkingEmail(email);
 
-  if (isOwnerBarberProfileLinkingSubmitDisabled({ barber, email: normalizedEmail })) {
-    return null;
-  }
+  if (isOwnerBarberProfileLinkingSubmitDisabled({ barber, email: normalizedEmail })) return null;
 
   try {
     await onLinkProfile({
@@ -95,17 +68,11 @@ export const submitOwnerBarberProfileLinking = async ({
 
     return {
       type: 'success',
-      message: getBarberProfileLinkingSuccessMessage({
-        barberName: barber.name,
-        email: normalizedEmail
-      })
+      message: getBarberProfileLinkingSuccessMessage({ barberName: barber.name, email: normalizedEmail })
     };
   } catch (error) {
     logOperationalError('owner:link-barber-profile', error);
-    return {
-      type: 'error',
-      message: getBarberProfileLinkingErrorMessage(error)
-    };
+    return { type: 'error', message: getBarberProfileLinkingErrorMessage(error) };
   }
 };
 
@@ -114,103 +81,105 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
   barbers,
   onLinkProfile
 }) => {
-  const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
-  const [pendingBarberId, setPendingBarberId] = useState<string | null>(null);
-  const [feedbackByBarberId, setFeedbackByBarberId] = useState<Record<string, FeedbackState | null>>({});
-  const [shareFeedback, setShareFeedback] = useState<FeedbackState | null>(null);
-  const [isSharing, setSharing] = useState(false);
+  const [email, setEmail] = useState('');
+  const [selectedBarberId, setSelectedBarberId] = useState('');
+  const [linkedBarberIds, setLinkedBarberIds] = useState<Set<string>>(() => new Set());
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+  const [isSubmitting, setSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
 
   const sortedBarbers = useMemo(
     () => [...barbers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
     [barbers]
   );
+  const availableBarbers = useMemo(
+    () => getAvailableBarbersForProfileLinking(barbers, linkedBarberIds),
+    [barbers, linkedBarberIds]
+  );
+  const selectedBarber = availableBarbers.find((barber) => barber.id === selectedBarberId);
 
-  if (!canManageOwnerBarberProfileLinking(role)) {
-    return null;
-  }
+  if (!canManageOwnerBarberProfileLinking(role)) return null;
 
-  const handleSubmit = async (barber: BarberOption) => {
-    if (isOwnerBarberProfileLinkingSubmitDisabled({
-      barber,
-      email: emailDrafts[barber.id],
-      isSubmitting: pendingBarberId === barber.id
-    })) {
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (submitLockRef.current) return;
+
+    if (!email.trim()) {
+      setFeedback({ type: 'error', message: 'Informe o e-mail usado pelo barbeiro no login.' });
+      return;
+    }
+    if (!isBasicEmailValid(email)) {
+      setFeedback({ type: 'error', message: 'Informe um e-mail válido.' });
+      return;
+    }
+    if (!selectedBarber) {
+      setFeedback({ type: 'error', message: 'Escolha o profissional correspondente.' });
       return;
     }
 
-    setPendingBarberId(barber.id);
-    setFeedbackByBarberId((prev) => ({ ...prev, [barber.id]: null }));
-
+    submitLockRef.current = true;
+    setSubmitting(true);
+    setFeedback(null);
     try {
-      const result = await submitOwnerBarberProfileLinking({
-        barber,
-        email: emailDrafts[barber.id],
-        onLinkProfile
-      });
+      const result = await submitOwnerBarberProfileLinking({ barber: selectedBarber, email, onLinkProfile });
+      if (!result) return;
 
-      if (result) {
-        setFeedbackByBarberId((prev) => ({
-          ...prev,
-          [barber.id]: result
-        }));
+      setFeedback(result);
+      if (result.type === 'success') {
+        setLinkedBarberIds((current) => new Set(current).add(selectedBarber.id));
+        setEmail('');
+        setSelectedBarberId('');
       }
     } finally {
-      setPendingBarberId(null);
-    }
-  };
-
-  const handleShareSignup = async () => {
-    if (isSharing) return;
-    setSharing(true);
-    setShareFeedback(null);
-    try {
-      const result = await shareBarberSignup(navigator, window.location.origin);
-      setShareFeedback({
-        type: 'success',
-        message: result === 'shared' ? 'Link de cadastro compartilhado.' : 'Link de cadastro copiado.'
-      });
-    } catch {
-      setShareFeedback({
-        type: 'error',
-        message: 'Não foi possível compartilhar o link. Tente novamente.'
-      });
-    } finally {
-      setSharing(false);
+      submitLockRef.current = false;
+      setSubmitting(false);
     }
   };
 
   return (
     <section className="ui-owner-panel mb-6 rounded-3xl p-5">
-      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-sky-300">
-            <Link2 size={18} />
-            <span className="text-xs font-bold uppercase tracking-widest">Acesso do barbeiro</span>
-          </div>
-          <h2 className="text-2xl font-bold">Vincular barbeiro a usuário</h2>
-          <p className="ui-owner-help mt-1 text-sm">Conecte a conta de login do barbeiro ao profissional cadastrado. Depois do vínculo, ele acessa somente a própria agenda.</p>
+      <div className="mb-5">
+        <div className="mb-2 flex items-center gap-2 text-sky-700">
+          <Link2 size={18} aria-hidden="true" />
+          <span className="text-xs font-bold uppercase tracking-widest">Acesso do barbeiro</span>
         </div>
-        <div className="flex flex-col items-start gap-2 md:items-end">
-          <p className="ui-owner-help text-sm">O barbeiro precisa criar a conta antes do vínculo.</p>
-          <Button
-            type="button"
-            variant="secondary"
-            loading={isSharing}
-            onClick={handleShareSignup}
-            className="min-h-11"
+        <h2 className="text-2xl font-bold">Vincular barbeiro à equipe</h2>
+        <p className="ui-owner-help mt-1 text-sm">Informe o mesmo e-mail usado pelo barbeiro no login e escolha o profissional correspondente.</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="ui-owner-card-solid mb-5 grid gap-4 rounded-2xl p-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end" aria-busy={isSubmitting} noValidate>
+        <div className="ui-field">
+          <Label htmlFor="barber-link-email">E-mail usado no login</Label>
+          <Input
+            id="barber-link-email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="barbeiro@exemplo.com"
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="ui-field">
+          <Label htmlFor="barber-link-professional">Profissional correspondente</Label>
+          <select
+            id="barber-link-professional"
+            value={selectedBarberId}
+            onChange={(event) => setSelectedBarberId(event.target.value)}
+            className="ui-input min-h-11"
+            disabled={isSubmitting || availableBarbers.length === 0}
           >
-            <Send size={16} aria-hidden="true" />
-            {isSharing ? 'Compartilhando...' : 'Enviar link de cadastro'}
-          </Button>
-          {shareFeedback && (
-            <InlineNotice
-              tone={shareFeedback.type}
-              className="max-w-sm text-left text-sm"
-            >
-              {shareFeedback.message}
-            </InlineNotice>
-          )}
+            <option value="">Selecione um profissional</option>
+            {availableBarbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
+          </select>
         </div>
+        <Button type="submit" loading={isSubmitting} className="min-h-11" disabled={availableBarbers.length === 0}>
+          {isSubmitting ? 'Vinculando...' : 'Vincular usuário'}
+        </Button>
+      </form>
+
+      <div aria-live="polite" className="mb-5">
+        {feedback && <InlineNotice tone={feedback.type}>{feedback.message}</InlineNotice>}
       </div>
 
       <div className="ui-owner-info mb-5 rounded-2xl p-4 text-sm">
@@ -220,87 +189,40 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
           <li>Você informa aqui o mesmo e-mail usado no login.</li>
           <li>Escolha o profissional correspondente e clique em vincular.</li>
         </ol>
-        <p className="ui-owner-help mt-3 text-xs">Este fluxo não envia convite automático por e-mail. Depois de vincular, avise o barbeiro para entrar novamente se a agenda ainda não aparecer.</p>
       </div>
 
-      {sortedBarbers.length === 0 ? (
-        <div className="ui-owner-empty rounded-2xl px-4 py-5 text-sm">
-          Cadastre pelo menos um barbeiro na sua barbearia para liberar o vínculo com usuário.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {sortedBarbers.map((barber) => {
-            const feedback = feedbackByBarberId[barber.id];
-            const isSubmitting = pendingBarberId === barber.id;
-            const disabled = isOwnerBarberProfileLinkingSubmitDisabled({
-              barber,
-              email: emailDrafts[barber.id],
-              isSubmitting
-            });
-
-            return (
-              <div key={barber.id} className="ui-owner-card-solid rounded-2xl p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-foreground">
-                      <Scissors size={16} />
-                      <p className="truncate text-sm font-bold">{barber.name}</p>
-                    </div>
-                    <div className="ui-owner-help mt-2 flex flex-wrap items-center gap-2 text-xs">
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-bold ${
-                        barber.active === false
-                          ? 'ui-owner-status-warning'
-                          : 'ui-owner-status-success'
-                      }`}>
-                        <CheckCircle2 size={11} />
-                        {barber.active === false ? 'Inativo' : 'Ativo'}
-                      </span>
-                      <span>Conta de usuário ainda precisa ser vinculada pelo e-mail de login.</span>
-                    </div>
-                  </div>
-
-                  <div className="flex w-full flex-col gap-2 lg:max-w-xl lg:flex-row">
-                    <div className="relative flex-1">
-                      <UserRound size={14} className="ui-owner-input-icon pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="email"
-                        value={emailDrafts[barber.id] || ''}
-                        onChange={(event) => setEmailDrafts((prev) => ({ ...prev, [barber.id]: event.target.value }))}
-                        placeholder="E-mail da conta do barbeiro"
-                        aria-label={`E-mail da conta do barbeiro ${barber.name}`}
-                        className="ui-owner-input w-full rounded-xl px-10 py-2.5 text-sm"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSubmit(barber)}
-                      disabled={disabled}
-                      className="ui-owner-button ui-owner-button-primary inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-bold"
-                    >
-                      {isSubmitting ? 'Vinculando...' : 'Vincular usuário'}
-                    </button>
-                  </div>
-                </div>
-
-                {feedback && (
-                  <div className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
-                    feedback.type === 'success'
-                      ? 'ui-owner-status-success'
-                      : 'ui-owner-status-error'
-                  }`}>
-                    <div className="flex items-start gap-2">
-                      {feedback.type === 'success'
-                        ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-                        : <CircleAlert size={14} className="mt-0.5 shrink-0" />}
-                      <span>{feedback.message}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {availableBarbers.length === 0 && (
+        <InlineNotice tone="info" className="mb-5">
+          <p className="font-bold">Nenhum profissional ativo aguardando vínculo.</p>
+          <p className="mt-1">Cadastre ou ative um profissional no <a href="#management-catalog" className="font-bold underline underline-offset-4">Catálogo</a> antes de realizar o vínculo.</p>
+        </InlineNotice>
       )}
+
+      <div className="space-y-3" aria-label="Profissionais da equipe">
+        {sortedBarbers.map((barber) => {
+          const linked = linkedBarberIds.has(barber.id);
+          return (
+            <div key={barber.id} className="ui-owner-card-solid rounded-2xl p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2 text-foreground">
+                  <Scissors size={16} aria-hidden="true" />
+                  <p className="truncate text-sm font-bold">{barber.name}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-bold ${barber.active === false ? 'ui-owner-status-warning' : 'ui-owner-status-success'}`}>
+                    <CheckCircle2 size={11} aria-hidden="true" />
+                    {barber.active === false ? 'Inativo' : 'Ativo'}
+                  </span>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-bold ${linked ? 'ui-owner-status-success' : 'ui-owner-status-warning'}`}>
+                    {linked ? <CheckCircle2 size={11} aria-hidden="true" /> : <CircleAlert size={11} aria-hidden="true" />}
+                    {linked ? 'Vinculado' : 'Vínculo pendente'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 };
