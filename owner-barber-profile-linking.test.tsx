@@ -2,13 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   OwnerBarberProfileLinking,
-  BARBER_SIGNUP_PATH,
-  BARBER_SIGNUP_SHARE_TEXT,
-  BARBER_SIGNUP_SHARE_TITLE,
   canManageOwnerBarberProfileLinking,
-  getBarberSignupUrl,
+  getAvailableBarbersForProfileLinking,
+  isBasicEmailValid,
   isOwnerBarberProfileLinkingSubmitDisabled,
-  shareBarberSignup,
   submitOwnerBarberProfileLinking
 } from './components/OwnerBarberProfileLinking';
 import { BarberOption } from './types';
@@ -22,7 +19,7 @@ const makeBarber = (overrides: Partial<BarberOption> = {}): BarberOption => ({
 });
 
 describe('owner barber profile linking', () => {
-  it('owner sees the linking UI', () => {
+  it('renders one global linking form before the professional list', () => {
     const html = renderToStaticMarkup(
       <OwnerBarberProfileLinking
         role="owner"
@@ -31,47 +28,35 @@ describe('owner barber profile linking', () => {
       />
     );
 
-    expect(html).toContain('Vincular barbeiro a usuário');
+    expect(html).toContain('Vincular barbeiro à equipe');
+    expect(html).toContain('E-mail usado no login');
+    expect(html).toContain('Profissional correspondente');
+    expect(html).toContain('Vincular usuário');
     expect(html).toContain('Como funciona');
-    expect(html).toContain('O barbeiro cria uma conta usando o e-mail dele.');
-    expect(html).toContain('E-mail da conta do barbeiro');
-    expect(html).toContain('Enviar link de cadastro');
-    expect(html.indexOf('Enviar link de cadastro')).toBeLessThan(html.indexOf('Como funciona'));
-    expect(html.indexOf('Enviar link de cadastro')).toBeLessThan(html.indexOf('Leo'));
-    expect(html).not.toContain('barber-1');
+    expect(html.match(/type="email"/g)).toHaveLength(1);
+    expect(html.match(/<select/g)).toHaveLength(1);
+    expect(html.indexOf('<form')).toBeLessThan(html.indexOf('Profissionais da equipe'));
+    expect(html).not.toContain('Enviar link de cadastro');
   });
 
-  it('renders the signup action without registered professionals', () => {
+  it('renders guidance when no professional is available', () => {
     const html = renderToStaticMarkup(
       <OwnerBarberProfileLinking role="owner" barbers={[]} onLinkProfile={vi.fn()} />
     );
 
-    expect(html).toContain('Enviar link de cadastro');
-    expect(html).toContain('O barbeiro precisa criar a conta antes do vínculo.');
+    expect(html).toContain('Nenhum profissional ativo aguardando vínculo.');
+    expect(html).toContain('Cadastre ou ative um profissional no');
+    expect(html).toContain('#management-catalog');
   });
 
-  it('shares only the dedicated public URL without tenant or personal data', async () => {
-    const share = vi.fn().mockResolvedValue(undefined);
+  it('offers only active professionals not linked in this session', () => {
+    const available = getAvailableBarbersForProfileLinking([
+      makeBarber(),
+      makeBarber({ id: 'barber-2', name: 'Inativo', active: false }),
+      makeBarber({ id: 'barber-3', name: 'Ana' })
+    ], new Set(['barber-3']));
 
-    await expect(shareBarberSignup({ share }, 'https://job-e-comiss-es.vercel.app')).resolves.toBe('shared');
-    expect(share).toHaveBeenCalledWith({
-      title: BARBER_SIGNUP_SHARE_TITLE,
-      text: BARBER_SIGNUP_SHARE_TEXT,
-      url: 'https://job-e-comiss-es.vercel.app/cadastro/barbeiro'
-    });
-    expect(share.mock.calls[0][0].url).not.toMatch(/[?#]|email|userId|barberId|barbershopId|token/i);
-    expect(getBarberSignupUrl('https://job-e-comiss-es.vercel.app')).toBe(`https://job-e-comiss-es.vercel.app${BARBER_SIGNUP_PATH}`);
-  });
-
-  it('copies the public signup URL when Web Share is unavailable', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-
-    await expect(shareBarberSignup({ clipboard: { writeText } }, 'https://app.example.test')).resolves.toBe('copied');
-    expect(writeText).toHaveBeenCalledWith('https://app.example.test/cadastro/barbeiro');
-  });
-
-  it('reports an unavailable sharing mechanism as a controlled failure', async () => {
-    await expect(shareBarberSignup({}, 'https://app.example.test')).rejects.toThrow('Share unavailable');
+    expect(available.map(({ id, name }) => ({ id, name }))).toEqual([{ id: 'barber-1', name: 'Leo' }]);
   });
 
   it('barber does not see the linking UI', () => {
@@ -102,6 +87,12 @@ describe('owner barber profile linking', () => {
 
     expect(result).toBeNull();
     expect(onLinkProfile).not.toHaveBeenCalled();
+  });
+
+  it('blocks an invalid email and a missing professional', async () => {
+    expect(isBasicEmailValid('invalid')).toBe(false);
+    expect(isOwnerBarberProfileLinkingSubmitDisabled({ barber: makeBarber(), email: 'invalid' })).toBe(true);
+    expect(isOwnerBarberProfileLinkingSubmitDisabled({ email: 'barber@example.com' })).toBe(true);
   });
 
   it('returns success when the barber is linked', async () => {

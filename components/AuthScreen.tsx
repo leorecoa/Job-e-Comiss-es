@@ -9,20 +9,16 @@ interface AuthScreenProps {
   onSignUp: (email: string, password: string, displayName: string, role: AppRole) => Promise<void>;
   loading?: boolean;
   error?: string | null;
-  initialMode?: 'signin' | 'signup';
-  fixedRole?: AppRole;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({
   onSignIn,
   onSignUp,
   loading = false,
-  error,
-  initialMode = 'signin',
-  fixedRole
+  error
 }) => {
   const reduceMotion = useReducedMotion();
-  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -35,7 +31,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       return;
     }
 
-    await onSignUp(email.trim(), password, displayName.trim(), fixedRole ?? role);
+    await onSignUp(email.trim(), password, displayName.trim(), role);
   };
 
   return (
@@ -70,10 +66,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </div>
             )}
 
-            {mode === 'signup' && fixedRole === 'barber' && (
-              <FieldMessage>Este cadastro cria um acesso de barbeiro.</FieldMessage>
-            )}
-
             <div className="ui-field">
               <Label htmlFor="auth-email">Email</Label>
               <Input id="auth-email" type="email" autoComplete="email" required aria-invalid={Boolean(error)} aria-describedby={error ? 'auth-form-error' : undefined} value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -84,7 +76,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <Input id="auth-password" type="password" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} required minLength={6} aria-invalid={Boolean(error)} aria-describedby={error ? 'auth-form-error' : undefined} value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
 
-            {mode === 'signup' && !fixedRole && (
+            {mode === 'signup' && (
               <div className="ui-field">
                 <Label htmlFor="auth-role">Perfil</Label>
                 <select id="auth-role" value={role} onChange={(e) => setRole(e.target.value as AppRole)} className="ui-input">

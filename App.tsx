@@ -205,7 +205,6 @@ export const getPublicBookingSlugFromPath = (pathname: string): string | undefin
 };
 
 export const isOwnerOnboardingPath = (pathname: string): boolean => pathname === '/onboarding';
-export const isBarberSignupPath = (pathname: string): boolean => pathname === '/cadastro/barbeiro';
 
 export type InternalAuthView = 'loading' | 'auth' | 'owner-onboarding' | 'owner-dashboard' | 'barber-dashboard';
 
@@ -231,7 +230,6 @@ const App: React.FC = () => {
   const publicBookingSlug = getPublicBookingSlugFromPath(pathname);
   const isPublicBookingRoute = pathname === '/book' || pathname === '/agendar' || pathname.startsWith('/book/');
   const isOnboardingRoute = isOwnerOnboardingPath(pathname);
-  const isBarberSignupRoute = isBarberSignupPath(pathname);
   const isAuthCallbackRoute = pathname === AUTH_CALLBACK_PATH;
 
   // -- Handle Splash Screen --
@@ -1725,24 +1723,6 @@ const App: React.FC = () => {
 
   if (isAuthCallbackRoute) {
     return <AuthCallbackScreen loading={isAuthLoading} session={authSession} />;
-  }
-
-  if (isBarberSignupRoute) {
-    return (
-      <>
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
-        <React.Suspense fallback={<ViewFallback />}>
-          <AuthScreen
-            onSignIn={handleAuthSignIn}
-            onSignUp={handleAuthSignUp}
-            loading={isAuthLoading}
-            error={authError}
-            initialMode="signup"
-            fixedRole="barber"
-          />
-        </React.Suspense>
-      </>
-    );
   }
 
   const internalAuthView = getInternalAuthView(isAuthLoading, authSession, isSupabaseConfigured);

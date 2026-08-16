@@ -17,6 +17,16 @@ const assertNoHorizontalOverflow = async (page: Page) => {
 };
 
 test.describe('authentication visual QA', () => {
+  test('/cadastro/barbeiro uses the regular authentication entry point', async ({ page }) => {
+    await page.goto('/cadastro/barbeiro?role=barber#role=barber');
+
+    await expect(page.getByLabel('Tipo de acesso').getByRole('button', { name: 'Entrar' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByText('Este cadastro cria um acesso de barbeiro.')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Criar acesso', exact: true }).first().click();
+    await expect(page.getByLabel('Perfil')).toBeVisible();
+    await expect(page.getByLabel('Perfil')).toHaveValue('owner');
+  });
+
   test('keeps login and signup accessible across required viewports without external fonts', async ({ page }) => {
     await page.route('https://fonts.googleapis.com/**', (route) => route.abort());
     await page.route('https://fonts.gstatic.com/**', (route) => route.abort());

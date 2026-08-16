@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getInternalAuthView, isBarberSignupPath, isOwnerOnboardingPath } from './App';
+import { getInternalAuthView, isOwnerOnboardingPath } from './App';
 import type { AuthSession } from './services/authRepository';
 
 const ownerSession = (barbershopId?: string): AuthSession => ({
@@ -51,10 +51,5 @@ describe('internal auth routing', () => {
 
   it('does not return a newly confirmed owner to login after sign-in resolves', () => {
     expect(getInternalAuthView(false, ownerSession(), true)).not.toBe('auth');
-  });
-
-  it('recognizes only the dedicated barber signup pathname', () => {
-    expect(isBarberSignupPath('/cadastro/barbeiro')).toBe(true);
-    expect(isBarberSignupPath('/cadastro/owner')).toBe(false);
   });
 });
