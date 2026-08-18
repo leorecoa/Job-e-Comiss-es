@@ -39,7 +39,6 @@ vi.mock('./services/authRepository', async (importOriginal) => {
     signOut: vi.fn(),
     signUpWithPassword: vi.fn(),
     getProfile: vi.fn(),
-    upsertProfile: vi.fn(),
   };
 });
 vi.mock('./services/appointmentRepository');

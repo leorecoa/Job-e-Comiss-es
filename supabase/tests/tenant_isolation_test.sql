@@ -36,15 +36,15 @@ select ok(has_function_privilege('authenticated', 'public.get_public_appointment
 select ok(not exists(select 1 from information_schema.table_privileges where table_schema = 'public' and table_name = 'profiles' and grantee = 'PUBLIC'), 'PUBLIC has no direct profiles privileges');
 select ok(not has_table_privilege('anon', 'public.profiles', 'select') and not has_table_privilege('anon', 'public.profiles', 'insert') and not has_table_privilege('anon', 'public.profiles', 'update') and not has_table_privilege('anon', 'public.profiles', 'delete') and not has_table_privilege('anon', 'public.profiles', 'truncate') and not has_table_privilege('anon', 'public.profiles', 'references') and not has_table_privilege('anon', 'public.profiles', 'trigger'), 'anon has no direct profiles privileges');
 select ok(has_table_privilege('authenticated', 'public.profiles', 'select'), 'authenticated can select profiles');
-select ok(has_table_privilege('authenticated', 'public.profiles', 'insert'), 'authenticated can insert profiles');
-select ok(has_table_privilege('authenticated', 'public.profiles', 'update'), 'authenticated can update profiles');
+select ok(not has_table_privilege('authenticated', 'public.profiles', 'insert'), 'authenticated cannot insert profiles');
+select ok(not has_table_privilege('authenticated', 'public.profiles', 'update'), 'authenticated cannot update profiles');
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'delete'), 'authenticated cannot delete profiles');
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'truncate'), 'authenticated cannot truncate profiles');
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'references'), 'authenticated has no profiles references privilege');
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'trigger'), 'authenticated has no profiles trigger privilege');
 select ok(has_table_privilege('service_role', 'public.profiles', 'select') and has_table_privilege('service_role', 'public.profiles', 'insert') and has_table_privilege('service_role', 'public.profiles', 'update') and has_table_privilege('service_role', 'public.profiles', 'delete') and has_table_privilege('service_role', 'public.profiles', 'truncate') and has_table_privilege('service_role', 'public.profiles', 'references') and has_table_privilege('service_role', 'public.profiles', 'trigger'), 'service_role retains all profiles privileges');
 select ok((select relrowsecurity from pg_class where oid = 'public.profiles'::regclass), 'profiles RLS remains enabled');
-select is((select count(*) from pg_policies where schemaname = 'public' and tablename = 'profiles'), 7::bigint, 'legacy direct onboarding profile policies are removed');
+select is((select count(*) from pg_policies where schemaname = 'public' and tablename = 'profiles'), 2::bigint, 'only profile select policies remain');
 select ok(has_function_privilege('authenticated', 'public.link_barber_profile_by_email(text,uuid)', 'execute'), 'authenticated can execute profile linking RPC');
 
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'private' and routine_name = 'current_user_barber_id' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC has no direct execute on barber helper');
@@ -128,7 +128,7 @@ select results_eq($test$update public.services set price = 99 where id = '444444
 select results_eq($test$delete from public.services where id = '44444444-4444-4444-8444-444444444444' returning 1$test$, array[]::integer[], 'Owner A cannot delete Tenant B');
 select is((select count(*) from public.profiles where id = 'aaaa0000-0000-4000-8000-000000000001'), 1::bigint, 'Owner A reads own profile');
 select is((select count(*) from public.profiles where barbershop_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'), 0::bigint, 'Owner A cannot read Tenant B profiles');
-select results_eq($test$update public.profiles set display_name = 'Blocked' where id = 'bbbb0000-0000-4000-8000-000000000001' returning 1$test$, array[]::integer[], 'Owner A cannot update Tenant B profile');
+select throws_ok($test$update public.profiles set display_name = 'Blocked' where id = 'bbbb0000-0000-4000-8000-000000000001'$test$, '42501'::char(5), null, 'Owner A cannot update Tenant B profile');
 select throws_ok($test$delete from public.profiles where id = 'bbbb0000-0000-4000-8000-000000000001'$test$, '42501'::char(5), null, 'profile delete is unavailable to authenticated owners');
 select throws_ok($test$insert into public.profiles (id, display_name, role, active, barbershop_id, barber_id) values ('aaaa0000-0000-4000-8000-000000000003', 'Cross Tenant Profile', 'owner', true, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', null)$test$, '42501'::char(5), null, 'Owner A cannot insert a Tenant B profile');
 select lives_ok($test$insert into storage.objects (bucket_id, name, owner_id) values ('barbershop-branding', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/upload.png', 'aaaa0000-0000-4000-8000-000000000001')$test$, 'Owner A inserts branding in Tenant Alpha directory');

@@ -150,17 +150,31 @@ export const signUpWithPassword = async (
     return null;
   }
 
-  if (role === 'owner') {
-    return mapAuthSession(data.session, null);
-  }
-
-  const profile = await upsertProfile(
-    data.session.user.id,
-    displayName,
-    role
-  );
+  const profile = await getProvisionedProfile(data.session.user.id);
 
   return mapAuthSession(data.session, profile);
+};
+const getProvisionedProfile = async (userId: string): Promise<ProfileRow> => {
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const { data, error } = await supabase!
+      .from('profiles')
+      .select('id,display_name,role,active,barbershop_id,barber_id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data) return data as ProfileRow;
+
+    if (attempt < maxAttempts) {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 25));
+    }
+  }
+
+  const error = new Error('Não foi possível concluir o cadastro. Tente entrar novamente.') as Error & { code?: string };
+  error.code = 'PROFILE_PROVISIONING_UNAVAILABLE';
+  throw error;
 };
 
 export const signOut = async (): Promise<void> => {
@@ -197,90 +211,4 @@ export const getProfile = async (userId: string): Promise<ProfileRow | null> => 
   if (error) throw error;
 
   return data as ProfileRow | null;
-};
-
-export const upsertProfile = async (
-  userId: string,
-  displayName: string,
-  role: AppRole
-): Promise<ProfileRow> => {
-  if (!isSupabaseConfigured || !supabase) {
-  return {
-    id: userId,
-    display_name: displayName,
-    role,
-    barbershop_id: null,
-    barber_id: null
-  };
-}
-
-  const authenticatedUserId = await getAuthenticatedUserId();
-
-  if (!authenticatedUserId) {
-    throw new Error('Usuario nao autenticado para atualizar profile.');
-  }
-
-  if (authenticatedUserId !== userId) {
-    throw new Error('Nao e permitido atualizar profile de outro usuario.');
-  }
-
-  const safeRole: AppRole = role === 'owner' ? 'barber' : role;
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .upsert({
-      id: userId,
-      display_name: displayName,
-      role: safeRole
-    }, { onConflict: 'id' }) // upsert does not take barber_id as an argument in this context, as it's not part of signup.
-    .select('id,display_name,role,active,barbershop_id,barber_id')
-    .single();
-
-  if (error) throw error;
-
-  return data as ProfileRow;
-};
-
-export const upsertOwnerProfileForBarbershop = async (
-  userId: string,
-  displayName: string,
-  barbershopId: string
-): Promise<ProfileRow> => {
-  if (!isSupabaseConfigured || !supabase) {
-    return {
-      id: userId,
-      display_name: displayName,
-      role: 'owner',
-      active: true,
-      barbershop_id: barbershopId,
-      barber_id: null
-    };
-  }
-
-  const authenticatedUserId = await getAuthenticatedUserId();
-
-  if (!authenticatedUserId) {
-    throw new Error('Usuario nao autenticado para atualizar profile.');
-  }
-
-  if (authenticatedUserId !== userId) {
-    throw new Error('Nao e permitido atualizar profile de outro usuario.');
-  }
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .upsert({
-      id: userId,
-      display_name: displayName,
-      role: 'owner',
-      active: true,
-      barbershop_id: barbershopId,
-      barber_id: null
-    }, { onConflict: 'id' })
-    .select('id,display_name,role,active,barbershop_id,barber_id')
-    .single();
-
-  if (error) throw error;
-
-  return data as ProfileRow;
 };
