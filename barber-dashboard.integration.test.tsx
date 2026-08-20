@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as authRepository from './services/authRepository';
 import * as appointmentRepository from './services/appointmentRepository';
@@ -169,18 +171,16 @@ describe('Barber Dashboard Logic & Contracts', () => {
       expect(appointmentToSave.barberName).toBe('Gabriel');
     });
 
-    it('Scenario 5: Ensures completion patch follows the required contract', async () => {
-      const app = makeAppointment({ id: 'app-1', status: 'scheduled' });
-      const now = new Date().toISOString();
+    it('Scenario 5: Keeps the barber workflow scheduling-only', () => {
+      const dashboardSource = readFileSync(
+        resolve(process.cwd(), 'components/BarberDashboard.tsx'),
+        'utf8'
+      );
 
-      // Simula o patch de conclusão gerado pelo BarberDashboard
-      const completionPatch: Partial<Appointment> = {
-        status: 'completed',
-        updatedAt: now
-      };
-
-      expect(completionPatch.status).toBe('completed');
-      expect(completionPatch.updatedAt).toBe(now);
+      expect(dashboardSource).not.toContain('onUpdateAppointment');
+      expect(dashboardSource).not.toContain('onCancelAppointment');
+      expect(dashboardSource).not.toContain('buildWhatsAppLink');
+      expect(dashboardSource).not.toContain('complete-appointment');
     });
 
     it('should call onLogout when the logout contract is triggered', () => {

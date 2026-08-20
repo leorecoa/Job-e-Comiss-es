@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(179);
+select plan(189);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -153,10 +153,11 @@ select results_eq($test$update storage.objects set metadata = '{"blocked":true}'
 reset role;
 set local role authenticated;
 set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000002","role":"authenticated"}';
+select ok(not exists(select 1 from pg_policies where schemaname = 'public' and tablename = 'appointments' and policyname = 'appointments_barber_update_own'), 'barber appointment update policy is absent');
 select is((select count(*) from public.appointments where id = '60000000-0000-4000-8000-000000000001'), 1::bigint, 'Barber A reads own appointment');
 select is((select count(*) from public.appointments where id = '60000000-0000-4000-8000-000000000002'), 0::bigint, 'Barber A cannot read Tenant B appointment');
 select is((select count(*) from public.appointments where id = '60000000-0000-4000-8000-000000000003'), 0::bigint, 'Barber A cannot read another barber appointment');
-select results_eq($test$update public.appointments set notes = 'Own update' where id = '60000000-0000-4000-8000-000000000001' returning 1$test$, array[1], 'Barber A updates own appointment');
+select results_eq($test$update public.appointments set notes = 'Own update' where id = '60000000-0000-4000-8000-000000000001' returning 1$test$, array[]::integer[], 'Barber A cannot update own appointment');
 select results_eq($test$update public.appointments set notes = 'Blocked' where id = '60000000-0000-4000-8000-000000000002' returning 1$test$, array[]::integer[], 'Barber A cannot update Tenant B appointment');
 select results_eq($test$update public.appointments set notes = 'Blocked' where id = '60000000-0000-4000-8000-000000000003' returning 1$test$, array[]::integer[], 'Barber A cannot update another barber appointment');
 select is((select count(*) from public.profiles where id = 'aaaa0000-0000-4000-8000-000000000002'), 1::bigint, 'Barber A reads own profile');
@@ -165,6 +166,15 @@ select is((select count(*) from storage.objects where bucket_id = 'barbershop-br
 select throws_ok($test$insert into storage.objects (bucket_id, name, owner_id) values ('barbershop-branding', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/barber.png', 'aaaa0000-0000-4000-8000-000000000002')$test$, '42501'::char(5), null, 'Barber A cannot insert branding objects');
 select results_eq($test$update storage.objects set metadata = '{"blocked":true}'::jsonb where bucket_id = 'barbershop-branding' returning 1$test$, array[]::integer[], 'Barber A cannot update branding objects');
 select ok(private.current_user_role() <> 'owner', 'Barber A does not satisfy branding delete policy');
+select lives_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Barber Scheduled', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '70 days', now() + interval '70 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, 'barber inserts own scheduled appointment');
+select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Barber Confirmed', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '71 days', now() + interval '71 days 30 minutes', 'confirmed', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'barber cannot insert confirmed appointment');
+select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Barber Completed', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '72 days', now() + interval '72 days 30 minutes', 'completed', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'barber cannot insert completed appointment');
+select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Barber Cancelled', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '73 days', now() + interval '73 days 30 minutes', 'cancelled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'barber cannot insert cancelled appointment');
+select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Barber No Show', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '74 days', now() + interval '74 days 30 minutes', 'no_show', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'barber cannot insert no-show appointment');
+select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id, financial_record_id) values ('Barber Financial', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '75 days', now() + interval '75 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', 'forbidden')$test$, '42501'::char(5), null, 'barber cannot insert appointment linked to finance');
+select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Other Barber', '0000000000', '55555555-5555-4555-8555-555555555555', 'Barber Alpha Two', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '76 days', now() + interval '76 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'barber cannot insert for another barber');
+select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Other Tenant', '0000000000', '22222222-2222-4222-8222-222222222222', 'Barber Beta', '44444444-4444-4444-8444-444444444444', 'Service Beta', 55, now() + interval '77 days', now() + interval '77 days 30 minutes', 'scheduled', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2')$test$, '42501'::char(5), null, 'barber cannot insert in another tenant');
+select results_eq($test$delete from public.appointments where id = '60000000-0000-4000-8000-000000000001' returning 1$test$, array[]::integer[], 'barber cannot delete appointments');
 
 reset role;
 set local role authenticated;
@@ -251,8 +261,8 @@ select throws_ok($test$select * from public.complete_appointment_with_financial_
 reset role;
 set local role authenticated;
 set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000002","role":"authenticated"}';
-select lives_ok($test$select * from public.complete_appointment_with_financial_record('60000000-0000-4000-8000-000000000001')$test$, 'barber can repeat completion of own appointment');
-select throws_ok($test$select * from public.complete_appointment_with_financial_record('60000000-0000-4000-8000-000000000003')$test$, 'P0001'::char(5), 'FINANCIAL_COMPLETION_APPOINTMENT_NOT_FOUND', 'barber cannot complete another barber appointment');
+select throws_ok($test$select * from public.complete_appointment_with_financial_record('60000000-0000-4000-8000-000000000001')$test$, 'P0001'::char(5), 'FINANCIAL_COMPLETION_FORBIDDEN', 'barber cannot complete own appointment');
+select throws_ok($test$select * from public.complete_appointment_with_financial_record('60000000-0000-4000-8000-000000000003')$test$, 'P0001'::char(5), 'FINANCIAL_COMPLETION_FORBIDDEN', 'barber cannot complete another barber appointment');
 select is((select count(*) from public.financial_records), 1::bigint, 'barber reads only own financial records');
 
 reset role;

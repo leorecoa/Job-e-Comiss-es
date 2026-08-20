@@ -1779,8 +1779,6 @@ const App: React.FC = () => {
             appointments={appointments}
             settings={settings}
             onCreateAppointment={handleCreateBarberAppointment}
-            onUpdateAppointment={handleUpdateAppointmentPatch}
-            onCancelAppointment={handleCancelAppointment}
             addToast={addToast}
             onSignOut={handleLogout}
           />
