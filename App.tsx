@@ -191,6 +191,14 @@ export const getResolvedDashboardShopName = ({
   return supabaseConfigured ? SAFE_INTERNAL_SHOP_NAME : SAFE_PUBLIC_BOOKING_SHOP_NAME;
 };
 
+export const scopeOwnerAppointmentToTenant = (
+  appointment: Appointment,
+  barbershopId: string
+): Appointment => ({
+  ...appointment,
+  barbershopId
+});
+
 // Códigos
 
 export const getPublicBookingSlugFromPath = (pathname: string): string | undefined => {
@@ -1272,16 +1280,23 @@ const App: React.FC = () => {
   };
 
   const handleSaveAppointment = async (appointment: Appointment) => {
+    const barbershopId = getOwnerCatalogBarbershopId();
+    if (!barbershopId) {
+      addToast('Sua conta não possui uma barbearia válida para agendar.', 'error');
+      return;
+    }
+
+    const scopedAppointment = scopeOwnerAppointmentToTenant(appointment, barbershopId);
     const editingId = editingAppointment?.id;
-    if (hasAppointmentConflict(appointments, appointment, editingId)) {
+    if (hasAppointmentConflict(appointments, scopedAppointment, editingId)) {
       addToast('Horario indisponivel para este barbeiro.', 'error');
       return;
     }
 
     try {
       const savedAppointment = editingId //
-        ? await updateAppointmentRecord(editingId, appointment)
-        : await createAppointmentRecord(appointment, appointments);
+        ? await updateAppointmentRecord(editingId, scopedAppointment)
+        : await createAppointmentRecord(scopedAppointment, appointments);
 
       setAppointments(prev => {
         if (editingId) {
