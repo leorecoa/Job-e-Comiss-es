@@ -145,8 +145,6 @@ describe('financial reporting clarity', () => {
         appointments={[]}
         settings={settings}
         onCreateAppointment={vi.fn()}
-        onUpdateAppointment={vi.fn()}
-        onCancelAppointment={vi.fn()}
         addToast={vi.fn()}
         onSignOut={vi.fn()}
       />

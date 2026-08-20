@@ -96,6 +96,7 @@ export const isExpectedOperationalError = (error: unknown): boolean => {
   const code = getPublicCode(error);
   if (code?.startsWith('PUBLIC_APPOINTMENT_') || code === 'APPOINTMENT_ACTIVE_SLOT_CONFLICT') return true;
   if (code?.startsWith('OWNER_ONBOARDING_')) return true;
+  if (code?.startsWith('FINANCIAL_COMPLETION_')) return true;
 
   const message = String((error as ErrorLike)?.message || '').toLowerCase();
   return [

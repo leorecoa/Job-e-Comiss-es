@@ -392,7 +392,7 @@ const signInAsBarber = async (page: Page) => {
 };
 
 const openNewAppointmentModal = async (page: Page) => {
-  await page.getByRole('button', { name: /Novo Agendamento/i }).click();
+  await page.getByRole('button', { name: 'Agendar', exact: true }).click();
   await expect(page.getByRole('heading', { name: /Novo agendamento/i })).toBeVisible();
 };
 
@@ -420,6 +420,11 @@ test.describe('barber dashboard e2e', () => {
     await expect(page.getByText(/Cliente Outro Tenant/i)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Gestao', exact: true })).toHaveCount(0);
     await expect(page.getByText(/Gest[aã]o M[aá]xima/i)).toHaveCount(0);
+
+    await expect(page.getByTitle(/Marcar como Concluido/i)).toHaveCount(0);
+    await expect(page.getByTitle(/Chamar no WhatsApp/i)).toHaveCount(0);
+    await expect(page.getByTitle(/Editar Agendamento/i)).toHaveCount(0);
+    await expect(page.getByTitle(/Cancelar Agendamento/i)).toHaveCount(0);
 
     expect(network.signInRequests).toHaveLength(1);
     expect(network.appointmentReadRequests.some((url) => url.includes(`barbershop_id=eq.${BARBERSHOP_ID}`))).toBeTruthy();

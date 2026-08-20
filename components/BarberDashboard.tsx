@@ -7,20 +7,17 @@ import {
   formatTime,
   generateId
 } from '../utils';
-import { buildWhatsAppLink, getAppointmentDateInput } from '../scheduling';
+import { getAppointmentDateInput } from '../scheduling';
 import { getOperationalErrorMessage, logOperationalError } from '../utils/errorHandling';
 import {
   Calendar,
   Clock,
   DollarSign,
-  MessageCircle,
   Plus,
   LogOut,
   TrendingUp,
   XCircle,
   CheckCircle,
-  Pencil,
-  Trash2,
   Scissors
 } from 'lucide-react';
 import { AppointmentModal } from './AppointmentModal';
@@ -31,8 +28,6 @@ type BarberDashboardProps = {
   appointments: Appointment[];
   settings: AppSettings;
   onCreateAppointment: (appointment: Appointment) => Promise<void> | void;
-  onUpdateAppointment: (id: string, patch: Partial<Appointment>) => Promise<void> | void;
-  onCancelAppointment: (appointment: Appointment) => void;
   addToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   onSignOut: (confirmLogout?: boolean) => Promise<void>;
 };
@@ -90,14 +85,11 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   appointments,
   settings,
   onCreateAppointment,
-  onUpdateAppointment,
-  onCancelAppointment,
   addToast,
   onSignOut
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [isAppointmentModalOpen, setAppointmentModalOpen] = useState(false);
-  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [isSigningOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const signOutInFlightRef = useRef(false);
@@ -159,12 +151,6 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   }), [currentBarber, settings]);
 
   const handleOpenNewAppointment = () => {
-    setEditingAppointment(null);
-    setAppointmentModalOpen(true);
-  };
-
-  const handleEditAppointment = (appointment: Appointment) => {
-    setEditingAppointment(appointment);
     setAppointmentModalOpen(true);
   };
 
@@ -186,20 +172,10 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
     }
 
     try {
-      if (editingAppointment) {
-        await onUpdateAppointment(editingAppointment.id, {
-          ...appointmentForBarber,
-          updatedAt: new Date().toISOString()
-        });
-
-        addToast('Agendamento atualizado!', 'success');
-      } else {
-        await onCreateAppointment(appointmentForBarber);
-        addToast('Agendamento criado!', 'success');
-      }
+      await onCreateAppointment(appointmentForBarber);
+      addToast('Agendamento criado!', 'success');
 
       setAppointmentModalOpen(false);
-      setEditingAppointment(null);
     } catch (error) {
       logOperationalError('barber-dashboard:save-appointment', error);
       addToast(getOperationalErrorMessage(
@@ -208,27 +184,6 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
         {
           authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de salvar.',
           networkMessage: 'Nao foi possivel conectar ao Supabase para salvar o agendamento.'
-        }
-      ), 'error');
-    }
-  };
-
-  const handleMarkAsCompleted = async (appointment: Appointment) => {
-    try {
-      await onUpdateAppointment(appointment.id, {
-        status: 'completed',
-        updatedAt: new Date().toISOString()
-      });
-
-      addToast('Agendamento marcado como concluido!', 'success');
-    } catch (error) {
-      logOperationalError('barber-dashboard:complete-appointment', error);
-      addToast(getOperationalErrorMessage(
-        error,
-        'Nao foi possivel atualizar o status do agendamento.',
-        {
-          authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de atualizar.',
-          networkMessage: 'Nao foi possivel conectar ao Supabase para atualizar o agendamento.'
         }
       ), 'error');
     }
@@ -340,7 +295,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
               className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95"
             >
               <Plus size={18} />
-              Novo Agendamento
+              Agendar
             </button>
           </div>
 
@@ -411,10 +366,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {todayAppointments.map((appointment) => {
-                const whatsappLink = buildWhatsAppLink(appointment);
-
-                return (
+              {todayAppointments.map((appointment) => (
                   <div
                     key={appointment.id}
                     className="ui-owner-card-solid p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
@@ -429,51 +381,8 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                       </p>
                     </div>
 
-                    <div className="flex gap-2">
-                      {appointment.status !== 'completed' && (
-                        <button
-                          type="button"
-                          onClick={() => handleMarkAsCompleted(appointment)}
-                          className="p-2 rounded-full bg-green-500/10 text-green-400 hover:bg-green-500/20"
-                          title="Marcar como Concluido"
-                        >
-                          <CheckCircle size={18} />
-                        </button>
-                      )}
-
-                      {whatsappLink && (
-                        <a
-                          href={whatsappLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-2 rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
-                          title="Chamar no WhatsApp"
-                        >
-                          <MessageCircle size={18} />
-                        </a>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleEditAppointment(appointment)}
-                        className="ui-button ui-button-ghost"
-                        title="Editar Agendamento"
-                      >
-                        <Pencil size={18} />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => onCancelAppointment(appointment)}
-                        className="p-2 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                        title="Cancelar Agendamento"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
                   </div>
-                );
-              })}
+              ))}
             </div>
           )}
         </section>
@@ -491,10 +400,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {upcomingAppointments.map((appointment) => {
-                const whatsappLink = buildWhatsAppLink(appointment);
-
-                return (
+              {upcomingAppointments.map((appointment) => (
                   <div
                     key={appointment.id}
                     className="ui-owner-card-solid p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
@@ -510,40 +416,8 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                       </p>
                     </div>
 
-                    <div className="flex gap-2">
-                      {whatsappLink && (
-                        <a
-                          href={whatsappLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-2 rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
-                          title="Chamar no WhatsApp"
-                        >
-                          <MessageCircle size={18} />
-                        </a>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleEditAppointment(appointment)}
-                        className="ui-button ui-button-ghost"
-                        title="Editar Agendamento"
-                      >
-                        <Pencil size={18} />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => onCancelAppointment(appointment)}
-                        className="p-2 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                        title="Cancelar Agendamento"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
                   </div>
-                );
-              })}
+              ))}
             </div>
           )}
         </section>
@@ -553,13 +427,12 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
         isOpen={isAppointmentModalOpen}
         onClose={() => {
           setAppointmentModalOpen(false);
-          setEditingAppointment(null);
         }}
         onSave={handleSaveAppointment}
         settings={barberScopedSettings}
         selectedDate={selectedDate}
         selectedBarber={barberName}
-        initialData={editingAppointment}
+        initialData={null}
         createId={generateId}
       />
     </div>
