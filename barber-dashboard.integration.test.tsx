@@ -9,7 +9,7 @@ import * as barbershopRepository from './services/barbershopRepository';
 import * as barberRepository from './services/barberRepository';
 import * as serviceRepository from './services/serviceRepository';
 import { Appointment, DEFAULT_SETTINGS } from './types';
-import { getInitialAppSettings, getInitialUserProfile, getPublicBookingSlugFromPath, getResolvedDashboardShopName } from './App';
+import { getInitialAppSettings, getInitialUserProfile, getPublicBookingSlugFromPath, getResolvedDashboardShopName, scopeOwnerAppointmentToTenant } from './App';
 import { buildPublicBookingInput, getPublicBookingBranding, getPublicBookingContactLinks, getPublicBookingLandingContent, getPublicBookingReadiness, getPublicBookingScopedSettings, getPublicBookingSteps, getPublicBookingSubmissionErrorMessage, getPublicBookingSummary, isPublicBookingSubmitDisabled, normalizePublicBarberOptions } from './components/PublicBookingPage';
 import {
   BarbershopBrandingSettings,
@@ -147,6 +147,17 @@ describe('Barber Dashboard Logic & Contracts', () => {
   });
 
   describe('Barber Dashboard Actions Logic', () => {
+    it('scopes owner appointments to the authenticated tenant before persistence', () => {
+      const appointment = makeAppointment({
+        barbershopId: 'untrusted-modal-tenant'
+      });
+
+      expect(scopeOwnerAppointmentToTenant(appointment, 'authenticated-owner-tenant')).toMatchObject({
+        id: appointment.id,
+        barbershopId: 'authenticated-owner-tenant'
+      });
+    });
+
     it('Scenario 3: Ensures barberId is attached when a barber creates an appointment', async () => {
       const newAppointmentInput = {
         clientName: 'Novo Cliente',
