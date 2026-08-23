@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const supabaseMock = vi.hoisted(() => ({
-  from: vi.fn()
+  from: vi.fn(),
+  rpc: vi.fn()
 }));
 
 vi.mock('./lib/supabase', () => ({
@@ -31,6 +32,7 @@ const INVALID_LOCAL_ID = '57hs3s9tt';
 describe('owner catalog management', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    supabaseMock.rpc.mockResolvedValue({ data: [], error: null });
   });
 
   it('owner sees only barbers from the current barbershop', async () => {
@@ -291,6 +293,10 @@ describe('owner catalog management', () => {
   });
 
   it('service with history is not deleted physically and is only deactivated', async () => {
+    supabaseMock.rpc.mockResolvedValue({
+      data: [{ viewer_role: 'barber', service_id: SERVICE_UUID, barbershop_id: OWNER_BARBERSHOP_UUID }],
+      error: null
+    });
     const appointmentsCountQuery = {
       eq: vi.fn(),
       count: 2,
@@ -381,6 +387,10 @@ describe('owner catalog management', () => {
   });
 
   it('barber with history is not deleted physically and is only deactivated', async () => {
+    supabaseMock.rpc.mockResolvedValue({
+      data: [{ viewer_role: 'barber', barber_id: BARBER_UUID, barbershop_id: OWNER_BARBERSHOP_UUID }],
+      error: null
+    });
     const appointmentsCountQuery = {
       eq: vi.fn(),
       count: 1,

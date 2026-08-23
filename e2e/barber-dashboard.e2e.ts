@@ -219,6 +219,7 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
 
   const signInRequests: CapturedRequest[] = [];
   const appointmentReadRequests: string[] = [];
+  const internalAppointmentResponses: unknown[][] = [];
   const appointmentCreateRequests: CapturedRequest[] = [];
   const signOutRequests: CapturedRequest[] = [];
 
@@ -353,16 +354,28 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
       }
 
       appointmentReadRequests.push(request.url());
+      await fulfillJson(route, 403, { message: 'Direct appointment reads are forbidden.' });
+      return;
+    }
 
-      const barbershopId = toEqValue(url.searchParams.get('barbershop_id'));
-      const barberId = toEqValue(url.searchParams.get('barber_id'));
-
-      const rows = appointments.filter((appointment) => {
-        if (barbershopId && appointment.barbershop_id !== barbershopId) return false;
-        if (barberId && appointment.barber_id !== barberId) return false;
-        return true;
-      });
-
+    if (url.pathname === '/rest/v1/rpc/get_internal_appointments') {
+      const rows = appointments
+        .filter((appointment) => (
+          appointment.barbershop_id === profile.barbershop_id
+          && appointment.barber_id === profile.barber_id
+        ))
+        .map((appointment) => ({
+          ...appointment,
+          viewer_role: 'barber',
+          client_phone: null,
+          service_value: null,
+          commission_rate: null,
+          notes: null,
+          financial_record_id: null,
+          created_at: null,
+          updated_at: null
+        }));
+      internalAppointmentResponses.push(rows);
       await fulfillJson(route, 200, rows);
       return;
     }
@@ -379,6 +392,7 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
     signInRequests,
     signOutRequests,
     appointmentReadRequests,
+    internalAppointmentResponses,
     appointmentCreateRequests
   };
 };
@@ -427,8 +441,14 @@ test.describe('barber dashboard e2e', () => {
     await expect(page.getByTitle(/Cancelar Agendamento/i)).toHaveCount(0);
 
     expect(network.signInRequests).toHaveLength(1);
-    expect(network.appointmentReadRequests.some((url) => url.includes(`barbershop_id=eq.${BARBERSHOP_ID}`))).toBeTruthy();
-    expect(network.appointmentReadRequests.some((url) => url.includes(`barber_id=eq.${BARBER_ID}`))).toBeTruthy();
+    expect(network.appointmentReadRequests).toHaveLength(0);
+    expect(network.internalAppointmentResponses).toHaveLength(1);
+    const response = network.internalAppointmentResponses[0][0] as Record<string, unknown>;
+    expect(response.client_phone).toBeNull();
+    expect(response.notes).toBeNull();
+    expect(response.service_value).toBeNull();
+    expect(response.commission_rate).toBeNull();
+    expect(response.financial_record_id).toBeNull();
   });
 
   test('barber creates a manual appointment with barbershopId and barberId from the authenticated session', async ({ page }) => {

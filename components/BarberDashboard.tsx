@@ -2,8 +2,6 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Appointment, AppSettings } from '../types';
 import { AuthSession } from '../services/authRepository';
 import {
-  calculateEstimatedCommission,
-  formatCurrency,
   formatTime,
   generateId
 } from '../utils';
@@ -12,10 +10,8 @@ import { getOperationalErrorMessage, logOperationalError } from '../utils/errorH
 import {
   Calendar,
   Clock,
-  DollarSign,
   Plus,
   LogOut,
-  TrendingUp,
   XCircle,
   CheckCircle,
   Scissors
@@ -41,14 +37,6 @@ const getTodayString = (): string => {
   const day = String(d.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
-};
-
-const getCurrentMonthString = (): string => {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-
-  return `${year}-${month}`;
 };
 
 export const buildBarberOwnedAppointment = ({
@@ -127,23 +115,6 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       ))
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   }, [barberAppointments, selectedDate]);
-
-  const dailyCommission = useMemo(() => (
-    todayAppointments
-      .filter((appointment) => appointment.status === 'completed')
-      .reduce((sum, appointment) => sum + calculateEstimatedCommission(appointment, settings), 0)
-  ), [todayAppointments, settings]);
-
-  const monthlyCommission = useMemo(() => {
-    const currentMonth = getCurrentMonthString();
-
-    return barberAppointments
-      .filter((appointment) => (
-        appointment.status === 'completed'
-        && getAppointmentDateInput(appointment).startsWith(currentMonth)
-      ))
-      .reduce((sum, appointment) => sum + calculateEstimatedCommission(appointment, settings), 0);
-  }, [barberAppointments, settings]);
 
   const barberScopedSettings = useMemo(() => ({
     ...settings,
@@ -325,34 +296,6 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="ui-owner-metric p-5 rounded-2xl flex items-center justify-between">
-            <div>
-              <p className="ui-owner-help text-sm">Comissao calculada do dia</p>
-              <p className="text-2xl font-bold text-gold-500">
-                {formatCurrency(dailyCommission)}
-              </p>
-            </div>
-
-            <DollarSign size={32} className="text-gold-500" />
-          </div>
-
-          <div className="ui-owner-metric p-5 rounded-2xl flex items-center justify-between">
-            <div>
-              <p className="ui-owner-help text-sm">Comissao calculada do mes</p>
-              <p className="text-2xl font-bold text-[var(--color-success)]">
-                {formatCurrency(monthlyCommission)}
-              </p>
-            </div>
-
-            <TrendingUp size={32} className="text-[var(--color-success)]" />
-          </div>
-        </div>
-
-        <div className="ui-owner-info mb-6 rounded-2xl p-4 text-sm">
-          Sua comissao e calculada com base nos atendimentos concluidos registrados no sistema. O painel nao confirma pagamento de repasse.
-        </div>
-
         <section className="ui-surface p-6 rounded-2xl mb-6">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <Calendar size={20} />
@@ -373,9 +316,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                   >
                     <div>
                       <p className="font-bold">{appointment.clientName}</p>
-                      <p className="text-sm">
-                        {appointment.serviceType} · {formatCurrency(appointment.serviceValue)}
-                      </p>
+                      <p className="text-sm">{appointment.serviceType}</p>
                       <p className="text-xs text-gold-400 font-mono">
                         {formatTime(new Date(appointment.startAt).getTime())}
                       </p>
@@ -407,9 +348,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                   >
                     <div>
                       <p className="font-bold">{appointment.clientName}</p>
-                      <p className="text-sm">
-                        {appointment.serviceType} · {formatCurrency(appointment.serviceValue)}
-                      </p>
+                      <p className="text-sm">{appointment.serviceType}</p>
                       <p className="text-xs text-gold-400 font-mono">
                         {new Date(appointment.startAt).toLocaleDateString('pt-BR')} as{' '}
                         {formatTime(new Date(appointment.startAt).getTime())}

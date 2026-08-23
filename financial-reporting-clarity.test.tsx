@@ -131,7 +131,7 @@ describe('financial reporting clarity', () => {
     expect(html).not.toContain('A Receber');
   });
 
-  it('labels barber dashboard commission as calculated, not paid', () => {
+  it('does not expose financial metrics in the barber dashboard', () => {
     const html = renderToStaticMarkup(
       <BarberDashboard
         authSession={{
@@ -150,9 +150,9 @@ describe('financial reporting clarity', () => {
       />
     );
 
-    expect(html).toContain('Comissao calculada do dia');
-    expect(html).toContain('Comissao calculada do mes');
-    expect(html).toContain('O painel nao confirma pagamento de repasse.');
+    expect(html).not.toContain('Comissao calculada do dia');
+    expect(html).not.toContain('Comissao calculada do mes');
+    expect(html).not.toContain('pagamento de repasse');
   });
 
   it('uses neutral commission labels in the PDF report', async () => {

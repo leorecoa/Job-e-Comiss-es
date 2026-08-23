@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(37);
+select plan(38);
 
 select ok(has_table_privilege('authenticated', 'public.profiles', 'select'), 'authenticated retains direct profile select');
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'insert'), 'authenticated has no profile insert');
@@ -53,9 +53,16 @@ select throws_ok($test$update public.profiles set created_at = now(), updated_at
 select throws_ok($test$delete from public.profiles where id = '01400000-0000-4000-8000-000000000002'$test$, '42501'::char(5), null, 'barber cannot delete profile');
 select throws_ok($test$insert into public.profiles (id, role, active) values ('01400000-0000-4000-8000-000000000098', 'barber', true)$test$, '42501'::char(5), null, 'barber cannot insert profile');
 select is((select barber_id from public.profiles where id = '01400000-0000-4000-8000-000000000002'), '11111111-1111-4111-8111-111111111111'::uuid, 'failed impersonation leaves barber link unchanged');
-select is((select count(*) from public.appointments where client_name in ('Own Security Client', 'Other Security Client')), 1::bigint, 'barber still reads only own appointments after attack');
+select is((select count(*) from public.get_internal_appointments() where client_name in ('Own Security Client', 'Other Security Client')), 1::bigint, 'barber still reads only own appointments after attack');
 
 reset role;
+update public.profiles set active = false where id = '01400000-0000-4000-8000-000000000002';
+set local role authenticated;
+set local "request.jwt.claims" = '{"sub":"01400000-0000-4000-8000-000000000002","role":"authenticated"}';
+select throws_ok($test$select * from public.get_internal_appointments()$test$, 'P0001'::char(5), 'INTERNAL_APPOINTMENTS_FORBIDDEN', 'inactive barber profile fails closed');
+
+reset role;
+update public.profiles set active = true where id = '01400000-0000-4000-8000-000000000002';
 set local role authenticated;
 set local "request.jwt.claims" = '{"sub":"01400000-0000-4000-8000-000000000001","role":"authenticated"}';
 select throws_ok($test$update public.profiles set display_name = 'Changed' where id = '01400000-0000-4000-8000-000000000002'$test$, '42501'::char(5), null, 'owner cannot update profiles directly');

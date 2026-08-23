@@ -47,6 +47,12 @@ type DatabasePublicAppointmentSlotRow = {
   status: Appointment['status'];
 };
 
+export type DatabaseInternalAppointmentRow = Omit<DatabaseAppointmentRow, 'client_phone' | 'service_value'> & {
+  viewer_role: 'owner' | 'barber';
+  client_phone: string | null;
+  service_value: number | string | null;
+};
+
 type DatabaseTenantEntityRow = {
   id: string;
   barbershop_id: string | null;
@@ -82,7 +88,7 @@ const nullableUuid = (value?: string | null): string | null => {
 const isActiveAppointmentConflictError = (error: DatabaseWriteError): boolean => {
   const details = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`.toLowerCase();
 
-  return error.code === '23505' && (
+  return (error.code === '23505' || error.code === '23P01') && (
     details.includes(ACTIVE_SLOT_UNIQUE_INDEX_NAME)
     || details.includes('barbershop_id')
     || details.includes('barber_id')
@@ -120,6 +126,34 @@ export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment =
   createdAt: row.created_at,
   updatedAt: row.updated_at
 });
+
+export const mapOwnerAppointmentFromDb = (row: DatabaseInternalAppointmentRow): Appointment => {
+  if (row.viewer_role !== 'owner' || row.client_phone === null || row.service_value === null) {
+    throw new Error('Contrato de agenda owner invalido.');
+  }
+
+  return mapAppointmentFromDb(row as DatabaseAppointmentRow);
+};
+export const mapBarberAppointmentFromDb = (row: DatabaseInternalAppointmentRow): Appointment => {
+  if (row.viewer_role !== 'barber') {
+    throw new Error('Contrato de agenda barber invalido.');
+  }
+
+  return {
+    id: row.id,
+    barbershopId: row.barbershop_id || undefined,
+    barberId: row.barber_id || undefined,
+    serviceId: row.service_id || undefined,
+    clientName: row.client_name,
+    barberName: row.barber_name,
+    serviceType: row.service_type,
+    startAt: row.start_at,
+    endAt: row.end_at,
+    status: row.status,
+    createdAt: row.created_at || row.start_at,
+    updatedAt: row.updated_at || row.start_at
+  } as Appointment;
+};
 
 export const mapAppointmentToDb = (appointment: Appointment): DatabaseAppointmentInsert => ({
   barbershop_id: nullableUuid(appointment.barbershopId),
@@ -164,26 +198,15 @@ const countLocalAppointmentsBy = (
 };
 
 const countRemoteAppointmentsBy = async (
-  column: 'barber_id' | 'service_id',
+  field: 'barberId' | 'serviceId',
   entityId: string,
   barbershopId?: string
 ): Promise<number> => {
-  if (!supabase) return 0;
-
-  let query = supabase
-    .from('appointments')
-    .select('id', { count: 'exact', head: true })
-    .eq(column, entityId);
-
-  if (barbershopId) {
-    query = query.eq('barbershop_id', barbershopId);
-  }
-
-  const { count, error } = await query;
-
-  if (error) throw error;
-
-  return count || 0;
+  const appointments = await listInternalAppointments();
+  return appointments.filter((appointment) => (
+    appointment[field] === entityId
+    && (!barbershopId || appointment.barbershopId === barbershopId)
+  )).length;
 };
 
 export const countAppointmentsForBarber = async (barberId: string, barbershopId?: string): Promise<number> => {
@@ -193,7 +216,7 @@ export const countAppointmentsForBarber = async (barberId: string, barbershopId?
   }
   assertOperationalSupabase();
 
-  return countRemoteAppointmentsBy('barber_id', barberId, barbershopId);
+  return countRemoteAppointmentsBy('barberId', barberId, barbershopId);
 };
 
 export const countAppointmentsForService = async (serviceId: string, barbershopId?: string): Promise<number> => {
@@ -203,33 +226,24 @@ export const countAppointmentsForService = async (serviceId: string, barbershopI
   }
   assertOperationalSupabase();
 
-  return countRemoteAppointmentsBy('service_id', serviceId, barbershopId);
+  return countRemoteAppointmentsBy('serviceId', serviceId, barbershopId);
 };
 
 export const listInternalAppointments = async (barbershopId?: string, barberId?: string): Promise<Appointment[]> => {
+  void barbershopId;
+  void barberId;
   if (shouldUseLocalFallback) return readLocalAppointments();
   assertOperationalSupabase();
 
-  let query = supabase
-    .from('appointments')
-    .select('*');
-
-  if (barbershopId) {
-    query = query.eq('barbershop_id', barbershopId);
-  }
-
-  query = query
-    .order('start_at', { ascending: true });
-
-  if (barberId) {
-    query = query.eq('barber_id', barberId);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc('get_internal_appointments');
 
   if (error) throw error;
 
-  return ((data || []) as DatabaseAppointmentRow[]).map(mapAppointmentFromDb);
+  return ((data || []) as DatabaseInternalAppointmentRow[]).map((row) => (
+    row.viewer_role === 'owner'
+      ? mapOwnerAppointmentFromDb(row)
+      : mapBarberAppointmentFromDb(row)
+  ));
 };
 
 export const listPublicAppointmentSlots = async (barbershopId: string): Promise<Appointment[]> => {
@@ -434,35 +448,29 @@ export const updateAppointment = async (
     updatedAt: patch.updatedAt || new Date().toISOString()
   };
 
-  const { data, error } = await supabase
-    .from('appointments')
-    .update(mapAppointmentToDb(next))
-    .eq('id', id)
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('update_owner_appointment', {
+    p_appointment_id: id,
+    p_client_name: next.clientName,
+    p_client_phone: next.clientPhone || '',
+    p_barber_id: next.barberId,
+    p_barber_name: next.barberName,
+    p_service_id: next.serviceId,
+    p_service_type: next.serviceType,
+    p_service_value: next.serviceValue,
+    p_commission_rate: next.commissionRate ?? null,
+    p_start_at: next.startAt,
+    p_end_at: next.endAt,
+    p_status: next.status,
+    p_notes: next.notes || null
+  });
 
   if (error) {
     logOperationalError('appointment-repository:update', error);
     throw error;
   }
 
-  return mapAppointmentFromDb(data as DatabaseAppointmentRow);
-};
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error('Agendamento nao encontrado.');
 
-export const deleteAppointment = async (id: string): Promise<void> => {
-  if (shouldUseLocalFallback) {
-    writeLocalAppointments(readLocalAppointments().filter(appointment => appointment.id !== id));
-    return;
-  }
-  assertOperationalSupabase();
-
-  const { error } = await supabase
-    .from('appointments')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    logOperationalError('appointment-repository:delete', error);
-    throw error;
-  }
+  return mapAppointmentFromDb(row as DatabaseAppointmentRow);
 };
