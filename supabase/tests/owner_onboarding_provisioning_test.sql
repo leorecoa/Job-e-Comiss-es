@@ -49,7 +49,7 @@ select is((select count(*) from public.profiles), 1::bigint, 'unscoped owner rea
 select is((select count(*) from public.barbershops), 0::bigint, 'unscoped owner reads no barbershops');
 select is((select count(*) from public.barbers), 0::bigint, 'unscoped owner reads no barbers');
 select is((select count(*) from public.services), 0::bigint, 'unscoped owner reads no services');
-select is((select count(*) from public.appointments), 0::bigint, 'unscoped owner reads no appointments');
+select throws_ok($test$select * from public.get_internal_appointments()$test$, 'P0001'::char(5), 'INTERNAL_APPOINTMENTS_FORBIDDEN', 'unscoped owner fails closed when reading appointments');
 select throws_ok($test$update public.profiles set barbershop_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' where id = '01300000-0000-4000-8000-000000000001'$test$, '42501'::char(5), null, 'unscoped owner cannot choose a tenant directly');
 select throws_ok($test$insert into public.barbershops (name, slug, active) values ('Blocked', 'blocked-direct', true)$test$, '42501'::char(5), null, 'unscoped owner cannot insert barbershop directly');
 select throws_ok($test$insert into public.services (name, price, duration_minutes, active, barbershop_id) values ('Blocked', 1, 30, true, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'unscoped owner cannot insert tenant service');

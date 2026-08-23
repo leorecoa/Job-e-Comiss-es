@@ -450,21 +450,15 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
     }
 
     if (url.pathname === '/rest/v1/appointments') {
-      if (request.method() !== 'GET') {
-        await fulfillJson(route, 405, { message: 'Owner e2e covers only appointment reads.' });
-        return;
-      }
-
       appointmentReadRequests.push(request.url());
-      const barbershopId = toEqValue(url.searchParams.get('barbershop_id'));
-      const barberId = toEqValue(url.searchParams.get('barber_id'));
+      await fulfillJson(route, 403, { message: 'Direct appointment reads are forbidden.' });
+      return;
+    }
 
-      const rows = appointments.filter((appointment) => {
-        if (barbershopId && appointment.barbershop_id !== barbershopId) return false;
-        if (barberId && appointment.barber_id !== barberId) return false;
-        return true;
-      });
-
+    if (url.pathname === '/rest/v1/rpc/get_internal_appointments') {
+      const rows = appointments
+        .filter((appointment) => appointment.barbershop_id === profile.barbershop_id)
+        .map((appointment) => ({ ...appointment, viewer_role: 'owner' }));
       await fulfillJson(route, 200, rows);
       return;
     }
@@ -702,8 +696,7 @@ test.describe('owner operational dashboard e2e', () => {
     expect(network.barbershopRequests.some((url) => url.includes(`id=eq.${OWNER_BARBERSHOP_ID}`))).toBeTruthy();
     expect(network.barberRequests.some((url) => url.includes(`barbershop_id=eq.${OWNER_BARBERSHOP_ID}`))).toBeTruthy();
     expect(network.serviceRequests.some((url) => url.includes(`barbershop_id=eq.${OWNER_BARBERSHOP_ID}`))).toBeTruthy();
-    expect(network.appointmentReadRequests.some((url) => url.includes(`barbershop_id=eq.${OWNER_BARBERSHOP_ID}`))).toBeTruthy();
-    expect(network.appointmentReadRequests.every((url) => !url.includes(`barbershop_id=eq.${OTHER_BARBERSHOP_ID}`))).toBeTruthy();
+    expect(network.appointmentReadRequests).toHaveLength(0);
   });
 
   test('owner management workspace is responsive and returns to the agenda', async ({ page }) => {

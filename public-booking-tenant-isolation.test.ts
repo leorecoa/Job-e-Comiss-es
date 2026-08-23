@@ -223,9 +223,10 @@ describe('public booking tenant isolation repositories', () => {
   });
 
   it('owner reads only appointments from the current barbershop_id', async () => {
-    const query = createOrderedAppointmentsQuery({
+    supabaseMock.rpc.mockResolvedValue({
       data: [
         {
+          viewer_role: 'owner',
           id: 'appointment-leo',
           barbershop_id: 'shop-leo',
           client_name: 'Cliente Leo',
@@ -246,63 +247,49 @@ describe('public booking tenant isolation repositories', () => {
       ],
       error: null
     });
-    const select = vi.fn().mockReturnValue(query);
-
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table !== 'appointments') throw new Error(`Unexpected table ${table}`);
-      return { select };
-    });
-
     const appointments = await listInternalAppointments('shop-leo');
 
-    expect(supabaseMock.from).toHaveBeenCalledWith('appointments');
-    expect(select).toHaveBeenCalledWith('*');
-    expect(query.eq).toHaveBeenCalledTimes(1);
-    expect(query.eq).toHaveBeenCalledWith('barbershop_id', 'shop-leo');
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('get_internal_appointments');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
     expect(appointments).toHaveLength(1);
     expect(appointments[0]?.barbershopId).toBe('shop-leo');
   });
 
   it('barber reads only appointments from the current barbershop_id and own barber_id', async () => {
-    const query = createOrderedAppointmentsQuery({
+    supabaseMock.rpc.mockResolvedValue({
       data: [
         {
+          viewer_role: 'barber',
           id: 'appointment-gabriel',
           barbershop_id: 'shop-leo',
           client_name: 'Cliente Gabriel',
-          client_phone: '85999990001',
+          client_phone: null,
           barber_id: 'barber-gabriel',
           barber_name: 'Gabriel',
           service_id: 'service-leo',
           service_type: 'Corte Leo',
-          service_value: 70,
+          service_value: null,
+          commission_rate: null,
           start_at: '2026-06-22T16:00:00.000Z',
           end_at: '2026-06-22T16:45:00.000Z',
           status: 'scheduled',
           notes: null,
           financial_record_id: null,
-          created_at: '2026-06-22T10:00:00.000Z',
-          updated_at: '2026-06-22T10:00:00.000Z'
+          created_at: null,
+          updated_at: null
         }
       ],
       error: null
     });
-    const select = vi.fn().mockReturnValue(query);
-
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table !== 'appointments') throw new Error(`Unexpected table ${table}`);
-      return { select };
-    });
-
     const appointments = await listInternalAppointments('shop-leo', 'barber-gabriel');
 
-    expect(supabaseMock.from).toHaveBeenCalledWith('appointments');
-    expect(select).toHaveBeenCalledWith('*');
-    expect(query.eq).toHaveBeenNthCalledWith(1, 'barbershop_id', 'shop-leo');
-    expect(query.eq).toHaveBeenNthCalledWith(2, 'barber_id', 'barber-gabriel');
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('get_internal_appointments');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
     expect(appointments).toHaveLength(1);
     expect(appointments[0]?.barberId).toBe('barber-gabriel');
     expect(appointments[0]?.barbershopId).toBe('shop-leo');
+    expect(appointments[0]).not.toHaveProperty('clientPhone');
+    expect(appointments[0]).not.toHaveProperty('serviceValue');
   });
 
   it('public booking reads occupied slots through get_public_appointment_slots instead of appointments or the public view', async () => {
