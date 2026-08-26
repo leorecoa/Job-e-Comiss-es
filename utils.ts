@@ -104,13 +104,24 @@ export const calculateClientCommission = (client: Client, currentRate: number): 
   return baseValue * (currentRate / 100);
 };
 
-const escapeCsvCell = (value: unknown): string => {
-  const text = String(value ?? '');
-  if (/[;"\r\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
+export const neutralizeCsvFormula = (value: string): string => {
+  if (/^[\s\x00-\x1F\x7F]*[=+@-]/.test(value)) {
+    return `'${value}`;
   }
 
-  return text;
+  return value;
+};
+
+const escapeCsvCell = (value: unknown, neutralizeFormula = true): string => {
+  const text = String(value ?? '');
+  const safeText = neutralizeFormula && typeof value === 'string'
+    ? neutralizeCsvFormula(text)
+    : text;
+  if (/[;"\r\n]/.test(safeText)) {
+    return `"${safeText.replace(/"/g, '""')}"`;
+  }
+
+  return safeText;
 };
 
 export const buildCsvContent = (
@@ -121,7 +132,7 @@ export const buildCsvContent = (
   const headers = ["Data", "Hora", "Tipo Movimento", "Cliente", "Detalhe/Produto", "Profissional", "Serviço", "Valor (R$)"];
   
   const rows: string[] = [];
-  rows.push(headers.map(escapeCsvCell).join(";")); // Usando ponto e vírgula para Excel em PT-BR
+  rows.push(headers.map((value) => escapeCsvCell(value)).join(";")); // Usando ponto e vírgula para Excel em PT-BR
 
   // Adicionar Clientes (Entradas)
   clients.forEach(c => {
@@ -145,16 +156,16 @@ export const buildCsvContent = (
         detail = `+ Adicional R$${c.extraValue}`;
     }
 
-    rows.push([
+    const textCells = [
       dateStr,
       timeStr,
       "RECEITA",
       c.name,
       detail,
       c.barberName,
-      c.serviceType,
-      valueStr
-    ].map(escapeCsvCell).join(";"));
+      c.serviceType
+    ].map((value) => escapeCsvCell(value));
+    rows.push([...textCells, escapeCsvCell(valueStr, false)].join(";"));
   });
 
   // Adicionar Vales (Saídas)
@@ -164,16 +175,16 @@ export const buildCsvContent = (
     const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const valueStr = `-${v.value.toFixed(2).replace('.', ',')}`; // Valor negativo
 
-    rows.push([
+    const textCells = [
       dateStr,
       timeStr,
       "DESPESA",
       "Vale/Retirada",
       v.description,
       v.barberName,
-      "Vale",
-      valueStr
-    ].map(escapeCsvCell).join(";"));
+      "Vale"
+    ].map((value) => escapeCsvCell(value));
+    rows.push([...textCells, escapeCsvCell(valueStr, false)].join(";"));
   });
 
   // Criar o conteudo com BOM para suportar acentos no Excel
