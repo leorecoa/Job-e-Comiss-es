@@ -87,4 +87,76 @@ describe('buildCsvContent', () => {
     expect(csv).toContain('"Linha 1\nLinha 2"');
     expect(csv).toContain('"Cafe; agua"');
   });
+
+  it.each([
+    ['equals', '=SUM(A1:A2)', "'=SUM(A1:A2)"],
+    ['plus', '+123', "'+123"],
+    ['minus', '-10', "'-10"],
+    ['at sign', '@command', "'@command"],
+    ['leading space', ' =SUM(A1:A2)', "' =SUM(A1:A2)"],
+    ['leading tab', '\t=SUM(A1:A2)', "'\t=SUM(A1:A2)"],
+    ['leading carriage return', '\r=SUM(A1:A2)', "'\r=SUM(A1:A2)"],
+    ['leading new line', '\n=SUM(A1:A2)', "'\n=SUM(A1:A2)"],
+  ])('neutralizes formula text with %s in the final CSV', (_case, input, expected) => {
+    const csv = buildCsvContent([makeClient({ name: input })], []);
+
+    expect(csv).toContain(expected);
+  });
+
+  it('keeps safe, accented, empty, and already-neutralized text unchanged', () => {
+    const csv = buildCsvContent(
+      [
+        makeClient({ name: "'=SUM(A1:A2)", description: 'Descrição comum' }),
+        makeClient({ id: 'client-2', name: '', description: null as unknown as string })
+      ],
+      []
+    );
+
+    expect(csv).toContain("'=SUM(A1:A2)");
+    expect(csv).not.toContain("''=SUM(A1:A2)");
+    expect(csv).toContain('Descrição comum');
+    expect(csv).toContain(';RECEITA;;');
+  });
+
+  it('preserves CSV escaping after neutralizing malicious text', () => {
+    const csv = buildCsvContent(
+      [makeClient({
+        name: '=HYPERLINK("https://example.test","Abrir")',
+        description: '@linha 1; "detalhe"\nlinha 2'
+      })],
+      []
+    );
+
+    expect(csv).toContain('"\'=HYPERLINK(""https://example.test"",""Abrir"")"');
+    expect(csv).toContain('"\'@linha 1; ""detalhe""\nlinha 2"');
+  });
+
+  it('keeps commas as content and generated monetary values numeric', () => {
+    const csv = buildCsvContent(
+      [makeClient({ name: 'Maria, Silva', totalValue: 60 })],
+      [{
+        id: 'vale-1',
+        barberName: 'Barbeiro',
+        value: 15,
+        description: 'Retirada',
+        timestamp: new Date(2026, 5, 4, 11, 0).getTime()
+      }]
+    );
+
+    expect(csv).toContain(';Maria, Silva;');
+    expect(csv).toContain(';60,00');
+    expect(csv).toContain(';-15,00');
+    expect(csv).not.toContain(";'-15,00");
+  });
+
+  it('does not mutate source values while neutralizing names and descriptions', () => {
+    const client = makeClient({ name: '=CMD()', description: '+payload' });
+    const original = structuredClone(client);
+
+    const csv = buildCsvContent([client], []);
+
+    expect(csv).toContain("'=CMD()");
+    expect(csv).toContain("'+payload");
+    expect(client).toEqual(original);
+  });
 });
