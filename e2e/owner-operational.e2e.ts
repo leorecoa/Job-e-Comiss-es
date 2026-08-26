@@ -562,11 +562,11 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
   };
 };
 
-const signInAsOwner = async (page: Page) => {
+const signInAsOwner = async (page: Page, initialUrl = '/') => {
   await page.addInitScript(() => {
     window.localStorage.setItem('hasSeenTour', 'true');
   });
-  await page.goto('/');
+  await page.goto(initialUrl);
   await expect(page.getByRole('heading', { name: /Painel interno/i })).toBeVisible();
   await page.locator('label').filter({ hasText: 'Email' }).locator('xpath=following-sibling::input').fill(OWNER_EMAIL);
   await page.locator('label').filter({ hasText: 'Senha' }).locator('xpath=following-sibling::input').fill(OWNER_PASSWORD);
@@ -705,6 +705,7 @@ test.describe('owner operational dashboard e2e', () => {
     await installOwnerSupabaseMocks(page);
     await signInAsOwner(page);
     await openOwnerManagement(page);
+    await expect(page).toHaveURL(/#management-public-presence$/);
 
     await expect(page.getByRole('heading', { name: 'Gestão da barbearia' })).toBeVisible();
     await expect(page.getByText('Prévia pública')).toBeVisible();
@@ -802,6 +803,29 @@ test.describe('owner operational dashboard e2e', () => {
       scrollWidth: document.documentElement.scrollWidth
     }));
     expect(zoomDimensions.scrollWidth).toBeLessThanOrEqual(zoomDimensions.clientWidth + 1);
+  });
+
+  test('owner restores management hashes on refresh and browser history', async ({ page }) => {
+    await installOwnerSupabaseMocks(page);
+    await signInAsOwner(page, '/#management-team');
+
+    await expect(page.locator('a[href="#management-team"]')).toHaveAttribute('aria-current', 'page');
+    await page.reload();
+    await expect(page.locator('a[href="#management-team"]')).toHaveAttribute('aria-current', 'page');
+
+    await page.locator('a[href="#management-catalog"]').click();
+    await expect(page).toHaveURL(/#management-catalog$/);
+    await page.reload();
+    await expect(page.locator('a[href="#management-catalog"]')).toHaveAttribute('aria-current', 'page');
+
+    await page.goBack();
+    await expect(page.locator('a[href="#management-team"]')).toHaveAttribute('aria-current', 'page');
+    await page.goForward();
+    await expect(page.locator('a[href="#management-catalog"]')).toHaveAttribute('aria-current', 'page');
+
+    await page.goto('/#management-unknown');
+    await expect(page.getByRole('heading', { name: 'Agenda do dia' })).toBeVisible();
+    await expect(page.locator('#management-team')).toBeHidden();
   });
 
   test('owner shell keeps navigation accessible and responsive', async ({ page }) => {
