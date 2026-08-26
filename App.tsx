@@ -58,6 +58,12 @@ import { AUTH_CALLBACK_PATH, AuthCallbackScreen } from './components/AuthCallbac
 import { DashboardShell, type DashboardNavigationItem } from './components/DashboardShell';
 import { InlineNotice, LoadingState, Surface } from './components/ui';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
+import {
+  getOwnerNavigationHash,
+  getOwnerNavigationRoute,
+  type ManagementSectionHash,
+  type OwnerMainSection
+} from './utils/ownerNavigation';
 
 const AddClientModal = React.lazy(() => import('./components/AddClientModal').then((module) => ({ default: module.AddClientModal })));
 const AddValeModal = React.lazy(() => import('./components/AddValeModal').then((module) => ({ default: module.AddValeModal })));
@@ -328,8 +334,16 @@ const App: React.FC = () => {
   ));
 
   // -- View State --
-  const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
-  const [activeTab, setActiveTab] = useState<'appointments' | 'clients' | 'vales' | 'management'>('appointments');
+  const initialOwnerNavigation = getOwnerNavigationRoute(window.location.hash);
+  const [viewMode, setViewMode] = useState<'daily' | 'monthly'>(() => (
+    initialOwnerNavigation.mainSection === 'reports' ? 'monthly' : 'daily'
+  ));
+  const [activeTab, setActiveTab] = useState<'appointments' | 'clients' | 'vales' | 'management'>(() => (
+    initialOwnerNavigation.mainSection === 'reports' ? 'appointments' : initialOwnerNavigation.mainSection
+  ));
+  const [activeManagementSection, setActiveManagementSection] = useState<ManagementSectionHash>(
+    initialOwnerNavigation.managementSection
+  );
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthString());
   const [selectedBarberFilter, setSelectedBarberFilter] = useState<string>('TODOS');
@@ -386,6 +400,26 @@ const App: React.FC = () => {
   };
 
   // -- Effects --
+  useEffect(() => {
+    const syncOwnerNavigationFromHash = () => {
+      const route = getOwnerNavigationRoute(window.location.hash);
+      setActiveManagementSection(route.managementSection);
+      if (route.mainSection === 'reports') {
+        setViewMode('monthly');
+        return;
+      }
+      setViewMode('daily');
+      setActiveTab(route.mainSection);
+    };
+
+    window.addEventListener('hashchange', syncOwnerNavigationFromHash);
+    window.addEventListener('popstate', syncOwnerNavigationFromHash);
+    return () => {
+      window.removeEventListener('hashchange', syncOwnerNavigationFromHash);
+      window.removeEventListener('popstate', syncOwnerNavigationFromHash);
+    };
+  }, []);
+
   useEffect(() => {
     if (shouldUseLocalFallback) {
       localStorage.setItem('barbearia_profile', JSON.stringify(userProfile));
@@ -1661,13 +1695,31 @@ const App: React.FC = () => {
     { id: 'management', label: 'Gestão', description: 'Configure presença pública, equipe e catálogo.', icon: <Settings size={18} /> }
   ];
   const activeOwnerSection = viewMode === 'monthly' ? 'reports' : activeTab;
-  const handleOwnerNavigation = (sectionId: string) => {
-    if (sectionId === 'reports') {
+  const applyOwnerNavigation = (
+    section: OwnerMainSection,
+    managementSection: ManagementSectionHash = activeManagementSection
+  ) => {
+    const nextHash = getOwnerNavigationHash(section, managementSection);
+    setActiveManagementSection(managementSection);
+    if (section === 'reports') {
       setViewMode('monthly');
-      return;
+    } else {
+      setViewMode('daily');
+      setActiveTab(section);
     }
-    setViewMode('daily');
-    setActiveTab(sectionId as 'appointments' | 'clients' | 'vales' | 'management');
+
+    if (window.location.hash === nextHash) return;
+    if (nextHash) {
+      window.location.hash = nextHash;
+    } else {
+      window.history.pushState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+  };
+  const handleOwnerNavigation = (sectionId: string) => {
+    applyOwnerNavigation(sectionId as OwnerMainSection);
+  };
+  const handleManagementNavigation = (section: ManagementSectionHash) => {
+    applyOwnerNavigation('management', section);
   };
 
   const changeDate = (days: number) => {
@@ -1891,6 +1943,8 @@ const App: React.FC = () => {
                   onRemoveService={handleRemoveOwnerService}
                 />
               )}
+              activeSection={activeManagementSection}
+              onNavigate={handleManagementNavigation}
             />
           </React.Suspense>
         </div>
@@ -1914,7 +1968,7 @@ const App: React.FC = () => {
                 </div>
 
                 <div id="tour-filters" className="flex gap-2 w-full md:w-auto items-center overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-                    <button onClick={() => setViewMode('monthly')} className="ui-owner-toolbar-button px-4 py-2.5 rounded-xl shrink-0">
+                    <button onClick={() => handleOwnerNavigation('reports')} className="ui-owner-toolbar-button px-4 py-2.5 rounded-xl shrink-0">
                         <BarChart3 size={18} />
                     </button>
                     <div className="ui-owner-date-control flex items-center rounded-xl p-0.5 flex-1 justify-between md:flex-none min-w-[140px]" id="tour-date-picker">
@@ -2199,7 +2253,7 @@ const App: React.FC = () => {
 
         {viewMode === 'monthly' && (
           <React.Suspense fallback={<SectionFallback />}>
-             <MonthlySummary clients={clients} vales={vales} settings={settings} onBack={() => setViewMode('daily')} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+             <MonthlySummary clients={clients} vales={vales} settings={settings} onBack={() => handleOwnerNavigation('appointments')} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
           </React.Suspense>
         )}
       </DashboardShell>

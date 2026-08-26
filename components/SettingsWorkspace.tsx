@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BookOpen, Globe2, Scissors, Users } from 'lucide-react';
 import { PageHeader, Surface } from './ui';
+import type { ManagementSectionHash } from '../utils/ownerNavigation';
 
 type SettingsWorkspaceProps = {
   publicPresence: React.ReactNode;
   readiness: React.ReactNode;
   team: React.ReactNode;
   catalog: React.ReactNode;
+  activeSection: ManagementSectionHash;
+  onNavigate: (section: ManagementSectionHash) => void;
 };
 
 const workspaceLinks = [
@@ -20,9 +23,18 @@ export const SettingsWorkspace: React.FC<SettingsWorkspaceProps> = ({
   publicPresence,
   readiness,
   team,
-  catalog
-}) => (
-  <div className="ui-settings-workspace">
+  catalog,
+  activeSection,
+  onNavigate
+}) => {
+  useEffect(() => {
+    window.requestAnimationFrame(() => {
+      document.getElementById(activeSection.slice(1))?.scrollIntoView({ block: 'start' });
+    });
+  }, [activeSection]);
+
+  return (
+    <div className="ui-settings-workspace">
     <Surface className="ui-settings-intro">
       <PageHeader
         title="Gestão da barbearia"
@@ -31,7 +43,15 @@ export const SettingsWorkspace: React.FC<SettingsWorkspaceProps> = ({
       />
       <nav className="ui-settings-navigation" aria-label="Grupos da gestão">
         {workspaceLinks.map(({ href, label, icon: Icon }) => (
-          <a key={href} href={href}>
+          <a
+            key={href}
+            href={href}
+            aria-current={activeSection === href ? 'page' : undefined}
+            onClick={(event) => {
+              event.preventDefault();
+              onNavigate(href as ManagementSectionHash);
+            }}
+          >
             <Icon size={17} aria-hidden="true" />
             {label}
           </a>
@@ -45,5 +65,6 @@ export const SettingsWorkspace: React.FC<SettingsWorkspaceProps> = ({
       <div id="management-team" className="ui-settings-group" tabIndex={-1}>{team}</div>
       <div id="management-catalog" className="ui-settings-group" tabIndex={-1}>{catalog}</div>
     </div>
-  </div>
-);
+    </div>
+  );
+};
