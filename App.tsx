@@ -663,7 +663,7 @@ const App: React.FC = () => {
         }
 
         const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([ //
-          isPublicBookingRoute ? listPublicAppointmentSlots(currentBarbershopId) : listInternalAppointments(currentBarbershopId, authSession?.barberId),
+          isPublicBookingRoute ? listPublicAppointmentSlots(publicBookingSlug!, currentBarbershopId) : listInternalAppointments(currentBarbershopId, authSession?.barberId),
           listBarbers(currentBarbershopId),
           listServices(currentBarbershopId)
         ]);

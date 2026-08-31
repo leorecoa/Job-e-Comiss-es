@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(220);
+select plan(230);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -27,15 +27,16 @@ select ok(not exists(select 1 from information_schema.routine_privileges where r
 select is((select count(*) from pg_proc where oid in ('public.get_internal_appointments()'::regprocedure, 'public.update_owner_appointment(uuid,text,text,uuid,text,uuid,text,numeric,numeric,timestamptz,timestamptz,text,text)'::regprocedure) and prosecdef), 2::bigint, 'internal appointment RPCs are security definer');
 select is((select count(*) from pg_proc where oid in ('public.get_internal_appointments()'::regprocedure, 'public.update_owner_appointment(uuid,text,text,uuid,text,uuid,text,numeric,numeric,timestamptz,timestamptz,text,text)'::regprocedure) and proconfig = array['search_path=pg_catalog']), 2::bigint, 'internal appointment RPCs keep controlled search paths');
 select is(pg_get_function_result('public.get_internal_appointments()'::regprocedure), 'TABLE(viewer_role text, id uuid, barbershop_id uuid, client_name text, client_phone text, barber_id uuid, barber_name text, service_id uuid, service_type text, service_value numeric, commission_rate numeric, start_at timestamp with time zone, end_at timestamp with time zone, status text, notes text, financial_record_id text, created_at timestamp with time zone, updated_at timestamp with time zone)', 'internal appointment read signature is explicit');
-select ok(has_function_privilege('anon', 'public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)', 'execute'), 'anon can execute appointment creation RPC');
+select ok(not has_function_privilege('anon', 'public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)', 'execute'), 'anon cannot bypass the creation proxy');
 select is((select pg_get_function_identity_arguments(p.oid) from pg_proc p where p.oid = 'public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)'::regprocedure), 'p_barbershop_id uuid, p_barber_id uuid, p_service_id uuid, p_client_name text, p_client_phone text, p_start_at timestamp with time zone, p_end_at timestamp with time zone, p_notes text', 'appointment creation RPC signature remains exact');
 select is(pg_get_function_result('public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)'::regprocedure), 'uuid', 'appointment creation RPC still returns uuid');
 select is((select prosecdef from pg_proc where oid = 'public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)'::regprocedure), true, 'appointment creation RPC remains security definer');
 select is((select proconfig from pg_proc where oid = 'public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)'::regprocedure), array['search_path=pg_catalog'], 'appointment creation RPC keeps controlled search path');
-select ok(has_function_privilege('authenticated', 'public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)', 'execute'), 'authenticated can execute appointment creation RPC');
+select ok(not has_function_privilege('authenticated', 'public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)', 'execute'), 'authenticated cannot bypass the creation proxy');
+select ok(has_function_privilege('service_role', 'public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)', 'execute'), 'proxy credential can execute appointment creation RPC');
 select is((select count(*) from pg_indexes where schemaname = 'public' and indexname in ('idx_appointments_public_phone_created_at', 'idx_appointments_public_phone_active_start')), 2::bigint, 'public booking abuse query indexes are versioned');
 select ok(position('pg_advisory_xact_lock' in pg_get_functiondef('public.create_public_appointment(uuid,uuid,uuid,text,text,timestamptz,timestamptz,text)'::regprocedure)) > 0, 'appointment creation RPC serializes tenant and phone attempts');
-select ok(has_function_privilege('anon', 'public.get_public_appointment_slots(uuid)', 'execute'), 'anon can execute slots RPC');
+select ok(not has_function_privilege('anon', 'public.get_public_appointment_slots(uuid)', 'execute'), 'anon cannot bypass the slots proxy');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'create_public_appointment' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute creation RPC');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'get_public_appointment_slots' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute slots RPC');
 select is(to_regclass('public.public_appointment_slots'), null::regclass, 'legacy public slots view is absent');
@@ -45,7 +46,15 @@ select ok(to_regprocedure('public.get_public_appointment_slots(uuid)') is not nu
 select is(pg_get_function_result('public.get_public_appointment_slots(uuid)'::regprocedure), 'TABLE(barber_id uuid, barber_name text, start_at timestamp with time zone, end_at timestamp with time zone, status text, barbershop_id uuid)', 'public slots RPC result signature remains exact');
 select is((select prosecdef from pg_proc where oid = 'public.get_public_appointment_slots(uuid)'::regprocedure), true, 'public slots RPC remains security definer');
 select is((select proconfig from pg_proc where oid = 'public.get_public_appointment_slots(uuid)'::regprocedure), array['search_path=pg_catalog'], 'public slots RPC keeps controlled search path');
-select ok(has_function_privilege('authenticated', 'public.get_public_appointment_slots(uuid)', 'execute'), 'authenticated can execute slots RPC');
+select ok(not has_function_privilege('authenticated', 'public.get_public_appointment_slots(uuid)', 'execute'), 'authenticated cannot bypass the slots proxy');
+select ok(not has_function_privilege('service_role', 'public.get_public_appointment_slots(uuid)', 'execute'), 'proxy credential cannot bypass the slug-scoped slots RPC');
+select ok(to_regprocedure('public.get_public_appointment_slots_by_slug(text)') is not null, 'proxy slots RPC exists with slug input');
+select is(pg_get_function_result('public.get_public_appointment_slots_by_slug(text)'::regprocedure), 'TABLE(barber_id uuid, barber_name text, start_at timestamp with time zone, end_at timestamp with time zone, status text)', 'proxy slots RPC exposes only the minimal projection');
+select is((select prosecdef from pg_proc where oid = 'public.get_public_appointment_slots_by_slug(text)'::regprocedure), true, 'proxy slots RPC is security definer');
+select is((select proconfig from pg_proc where oid = 'public.get_public_appointment_slots_by_slug(text)'::regprocedure), array['search_path=pg_catalog'], 'proxy slots RPC keeps controlled search path');
+select ok(has_function_privilege('service_role', 'public.get_public_appointment_slots_by_slug(text)', 'execute'), 'proxy credential can execute slug slots RPC');
+select ok(not has_function_privilege('anon', 'public.get_public_appointment_slots_by_slug(text)', 'execute') and not has_function_privilege('authenticated', 'public.get_public_appointment_slots_by_slug(text)', 'execute'), 'browser roles cannot execute slug slots RPC');
+select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'get_public_appointment_slots_by_slug' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute slug slots RPC');
 
 select ok(not exists(select 1 from information_schema.table_privileges where table_schema = 'public' and table_name = 'profiles' and grantee = 'PUBLIC'), 'PUBLIC has no direct profiles privileges');
 select ok(not has_table_privilege('anon', 'public.profiles', 'select') and not has_table_privilege('anon', 'public.profiles', 'insert') and not has_table_privilege('anon', 'public.profiles', 'update') and not has_table_privilege('anon', 'public.profiles', 'delete') and not has_table_privilege('anon', 'public.profiles', 'truncate') and not has_table_privilege('anon', 'public.profiles', 'references') and not has_table_privilege('anon', 'public.profiles', 'trigger'), 'anon has no direct profiles privileges');
@@ -230,13 +239,16 @@ set local role anon;
 set local "request.jwt.claims" = '{"role":"anon"}';
 select throws_ok('select * from public.appointments', '42501'::char(5), null, 'anon direct select is denied');
 select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Blocked Direct', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '29 days', now() + interval '29 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'anon direct insert is denied');
-select lives_ok($test$select public.create_public_appointment('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'Public Fixture', '(919) 111-1111', date_trunc('minute', now()) + interval '30 days', date_trunc('minute', now()) + interval '30 days 30 minutes', null)$test$, 'anon creates through RPC');
+select throws_ok($test$select public.create_public_appointment('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'Blocked RPC', '(919) 111-1111', date_trunc('minute', now()) + interval '30 days', date_trunc('minute', now()) + interval '30 days 30 minutes', null)$test$, '42501'::char(5), null, 'anon cannot bypass creation proxy');
 
+reset role;
+set local role service_role;
+select lives_ok($test$select public.create_public_appointment('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'Public Fixture', '(919) 111-1111', date_trunc('minute', now()) + interval '30 days', date_trunc('minute', now()) + interval '30 days 30 minutes', null)$test$, 'proxy credential creates through controlled RPC');
 reset role;
 select is((select status from public.appointments where client_name = 'Public Fixture'), 'scheduled', 'public RPC creates scheduled status');
 select is((select client_phone from public.appointments where client_name = 'Public Fixture'), '9191111111', 'public RPC stores normalized phone digits');
 
-set local role anon;
+set local role service_role;
 select throws_ok($test$select public.create_public_appointment('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'Public Repeat', '9191111111', date_trunc('minute', now()) + interval '31 days', date_trunc('minute', now()) + interval '31 days 30 minutes', null)$test$, 'P0001'::char(5), 'PUBLIC_APPOINTMENT_RATE_LIMITED', 'public RPC rate limits the same tenant and phone for 60 seconds');
 select lives_ok($test$select public.create_public_appointment('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'Other Phone', '9191111112', date_trunc('minute', now()) + interval '32 days', date_trunc('minute', now()) + interval '32 days 30 minutes', null)$test$, 'another phone is not rate limited');
 select lives_ok($test$select public.create_public_appointment('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', '22222222-2222-4222-8222-222222222222', '44444444-4444-4444-8444-444444444444', 'Other Tenant', '9191111111', date_trunc('minute', now()) + interval '33 days', date_trunc('minute', now()) + interval '33 days 30 minutes', null)$test$, 'same phone in another tenant is not rate limited');
@@ -253,12 +265,12 @@ values
   ('Ignored Completed', '9191111115', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, date_trunc('minute', now()) + interval '45 days', date_trunc('minute', now()) + interval '45 days 30 minutes', 'completed', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', now() - interval '2 minutes'),
   ('Ignored No Show', '9191111115', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, date_trunc('minute', now()) + interval '46 days', date_trunc('minute', now()) + interval '46 days 30 minutes', 'no_show', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', now() - interval '2 minutes');
 
-set local role anon;
+set local role service_role;
 select throws_ok($test$select public.create_public_appointment('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'Active Limit Four', '9191111114', date_trunc('minute', now()) + interval '43 days', date_trunc('minute', now()) + interval '43 days 30 minutes', null)$test$, 'P0001'::char(5), 'PUBLIC_APPOINTMENT_ACTIVE_LIMIT', 'fourth future active appointment is blocked');
 select lives_ok($test$select public.create_public_appointment('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'Ignored Statuses Allowed', '9191111115', date_trunc('minute', now()) + interval '47 days', date_trunc('minute', now()) + interval '47 days 30 minutes', null)$test$, 'completed cancelled and no-show do not count toward active limit');
-select ok((select count(*) > 0 from public.get_public_appointment_slots('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')), 'anon reads occupied slots through RPC');
+select ok((select count(*) > 0 from public.get_public_appointment_slots_by_slug('tenant-alpha')), 'proxy reads occupied slots through slug RPC');
 select ok(position('client_name' in lower(pg_get_function_result('public.get_public_appointment_slots(uuid)'::regprocedure))) = 0 and position('client_phone' in lower(pg_get_function_result('public.get_public_appointment_slots(uuid)'::regprocedure))) = 0 and position('financial' in lower(pg_get_function_result('public.get_public_appointment_slots(uuid)'::regprocedure))) = 0, 'slots RPC result excludes personal and financial fields');
-select is((select count(*) from public.get_public_appointment_slots('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') where barbershop_id <> 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'), 0::bigint, 'slots RPC remains tenant scoped');
+select is((select count(*) from public.get_public_appointment_slots_by_slug('tenant-alpha') slots join public.barbers b on b.id = slots.barber_id where b.barbershop_id <> 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'), 0::bigint, 'slots RPC remains tenant scoped');
 
 reset role;
 

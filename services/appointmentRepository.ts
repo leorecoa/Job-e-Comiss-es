@@ -41,7 +41,6 @@ type DatabaseAppointmentInsert = Omit<
 type DatabasePublicAppointmentSlotRow = {
   barber_id: string | null;
   barber_name: string;
-  barbershop_id: string | null; // Added for multi-tenancy
   start_at: string;
   end_at: string;
   status: Appointment['status'];
@@ -66,8 +65,6 @@ type DatabaseWriteError = {
 };
 
 const ACTIVE_SLOT_UNIQUE_INDEX_NAME = 'appointments_unique_active_barbershop_barber_start';
-const PUBLIC_APPOINTMENT_RPC_NAME = 'create_public_appointment';
-
 const PUBLIC_APPOINTMENT_RPC_ERRORS: Record<string, string> = {
   PUBLIC_APPOINTMENT_INVALID_TENANT: 'Barbearia nao encontrada ou indisponivel.',
   PUBLIC_APPOINTMENT_INVALID_BARBER: 'Barbeiro invalido para esta barbearia.',
@@ -105,6 +102,24 @@ const mapPublicAppointmentRpcError = (error: DatabaseWriteError): Error => {
 
   const errorCode = Object.keys(PUBLIC_APPOINTMENT_RPC_ERRORS).find((code) => details.includes(code));
   return new Error(errorCode ? PUBLIC_APPOINTMENT_RPC_ERRORS[errorCode] : 'Nao foi possivel confirmar este horario. Tente novamente.');
+};
+
+const requestPublicBookingApi = async <T>(input: string, init?: RequestInit): Promise<T> => {
+  const response = await fetch(input, init);
+  const body = await response.json().catch(() => null) as { code?: string } | null;
+
+  if (!response.ok) {
+    const mapped = mapPublicAppointmentRpcError({ message: body?.code || 'PUBLIC_BOOKING_UNAVAILABLE' });
+    if (response.status === 429) {
+      const rateLimitError = new Error(PUBLIC_BOOKING_RATE_LIMIT_MESSAGE) as Error & { retryAfter?: number };
+      const retryAfter = Number(response.headers.get('retry-after'));
+      if (Number.isFinite(retryAfter) && retryAfter > 0) rateLimitError.retryAfter = retryAfter;
+      throw rateLimitError;
+    }
+    throw mapped;
+  }
+
+  return body as T;
 };
 
 export const mapAppointmentFromDb = (row: DatabaseAppointmentRow): Appointment => ({
@@ -246,29 +261,28 @@ export const listInternalAppointments = async (barbershopId?: string, barberId?:
   ));
 };
 
-export const listPublicAppointmentSlots = async (barbershopId: string): Promise<Appointment[]> => {
-  const scopedBarbershopId = barbershopId.trim();
+export const listPublicAppointmentSlots = async (barbershopSlug: string, barbershopId?: string): Promise<Appointment[]> => {
+  const scopedSlug = barbershopSlug.trim().toLowerCase();
 
-  if (!scopedBarbershopId) {
+  if (!scopedSlug) {
     throw new Error('Barbearia nao encontrada ou indisponivel.');
   }
 
   if (shouldUseLocalFallback) {
-    return readLocalAppointments().filter((appointment) => appointment.barbershopId === scopedBarbershopId);
+    return readLocalAppointments().filter((appointment) => !barbershopId || appointment.barbershopId === barbershopId);
   }
 
   assertOperationalSupabase();
 
-  const { data, error } = await supabase.rpc('get_public_appointment_slots', {
-    p_barbershop_id: scopedBarbershopId
-  });
+  const { slots } = await requestPublicBookingApi<{ slots: DatabasePublicAppointmentSlotRow[] }>(
+    `/api/public-booking/slots?slug=${encodeURIComponent(scopedSlug)}`,
+    { method: 'GET', headers: { accept: 'application/json' } }
+  );
 
-  if (error) throw error;
-
-  return ((data || []) as DatabasePublicAppointmentSlotRow[]).map((row, index) => ({
+  return (slots || []).map((row, index) => ({
     id: `slot-${row.barber_id || row.barber_name}-${row.start_at}-${index}`,
     barberId: row.barber_id || undefined,
-    barbershopId: row.barbershop_id || undefined,
+    barbershopId,
     clientName: 'Horario ocupado',
     clientPhone: '',
     barberName: row.barber_name,
@@ -342,7 +356,7 @@ export const createAppointment = async ( // Internal owner/barber appointment cr
     throw new Error(validationErrors[0]);
   }
 
-  const appointments = existingAppointments || await listPublicAppointmentSlots(appointment.barbershopId || '');
+  const appointments = existingAppointments || await listInternalAppointments();
 
   if (hasAppointmentConflict(appointments, appointment)) {
     throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
@@ -383,7 +397,7 @@ export const createPublicAppointment = async (
     throw new Error(validationErrors[0]);
   }
 
-  const appointments = existingAppointments || await listPublicAppointmentSlots(appointment.barbershopId || '');
+  const appointments = existingAppointments || [];
 
   if (hasAppointmentConflict(appointments, appointment)) {
     throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
@@ -395,25 +409,30 @@ export const createPublicAppointment = async (
   }
   assertOperationalSupabase();
 
-  const { data, error } = await supabase.rpc(PUBLIC_APPOINTMENT_RPC_NAME, {
-    p_barbershop_id: appointment.barbershopId,
-    p_barber_id: appointment.barberId,
-    p_service_id: appointment.serviceId,
-    p_client_name: appointment.clientName.trim(),
-    p_client_phone: appointment.clientPhone || '',
-    p_start_at: appointment.startAt,
-    p_end_at: appointment.endAt,
-    p_notes: appointment.notes?.trim() || null
-  });
-
-  if (error) {
+  let data: { id: string | null };
+  try {
+    data = await requestPublicBookingApi<{ id: string | null }>('/api/public-booking/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        barbershopId: appointment.barbershopId,
+        barberId: appointment.barberId,
+        serviceId: appointment.serviceId,
+        clientName: appointment.clientName.trim(),
+        clientPhone: appointment.clientPhone || '',
+        startAt: appointment.startAt,
+        endAt: appointment.endAt,
+        notes: appointment.notes?.trim() || null
+      })
+    });
+  } catch (error) {
     logOperationalError('appointment-repository:create-public', error);
-    throw mapPublicAppointmentRpcError(error);
+    throw error;
   }
 
   return {
     ...appointment,
-    id: typeof data === 'string' && data ? data : appointment.id
+    id: data.id || appointment.id
   };
 };
 
