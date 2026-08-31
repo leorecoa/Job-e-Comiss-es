@@ -154,6 +154,7 @@ const mockTenantValidatedInsert = () => {
 describe('public booking tenant isolation repositories', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn());
   });
 
   it('filters public barbers by active status and barbershop_id', async () => {
@@ -292,64 +293,49 @@ describe('public booking tenant isolation repositories', () => {
     expect(appointments[0]).not.toHaveProperty('serviceValue');
   });
 
-  it('public booking reads occupied slots through get_public_appointment_slots instead of appointments or the public view', async () => {
-    supabaseMock.rpc.mockResolvedValue({
-      data: [
+  it('public booking reads occupied slots through the same-origin proxy', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
+      slots: [
         {
-          barbershop_id: 'shop-leo',
           barber_id: 'barber-leo',
           barber_name: 'Leo',
           start_at: '2026-06-22T15:00:00.000Z',
           end_at: '2026-06-22T15:45:00.000Z',
           status: 'scheduled'
         }
-      ],
-      error: null
-    });
+      ]
+    }), { status: 200 }));
 
-    const slots = await listPublicAppointmentSlots('shop-leo');
+    const slots = await listPublicAppointmentSlots('leo-do-leo', 'shop-leo');
 
-    expect(supabaseMock.rpc).toHaveBeenCalledWith('get_public_appointment_slots', {
-      p_barbershop_id: 'shop-leo'
+    expect(fetch).toHaveBeenCalledWith('/api/public-booking/slots?slug=leo-do-leo', {
+      method: 'GET',
+      headers: { accept: 'application/json' }
     });
+    expect(supabaseMock.rpc).not.toHaveBeenCalledWith('get_public_appointment_slots', expect.anything());
     expect(supabaseMock.from).not.toHaveBeenCalledWith('public_appointment_slots');
     expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
     expect(slots).toHaveLength(1);
     expect(slots[0]?.barbershopId).toBe('shop-leo');
   });
 
-  it('rejects public slot lookup with an empty barbershopId before Supabase', async () => {
+  it('rejects public slot lookup with an empty slug before the proxy', async () => {
     await expect(listPublicAppointmentSlots('   ')).rejects.toThrow('Barbearia nao encontrada ou indisponivel.');
 
-    expect(supabaseMock.rpc).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
     expect(supabaseMock.from).not.toHaveBeenCalled();
   });
 
   it('public booking create flow does not perform SELECT on appointments', async () => {
-    supabaseMock.rpc.mockImplementation((name: string) => {
-      if (name === 'get_public_appointment_slots') return Promise.resolve({ data: [], error: null });
-      if (name === 'create_public_appointment') return Promise.resolve({ data: 'created-appointment-id', error: null });
-      throw new Error(`Unexpected RPC ${name}`);
-    });
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ id: 'created-appointment-id' }), { status: 201 }));
 
-    await expect(createPublicAppointment(makeAppointment())).resolves.toMatchObject({
+    await expect(createPublicAppointment(makeAppointment(), [])).resolves.toMatchObject({
       id: 'created-appointment-id',
       barbershopId: 'shop-leo'
     });
 
-    expect(supabaseMock.rpc).toHaveBeenCalledWith('get_public_appointment_slots', {
-      p_barbershop_id: 'shop-leo'
-    });
-    expect(supabaseMock.rpc).toHaveBeenCalledWith('create_public_appointment', {
-      p_barbershop_id: 'shop-leo',
-      p_barber_id: 'barber-leo',
-      p_service_id: 'service-leo',
-      p_client_name: 'Cliente Leo',
-      p_client_phone: '85999990000',
-      p_start_at: '2026-06-22T15:00:00.000Z',
-      p_end_at: '2026-06-22T15:45:00.000Z',
-      p_notes: null
-    });
+    expect(fetch).toHaveBeenCalledWith('/api/public-booking/create', expect.objectContaining({ method: 'POST' }));
+    expect(supabaseMock.rpc).not.toHaveBeenCalledWith('create_public_appointment', expect.anything());
     expect(supabaseMock.from).not.toHaveBeenCalledWith('public_appointment_slots');
     expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
   });
@@ -365,24 +351,34 @@ describe('public booking tenant isolation repositories', () => {
     ['PUBLIC_APPOINTMENT_RATE_LIMITED', PUBLIC_BOOKING_RATE_LIMIT_MESSAGE],
     ['PUBLIC_APPOINTMENT_ACTIVE_LIMIT', PUBLIC_BOOKING_ACTIVE_LIMIT_MESSAGE]
   ])('maps tenant-scoped RPC error %s without direct appointment INSERT', async (rpcCode, expectedMessage) => {
-    supabaseMock.rpc.mockResolvedValue({ data: null, error: { code: 'P0001', message: rpcCode } });
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: rpcCode }), { status: 400 }));
 
     await expect(createPublicAppointment(makeAppointment(), [])).rejects.toThrow(expectedMessage);
 
-    expect(supabaseMock.rpc).toHaveBeenCalledWith('create_public_appointment', expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith('/api/public-booking/create', expect.objectContaining({ method: 'POST' }));
     expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
   });
 
   it('maps an RPC slot race to the friendly public conflict message', async () => {
-    supabaseMock.rpc.mockResolvedValue({
-      data: null,
-      error: { code: 'P0001', message: 'PUBLIC_APPOINTMENT_SLOT_CONFLICT' }
-    });
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'PUBLIC_APPOINTMENT_SLOT_CONFLICT' }), { status: 409 }));
 
     await expect(createPublicAppointment(makeAppointment(), [])).rejects.toThrow(
       PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
     );
     expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
+  });
+
+  it('preserves a WAF Retry-After hint without retrying the creation request', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'RATE_LIMITED' }), {
+      status: 429,
+      headers: { 'retry-after': '600' }
+    }));
+
+    const error = await createPublicAppointment(makeAppointment(), []).catch((caught) => caught) as Error & { retryAfter?: number };
+
+    expect(error.message).toBe(PUBLIC_BOOKING_RATE_LIMIT_MESSAGE);
+    expect(error.retryAfter).toBe(600);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('creates the appointment with the current barbershop_id after validating barber and service tenant ownership', async () => {

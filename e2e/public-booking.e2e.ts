@@ -189,6 +189,36 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
   const appointmentRequests: CapturedRequest[] = [];
   const appointmentReadRequests: CapturedRequest[] = [];
 
+  await page.route('**/api/public-booking/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (url.pathname === '/api/public-booking/slots') {
+      slotRequests.push({ method: request.method(), url: request.url(), body: null });
+      const shop = state.barbershops.find((candidate) => candidate.slug === url.searchParams.get('slug'));
+      const slots = state.slots
+        .filter((slot) => slot.barbershop_id === shop?.id)
+        .map(({ barbershop_id: _barbershopId, ...slot }) => slot);
+      await fulfillJson(route, 200, { slots });
+      return;
+    }
+
+    if (url.pathname === '/api/public-booking/create') {
+      appointmentRequests.push({ method: request.method(), url: request.url(), body: parseRequestBody(route) });
+      if (state.appointmentInsertDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, state.appointmentInsertDelayMs));
+      }
+      const configuredBody = state.appointmentInsertResponse.body as { message?: string } | null;
+      const body = state.appointmentInsertResponse.status >= 400
+        ? { code: configuredBody?.message || 'PUBLIC_BOOKING_UNAVAILABLE' }
+        : { id: 'created-public-appointment' };
+      await fulfillJson(route, state.appointmentInsertResponse.status, body);
+      return;
+    }
+
+    await fulfillJson(route, 404, { code: 'NOT_FOUND' });
+  });
+
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -353,8 +383,8 @@ test.describe('public booking /book/:slug', () => {
     expect(network.servicesRequests.some((url) => url.includes(`barbershop_id=eq.${LEO_BARBERSHOP_ID}`))).toBeTruthy();
     expect(network.servicesRequests.some((url) => url.includes('active=eq.true'))).toBeTruthy();
     expect(network.slotRequests.some((request) => (
-      request.method === 'POST'
-      && (request.body as { p_barbershop_id?: string } | null)?.p_barbershop_id === LEO_BARBERSHOP_ID
+      request.method === 'GET'
+      && request.url.includes('/api/public-booking/slots?slug=leo-do-leo')
     ))).toBeTruthy();
     expect(network.appointmentReadRequests).toHaveLength(0);
   });
@@ -386,13 +416,13 @@ test.describe('public booking /book/:slug', () => {
     const payload = Array.isArray(body) ? body[0] : body as Record<string, unknown>;
 
     expect(method).toBe('POST');
-    expect(url).toContain('/rpc/create_public_appointment');
+    expect(url).toContain('/api/public-booking/create');
     expect(payload).toMatchObject({
-      p_barbershop_id: LEO_BARBERSHOP_ID,
-      p_barber_id: LEO_BARBER_ID,
-      p_service_id: LEO_SERVICE_ID,
-      p_client_name: 'pedro',
-      p_client_phone: '81987324097'
+      barbershopId: LEO_BARBERSHOP_ID,
+      barberId: LEO_BARBER_ID,
+      serviceId: LEO_SERVICE_ID,
+      clientName: 'pedro',
+      clientPhone: '81987324097'
     });
     expect(payload).not.toHaveProperty('barber_name');
     expect(payload).not.toHaveProperty('service_type');
@@ -418,13 +448,13 @@ test.describe('public booking /book/:slug', () => {
     expect(network.appointmentRequests).toHaveLength(1);
   });
 
-  for (const [code, message] of [
-    ['PUBLIC_APPOINTMENT_RATE_LIMITED', /Aguarde um minuto antes de tentar agendar novamente/i],
-    ['PUBLIC_APPOINTMENT_ACTIVE_LIMIT', /já possui três agendamentos futuros ativos/i]
+  for (const [code, status, message] of [
+    ['PUBLIC_APPOINTMENT_RATE_LIMITED', 429, /Aguarde um minuto antes de tentar agendar novamente/i],
+    ['PUBLIC_APPOINTMENT_ACTIVE_LIMIT', 409, /já possui três agendamentos futuros ativos/i]
   ] as const) {
     test(`shows friendly public abuse error ${code} and restores submit`, async ({ page }) => {
       const network = await installSupabaseMocks(page, {
-        appointmentInsertResponse: { status: 429, body: { code: 'P0001', message: code } }
+        appointmentInsertResponse: { status, body: { code: 'P0001', message: code } }
       });
 
       await page.goto('/book/leo-do-leo');
