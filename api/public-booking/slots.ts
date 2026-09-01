@@ -16,7 +16,7 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ code: 'METHOD_NOT_ALLOWED' }, 405, 'no-store');
   }
 
-  const slug = new URL(request.url).searchParams.get('slug')?.trim().toLowerCase() || '';
+  const slug = new URL(request.url, 'http://localhost').searchParams.get('slug')?.trim().toLowerCase() || '';
   if (slug.length < 3 || slug.length > 80 || !SLUG_PATTERN.test(slug)) {
     return jsonResponse({ code: 'PUBLIC_APPOINTMENT_INVALID_TENANT' }, 400, 'no-store');
   }
