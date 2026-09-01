@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import createHandler from '../../api/public-booking/create';
-import slotsHandler from '../../api/public-booking/slots';
+import { POST as createHandler } from '../../api/public-booking/create';
+import { GET as slotsHandler } from '../../api/public-booking/slots';
 
 const validPayload = {
   barbershopId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',

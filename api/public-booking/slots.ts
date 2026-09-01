@@ -11,7 +11,7 @@ type SlotRow = {
   status: string;
 };
 
-export default async function handler(request: Request): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   if (request.method !== 'GET') {
     return jsonResponse({ code: 'METHOD_NOT_ALLOWED' }, 405, 'no-store');
   }

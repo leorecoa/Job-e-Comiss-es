@@ -32,7 +32,7 @@ const isValidPayload = (value: unknown): value is CreatePayload => {
     && (payload.notes === undefined || payload.notes === null || (typeof payload.notes === 'string' && payload.notes.length <= 500));
 };
 
-export default async function handler(request: Request): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
     return jsonResponse({ code: 'METHOD_NOT_ALLOWED' }, 405, 'no-store');
   }
