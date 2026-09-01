@@ -92,7 +92,10 @@ describe('public booking Vercel proxy', () => {
       end_at: validPayload.endAt,
       status: 'scheduled'
     }]), { status: 200 }));
-    const response = await slotsHandler(new Request('https://example.test/api/public-booking/slots?slug=barbearia-alpha'));
+    const response = await slotsHandler({
+      method: 'GET',
+      url: '/api/public-booking/slots?slug=barbearia-alpha'
+    } as Request);
     const body = await response.json() as { slots: Array<Record<string, unknown>> };
 
     expect(response.status).toBe(200);
