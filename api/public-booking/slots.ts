@@ -1,4 +1,4 @@
-import { callBookingRpc, jsonResponse } from './_shared';
+import { callBookingRpc, jsonResponse } from './_shared.js';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SLOT_CACHE_CONTROL = 'public, s-maxage=15, stale-while-revalidate=30';
