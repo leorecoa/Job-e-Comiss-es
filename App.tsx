@@ -39,7 +39,6 @@ import {
   DollarSign, 
   Settings, 
   Trash2, 
-  Plus, 
   MinusCircle, 
   TrendingUp, 
   Download, 
@@ -1744,7 +1743,7 @@ const App: React.FC = () => {
     {
         targetId: 'tour-actions',
         title: 'Acoes rapidas',
-        content: 'Use esta area para criar atendimento, acessar a agenda e abrir funcoes operacionais.',
+        content: 'Use esta area para agendar, registrar vales e abrir funcoes operacionais.',
         position: 'bottom'
     },
     {
@@ -1956,9 +1955,6 @@ const App: React.FC = () => {
                     <button onClick={handleOpenAppointment} className="ui-button ui-button-secondary flex-1 md:flex-none">
                         <Calendar size={18} /> Agendar
                     </button>
-                     <button id="tour-new-client-btn" onClick={handleOpenAddClient} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-black px-4 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-gold-500/20 active:scale-95">
-                        <Plus size={18} /> Atendimento
-                     </button>
                     <button onClick={() => setValeModalOpen(true)} className="ui-button ui-button-secondary flex-1 md:flex-none">
                         <MinusCircle size={18} /> Vale
                     </button>
@@ -2064,7 +2060,7 @@ const App: React.FC = () => {
                               <p className="mx-auto mt-2 max-w-md text-sm">
                                 Quando voce registrar um atendimento manual ou concluir agendamentos, o historico de clientes aparecera aqui.
                               </p>
-                              <p className="mt-3 text-xs font-bold uppercase tracking-widest text-gold-300">Use o botao Atendimento para lancar o primeiro registro.</p>
+                              <p className="mt-3 text-xs font-bold uppercase tracking-widest text-gold-300">Use o botao Agendar para criar o primeiro agendamento.</p>
                             </div>
                            ) : (
                                 <>
