@@ -449,6 +449,16 @@ test.describe('barber dashboard e2e', () => {
     expect(response.service_value).toBeNull();
     expect(response.commission_rate).toBeNull();
     expect(response.financial_record_id).toBeNull();
+
+    await page.reload();
+
+    await expect(page.getByRole('heading', { name: /Leo Barber/i })).toBeVisible();
+    await expect(page.getByText(/Cliente do Leo/i)).toBeVisible();
+    await expect(page.getByText(/Cliente do Outro/i)).toHaveCount(0);
+    await expect(page.getByText(/Cliente Outro Tenant/i)).toHaveCount(0);
+    expect(network.signInRequests).toHaveLength(1);
+    expect(network.appointmentReadRequests).toHaveLength(0);
+    expect(network.internalAppointmentResponses).toHaveLength(2);
   });
 
   test('barber creates a manual appointment with barbershopId and barberId from the authenticated session', async ({ page }) => {
