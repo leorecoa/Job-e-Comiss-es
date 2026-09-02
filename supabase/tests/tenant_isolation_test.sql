@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(230);
+select plan(232);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -197,6 +197,8 @@ select ok((select service_value is null from public.get_internal_appointments() 
 select ok((select commission_rate is null from public.get_internal_appointments() where id = '60000000-0000-4000-8000-000000000001'), 'barber contract excludes commission rate');
 select ok((select financial_record_id is null from public.get_internal_appointments() where id = '60000000-0000-4000-8000-000000000001'), 'barber contract excludes financial record id');
 select throws_ok($test$update public.appointments set notes = 'Own update' where id = '60000000-0000-4000-8000-000000000001'$test$, '42501'::char(5), null, 'Barber A cannot update own appointment');
+select throws_ok($test$select * from public.update_owner_appointment('60000000-0000-4000-8000-000000000001', 'Client Alpha Changed', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, null, date_trunc('minute', now()) + interval '7 days', date_trunc('minute', now()) + interval '7 days 30 minutes', 'cancelled', 'Barber RPC abuse')$test$, 'P0001'::char(5), 'OWNER_APPOINTMENT_UPDATE_FORBIDDEN', 'barber cannot execute owner appointment update RPC');
+select is((select status from public.get_internal_appointments() where id = '60000000-0000-4000-8000-000000000001'), 'confirmed', 'barber RPC denial leaves own appointment unchanged');
 select throws_ok($test$update public.appointments set notes = 'Blocked' where id = '60000000-0000-4000-8000-000000000002'$test$, '42501'::char(5), null, 'Barber A cannot update Tenant B appointment');
 select throws_ok($test$update public.appointments set notes = 'Blocked' where id = '60000000-0000-4000-8000-000000000003'$test$, '42501'::char(5), null, 'Barber A cannot update another barber appointment');
 select is((select count(*) from public.profiles where id = 'aaaa0000-0000-4000-8000-000000000002'), 1::bigint, 'Barber A reads own profile');
