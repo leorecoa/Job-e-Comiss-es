@@ -268,6 +268,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             />
           </div>
 
+          {!manageCatalogRemotely && (
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="settings-price-cut" className="ui-label mb-1 block text-xs">
@@ -333,6 +334,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
             </div>
           </div>
+          )}
 
           {manageCatalogRemotely ? (
             <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
@@ -506,6 +508,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
+          {!manageCatalogRemotely && (
           <div className="mt-2">
             <div>
               <label htmlFor="settings-commission-rate" className="ui-label mb-1 block">
@@ -528,6 +531,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               A comissão se aplica estritamente a serviços. Produtos não geram comissão.
             </p>
           </div>
+          )}
 
           {/* Backup & Security Section */}
           <div className="mt-6 border-t border-border pt-6">
