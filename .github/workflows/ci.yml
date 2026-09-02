@@ -32,3 +32,45 @@ jobs:
 
       - name: Audit dependencies
         run: npm audit --audit-level=moderate
+
+  playwright-critical:
+    name: Critical Playwright flows
+    runs-on: ubuntu-latest
+    needs: check
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run critical Playwright flows
+        run: >-
+          npx playwright test
+          e2e/auth-callback.e2e.ts
+          e2e/owner-operational.e2e.ts
+          e2e/public-booking.e2e.ts
+          e2e/barber-dashboard.e2e.ts
+          --reporter="line,html"
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-critical-failure
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
