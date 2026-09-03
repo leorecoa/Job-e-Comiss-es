@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/react';
 import type { ErrorEvent, EventHint } from '@sentry/react';
+import { sanitizeTechnicalCode } from './operationalError';
 
 type MonitoringConfig = {
   dsn?: string;
@@ -13,6 +14,9 @@ type ErrorLike = {
   message?: unknown;
   details?: unknown;
   hint?: unknown;
+  publicCode?: unknown;
+  providerCode?: unknown;
+  httpStatus?: unknown;
 };
 
 const PUBLIC_CODE_PATTERN = /(PUBLIC_APPOINTMENT_[A-Z_]+|FINANCIAL_COMPLETION_[A-Z_]+|OWNER_ONBOARDING_[A-Z_]+|APPOINTMENT_ACTIVE_SLOT_CONFLICT)/;
@@ -41,7 +45,7 @@ export const sanitizeSentryEvent = (event: ErrorEvent, _hint?: EventHint): Error
     ...value,
     value: 'Unexpected application error'
   }));
-  const allowedTagNames = new Set(['operation', 'public_code', 'http_status', 'route']);
+  const allowedTagNames = new Set(['operation', 'public_code', 'provider_code', 'http_status', 'route']);
   const tags = Object.fromEntries(
     Object.entries(event.tags || {})
       .filter(([key]) => allowedTagNames.has(key))
@@ -86,7 +90,7 @@ export const initializeObservability = (config: MonitoringConfig = getMonitoring
 
 const getPublicCode = (error: unknown): string | undefined => {
   const errorLike = error as ErrorLike;
-  const searchable = [errorLike?.code, errorLike?.message, errorLike?.details, errorLike?.hint]
+  const searchable = [errorLike?.publicCode, errorLike?.code, errorLike?.message, errorLike?.details, errorLike?.hint]
     .filter((value): value is string => typeof value === 'string')
     .join(' ');
   return searchable.match(PUBLIC_CODE_PATTERN)?.[1];
@@ -129,13 +133,16 @@ export const reportUnexpectedError = (operation: string, error: unknown): string
   const correlationId = createCorrelationId();
   const errorLike = error as ErrorLike;
   const publicCode = getPublicCode(error);
-  const status = typeof errorLike?.status === 'number' ? String(errorLike.status) : undefined;
+  const providerCode = sanitizeTechnicalCode(errorLike?.providerCode);
+  const statusValue = typeof errorLike?.httpStatus === 'number' ? errorLike.httpStatus : errorLike?.status;
+  const status = typeof statusValue === 'number' ? String(statusValue) : undefined;
 
   try {
     Sentry.withScope((scope) => {
       scope.setTag('operation', operation);
       scope.setTag('route', sanitizeRoute());
       if (publicCode) scope.setTag('public_code', publicCode);
+      if (providerCode) scope.setTag('provider_code', providerCode);
       if (status) scope.setTag('http_status', status);
       scope.setExtra('correlation_id', correlationId);
       Sentry.captureException(new Error('Unexpected operational error'));
