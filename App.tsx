@@ -29,6 +29,7 @@ import type { TourStep } from './components/tourUtils';
 import { isProductionWithoutSupabase, isSupabaseConfigured, PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE, shouldUseLocalFallback } from './lib/supabase';
 import { createAppointment as createAppointmentRecord, createPublicAppointment, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { completeAppointmentWithFinancialRecord, listFinancialRecords, mapFinancialRecordToClient } from './services/financialRecordRepository';
+import { resolveClientEditTarget } from './clientEditing';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
 import { linkBarberProfileByEmail } from './services/profileLinkingRepository';
 import { createService, listServices, removeService, updateService } from './services/serviceRepository';
@@ -354,6 +355,7 @@ const App: React.FC = () => {
   const [isValeModalOpen, setValeModalOpen] = useState(false);
   const [isAppointmentModalOpen, setAppointmentModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [isAppointmentReadOnly, setAppointmentReadOnly] = useState(false);
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
   const [isReportModalOpen, setReportModalOpen] = useState(false);
   const [isAppointmentsLoading, setAppointmentsLoading] = useState(false);
@@ -1342,6 +1344,7 @@ const App: React.FC = () => {
       setSelectedScheduleBarber(savedAppointment.barberName);
       setAppointmentModalOpen(false);
       setEditingAppointment(null);
+      setAppointmentReadOnly(false);
       addToast(editingId ? 'Agendamento atualizado!' : 'Agendamento criado!', 'success');
     } catch (error) {
       logOperationalError('dashboard:save-appointment', error);
@@ -1468,6 +1471,7 @@ const App: React.FC = () => {
   };
 
   const handleEditAppointment = (appointment: Appointment) => {
+    setAppointmentReadOnly(false);
     setEditingAppointment(appointment);
     setAppointmentModalOpen(true);
   };
@@ -1553,6 +1557,20 @@ const App: React.FC = () => {
   };
 
   const handleEditClient = (client: Client) => {
+    const target = resolveClientEditTarget(client, appointments);
+    if (target.type === 'missing-appointment') {
+      addToast('Nao foi possivel localizar o agendamento deste atendimento.', 'error');
+      return;
+    }
+
+    if (target.type === 'appointment') {
+      setEditingClient(null);
+      setAppointmentReadOnly(target.readOnly);
+      setEditingAppointment(target.appointment);
+      setAppointmentModalOpen(true);
+      return;
+    }
+
     setEditingClient(client);
     setClientModalOpen(true);
   };
@@ -2109,6 +2127,7 @@ const App: React.FC = () => {
                                                 <div className="flex gap-3 border-t border-border pt-3">
                                                     <button 
                                                         onClick={() => handleEditClient(c)} 
+                                                        aria-label={`Editar atendimento de ${c.name}`}
                                                         className="flex-1 flex items-center justify-center gap-2 bg-blue-500/10 text-blue-400 py-2.5 rounded-lg text-sm font-bold active:bg-blue-500/20 transition-colors"
                                                     >
                                                         <Pencil size={16}/> Editar
@@ -2155,7 +2174,7 @@ const App: React.FC = () => {
                                                         </td>
                                                         <td className="p-4 text-right font-bold text-foreground whitespace-nowrap">{formatCurrency(c.totalValue)}</td>
                                                         <td className="p-4 flex justify-end gap-2">
-                                                            <button onClick={() => handleEditClient(c)} className="text-blue-400 hover:bg-blue-500/10 p-2 rounded"><Pencil size={16}/></button>
+                                                            <button onClick={() => handleEditClient(c)} aria-label={`Editar atendimento de ${c.name}`} className="text-blue-400 hover:bg-blue-500/10 p-2 rounded"><Pencil size={16}/></button>
                                                             <button onClick={() => handleDeleteClient(c.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>
                                                         </td>
                                                     </tr>
@@ -2281,13 +2300,14 @@ const App: React.FC = () => {
         {isAppointmentModalOpen && (
           <AppointmentModal
             isOpen={isAppointmentModalOpen}
-            onClose={() => { setAppointmentModalOpen(false); setEditingAppointment(null); }}
+            onClose={() => { setAppointmentModalOpen(false); setEditingAppointment(null); setAppointmentReadOnly(false); }}
             onSave={handleSaveAppointment}
             settings={settings}
             selectedDate={selectedDate}
             selectedBarber={selectedScheduleBarber}
             initialData={editingAppointment}
             createId={generateId}
+            readOnly={isAppointmentReadOnly}
           />
         )}
       </React.Suspense>

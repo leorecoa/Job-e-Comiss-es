@@ -308,6 +308,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
   const appointmentReadRequests: string[] = [];
   const rpcRequests: CapturedRequest[] = [];
   const completionRequests: CapturedRequest[] = [];
+  const appointmentUpdateRequests: CapturedRequest[] = [];
   const onboardingRequests: CapturedRequest[] = [];
 
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
@@ -504,6 +505,23 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
       return;
     }
 
+    if (url.pathname === '/rest/v1/rpc/update_owner_appointment') {
+      const body = parseRequestBody(route) as Record<string, unknown>;
+      appointmentUpdateRequests.push({ method: request.method(), url: request.url(), body });
+      const appointment = appointments.find((item) => item.id === body.p_appointment_id);
+      if (!appointment) {
+        await fulfillJson(route, 404, { message: 'OWNER_APPOINTMENT_NOT_FOUND' });
+        return;
+      }
+
+      appointment.client_name = String(body.p_client_name);
+      appointment.start_at = String(body.p_start_at);
+      appointment.end_at = String(body.p_end_at);
+      appointment.updated_at = new Date().toISOString();
+      await fulfillJson(route, 200, [{ ...appointment, viewer_role: 'owner' }]);
+      return;
+    }
+
     if (url.pathname === '/rest/v1/rpc/link_barber_profile_by_email') {
       rpcRequests.push({
         method: request.method(),
@@ -558,6 +576,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
     appointmentReadRequests,
     rpcRequests,
     completionRequests,
+    appointmentUpdateRequests,
     onboardingRequests
   };
 };
@@ -646,6 +665,15 @@ test.describe('owner operational dashboard e2e', () => {
 
     await page.getByRole('button', { name: 'Clientes' }).click();
     await expect(page.getByRole('cell', { name: /Cliente Leo/ }).first()).toBeVisible();
+    await page.getByRole('button', { name: 'Editar atendimento de Cliente Leo' }).click();
+    await expect(page.getByRole('heading', { name: 'Detalhes do agendamento' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Cliente', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Salvar agendamento' })).toHaveCount(0);
+    await page.getByText(/Os dados ficam somente para consulta/).locator('..').evaluate((form) => (
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    ));
+    expect(network.appointmentUpdateRequests).toHaveLength(0);
+    await page.getByRole('button', { name: 'Fechar', exact: true }).click();
     await page.reload();
     await page.getByRole('button', { name: 'Clientes' }).click();
     await expect(page.getByRole('cell', { name: /Cliente Leo/ }).first()).toBeVisible();
@@ -665,6 +693,51 @@ test.describe('owner operational dashboard e2e', () => {
     await expect(failedPage.getByRole('cell', { name: /Cliente Leo/ })).toHaveCount(0);
     expect(failedNetwork.completionRequests).toHaveLength(1);
     await failedContext.close();
+  });
+
+  test('linked client uses the modern appointment update flow', async ({ page }) => {
+    const today = getTodayString();
+    const linkedAppointment = makeAppointmentRow({
+      id: 'appointment-linked-client',
+      clientName: 'Cliente Editavel',
+      barberId: OWNER_BARBER_ID,
+      barberName: 'Leo Barber',
+      barbershopId: OWNER_BARBERSHOP_ID,
+      date: today,
+      time: '11:00'
+    });
+    const network = await installOwnerSupabaseMocks(page, {
+      appointments: [linkedAppointment],
+      financialRecords: [{
+        id: 'financial-linked-client',
+        appointment_id: linkedAppointment.id,
+        barbershop_id: OWNER_BARBERSHOP_ID,
+        barber_id: OWNER_BARBER_ID,
+        service_id: OWNER_SERVICE_ID,
+        service_type: 'Corte Leo',
+        service_value: 60,
+        commission_rate: 50,
+        commission_value: 30,
+        completed_at: linkedAppointment.start_at,
+        created_at: linkedAppointment.created_at
+      }]
+    });
+
+    await signInAsOwner(page);
+    await page.getByRole('button', { name: 'Clientes' }).click();
+    await page.getByRole('button', { name: 'Editar atendimento de Cliente Editavel' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Editar agendamento' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Cliente', exact: true })).toHaveValue('Cliente Editavel');
+    await page.getByRole('textbox', { name: 'Cliente', exact: true }).fill('Cliente Atualizado');
+    await page.getByRole('button', { name: 'Salvar agendamento' }).click();
+
+    await expect.poll(() => network.appointmentUpdateRequests.length).toBe(1);
+    expect(network.appointmentUpdateRequests[0].body).toMatchObject({
+      p_appointment_id: linkedAppointment.id,
+      p_client_name: 'Cliente Atualizado'
+    });
+    await expect(page.getByText('Agendamento atualizado!')).toBeVisible();
   });
 
   test('owner sees only own tenant data, operational checklist, and public booking link', async ({ page }) => {

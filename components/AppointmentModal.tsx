@@ -18,6 +18,7 @@ interface AppointmentModalProps {
   selectedBarber: string;
   initialData?: Appointment | null;
   createId: () => string;
+  readOnly?: boolean;
 }
 
 const normalizeBarberOptions = (
@@ -52,7 +53,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   selectedDate,
   selectedBarber,
   initialData,
-  createId
+  createId,
+  readOnly = false
 }) => {
   const fallbackService = settings.services[0];
 
@@ -131,6 +133,9 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (readOnly) {
+      return;
+    }
 
     const now = new Date().toISOString();
     const startAt = buildLocalDateTimeIso(dateInput, timeInput);
@@ -172,7 +177,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
       <div className="ui-modal rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="ui-modal-header flex justify-between items-center p-6">
           <h2 className="text-xl font-bold font-display">
-            {initialData ? 'Editar agendamento' : 'Novo agendamento'}
+            {readOnly ? 'Detalhes do agendamento' : initialData ? 'Editar agendamento' : 'Novo agendamento'}
           </h2>
 
           <button type="button" onClick={onClose} className="ui-modal-close">
@@ -181,6 +186,11 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {readOnly && (
+            <p className="ui-owner-status-info rounded-lg p-3 text-sm">
+              Este atendimento ja foi concluido. Os dados ficam somente para consulta para preservar o lancamento financeiro.
+            </p>
+          )}
           <div>
             <label htmlFor="appointment-client-name" className="ui-label block mb-1.5">
               Cliente
@@ -189,6 +199,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               id="appointment-client-name"
               name="clientName"
               required
+              disabled={readOnly}
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               className="ui-input"
@@ -203,6 +214,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               id="appointment-client-phone"
               name="clientPhone"
               type="tel"
+              disabled={readOnly}
               value={clientPhone}
               onChange={(e) => setClientPhone(e.target.value)}
               placeholder="DDD + numero"
@@ -220,6 +232,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 name="date"
                 type="date"
                 required
+                disabled={readOnly}
                 value={dateInput}
                 onChange={(e) => setDateInput(e.target.value)}
                 className="ui-input"
@@ -235,6 +248,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 name="time"
                 type="time"
                 required
+                disabled={readOnly}
                 value={timeInput}
                 onChange={(e) => setTimeInput(e.target.value)}
                 className="ui-input"
@@ -250,6 +264,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               id="appointment-barber"
               name="barberName"
               required
+              disabled={readOnly}
               value={barberName}
               onChange={(e) => setBarberName(e.target.value)}
               className="ui-input"
@@ -271,6 +286,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 id="appointment-service"
                 name="serviceName"
                 required
+                disabled={readOnly}
                 value={serviceName}
                 onChange={(e) => handleServiceChange(e.target.value)}
                 className="ui-input"
@@ -293,6 +309,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 type="number"
                 min="1"
                 required
+                disabled={readOnly}
                 value={durationMinutes}
                 onChange={(e) => setDurationMinutes(e.target.value)}
                 className="ui-input"
@@ -311,6 +328,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               min="0"
               step="0.01"
               required
+              disabled={readOnly}
               value={serviceValue}
               onChange={(e) => setServiceValue(e.target.value)}
               className="ui-input"
@@ -324,6 +342,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
             <textarea
               id="appointment-notes"
               name="notes"
+              disabled={readOnly}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
@@ -331,13 +350,19 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
             />
           </div>
 
-          <button
-            type="submit"
-            className="ui-button ui-button-primary w-full"
-          >
-            <Save size={20} />
-            Salvar agendamento
-          </button>
+          {readOnly ? (
+            <button type="button" onClick={onClose} className="ui-button ui-button-secondary w-full">
+              Fechar
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="ui-button ui-button-primary w-full"
+            >
+              <Save size={20} />
+              Salvar agendamento
+            </button>
+          )}
         </form>
       </div>
     </div>
