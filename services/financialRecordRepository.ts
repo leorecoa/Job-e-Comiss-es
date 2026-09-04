@@ -1,5 +1,6 @@
 import { assertOperationalSupabase, supabase } from '../lib/supabase';
 import { Appointment, Client, ClientType, ServiceType } from '../types';
+import { OperationalError, sanitizeTechnicalCode } from '../utils/operationalError';
 
 export type FinancialRecordRow = {
   id: string;
@@ -67,19 +68,43 @@ export const completeAppointmentWithFinancialRecord = async (
 ): Promise<FinancialCompletionResult> => {
   assertOperationalSupabase();
 
-  const { data, error } = await supabase.rpc('complete_appointment_with_financial_record', {
-    p_appointment_id: appointmentId
-  });
+  let response;
+  try {
+    response = await supabase.rpc('complete_appointment_with_financial_record', {
+      p_appointment_id: appointmentId
+    });
+  } catch {
+    throw new OperationalError('Nao foi possivel conectar ao Supabase para concluir o agendamento.', {
+      providerCode: 'NETWORK_ERROR'
+    });
+  }
+
+  const { data, error, status } = response;
 
   if (error) {
     const details = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
-    const code = Object.keys(FINANCIAL_COMPLETION_ERRORS).find((candidate) => details.includes(candidate));
-    throw new Error(code ? FINANCIAL_COMPLETION_ERRORS[code] : 'Nao foi possivel concluir o agendamento e salvar o financeiro. Tente novamente.');
+    const publicCode = Object.keys(FINANCIAL_COMPLETION_ERRORS).find((candidate) => details.includes(candidate));
+    const isNetworkError = /failed to fetch|fetcherror|network|timeout/i.test(details);
+    throw new OperationalError(
+      publicCode
+        ? FINANCIAL_COMPLETION_ERRORS[publicCode]
+        : isNetworkError
+          ? 'Nao foi possivel conectar ao Supabase para concluir o agendamento.'
+        : 'Nao foi possivel concluir o agendamento e salvar o financeiro. Tente novamente.',
+      {
+        publicCode,
+        providerCode: isNetworkError ? 'NETWORK_ERROR' : sanitizeTechnicalCode(error.code),
+        httpStatus: status
+      }
+    );
   }
 
   const row = Array.isArray(data) ? data[0] : data;
   if (!row?.appointment_id || !row?.financial_record_id) {
-    throw new Error('O Supabase nao confirmou a conclusao financeira. Tente novamente.');
+    throw new OperationalError('O Supabase nao confirmou a conclusao financeira. Tente novamente.', {
+      providerCode: 'INVALID_RPC_RESPONSE',
+      httpStatus: status
+    });
   }
 
   return {

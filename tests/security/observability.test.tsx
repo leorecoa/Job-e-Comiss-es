@@ -2,18 +2,20 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const sentry = vi.hoisted(() => ({
-  init: vi.fn(),
-  captureException: vi.fn(),
-  withScope: vi.fn((callback: (scope: { setTag: ReturnType<typeof vi.fn>; setExtra: ReturnType<typeof vi.fn> }) => void) => callback({
-    setTag: vi.fn(),
-    setExtra: vi.fn()
-  }))
-}));
+const sentry = vi.hoisted(() => {
+  const scope = { setTag: vi.fn(), setExtra: vi.fn() };
+  return {
+    init: vi.fn(),
+    captureException: vi.fn(),
+    scope,
+    withScope: vi.fn((callback: (currentScope: typeof scope) => void) => callback(scope))
+  };
+});
 
 vi.mock('@sentry/react', () => sentry);
 
 import { AppErrorBoundary } from '../../components/AppErrorBoundary';
+import { OperationalError } from '../../utils/operationalError';
 import {
   initializeObservability,
   isExpectedOperationalError,
@@ -157,6 +159,35 @@ describe('privacy-safe production observability', () => {
     }
 
     expect(sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('does not report an expected financial completion error', () => {
+    initializeObservability({ dsn: 'https://public@example.invalid/1' });
+    const error = new OperationalError('Voce nao tem permissao para concluir este agendamento.', {
+      publicCode: 'FINANCIAL_COMPLETION_FORBIDDEN',
+      providerCode: 'P0001',
+      httpStatus: 403
+    });
+
+    expect(isExpectedOperationalError(error)).toBe(true);
+    expect(reportUnexpectedError('dashboard:complete-appointment', error)).toBeUndefined();
+    expect(sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('reports only allowlisted metadata for an unexpected provider error', () => {
+    initializeObservability({ dsn: 'https://public@example.invalid/1' });
+    const error = new OperationalError('Friendly fallback without provider details', {
+      providerCode: '23514',
+      httpStatus: 500
+    });
+
+    const correlationId = reportUnexpectedError('dashboard:complete-appointment', error);
+
+    expect(sentry.scope.setTag).toHaveBeenCalledWith('operation', 'dashboard:complete-appointment');
+    expect(sentry.scope.setTag).toHaveBeenCalledWith('provider_code', '23514');
+    expect(sentry.scope.setTag).toHaveBeenCalledWith('http_status', '500');
+    expect(sentry.scope.setExtra).toHaveBeenCalledWith('correlation_id', correlationId);
+    expect(sentry.captureException).toHaveBeenCalledWith(expect.objectContaining({ message: 'Unexpected operational error' }));
   });
 
   it('reports unexpected errors with a non-persistent correlation id', () => {

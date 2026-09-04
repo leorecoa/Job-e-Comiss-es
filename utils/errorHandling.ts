@@ -5,6 +5,9 @@ type ErrorLike = {
   status?: unknown;
   details?: unknown;
   hint?: unknown;
+  publicCode?: unknown;
+  providerCode?: unknown;
+  httpStatus?: unknown;
 };
 
 const SENSITIVE_KEY_PATTERN = /(token|password|authorization|apikey|api_key|refresh|session|secret|cookie|headers)/i;
@@ -19,7 +22,10 @@ export const sanitizeOperationalError = (error: unknown): Record<string, unknown
       code: errorWithFields.code,
       status: errorWithFields.status,
       details: errorWithFields.details,
-      hint: errorWithFields.hint
+      hint: errorWithFields.hint,
+      publicCode: errorWithFields.publicCode,
+      providerCode: errorWithFields.providerCode,
+      httpStatus: errorWithFields.httpStatus
     };
   }
 
@@ -62,8 +68,12 @@ export const getOperationalErrorMessage = (
     : typeof errorLike?.message === 'string'
       ? errorLike.message
       : '';
-  const status = typeof errorLike?.status === 'number' ? errorLike.status : undefined;
-  const code = typeof errorLike?.code === 'string' ? errorLike.code : '';
+  const status = typeof errorLike?.httpStatus === 'number'
+    ? errorLike.httpStatus
+    : typeof errorLike?.status === 'number' ? errorLike.status : undefined;
+  const code = [errorLike?.publicCode, errorLike?.providerCode, errorLike?.code]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ');
   const normalized = `${message} ${code}`.toLowerCase();
 
   if (
