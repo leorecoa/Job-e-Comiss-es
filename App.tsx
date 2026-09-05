@@ -1,7 +1,7 @@
 
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, ClientType, UserProfile, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
-import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, resolveOwnerScopedBarbershopId } from './utils';
+import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, getOperationalVales, parseLocalDateInput, resolveOwnerScopedBarbershopId } from './utils';
 import { 
   BarbershopBrandingImageType,
   BarbershopBrandingInput,
@@ -783,6 +783,11 @@ const App: React.FC = () => {
     })
   ), [ownerBarbershop, settings, userProfile]);
 
+  const operationalVales = useMemo(
+    () => getOperationalVales(vales, shouldUseLocalFallback),
+    [vales]
+  );
+
   const barberFilterOptions = useMemo(() => {
     const names = new Set<string>();
     (settings.barbers || []).forEach(barber => { // settings.barbers is now BarberOption[]
@@ -792,11 +797,11 @@ const App: React.FC = () => {
     clients.forEach(client => {
       if (client.barberName?.trim()) names.add(client.barberName.trim());
     });
-    vales.forEach(vale => {
+    operationalVales.forEach(vale => {
       if (vale.barberName?.trim()) names.add(vale.barberName.trim());
     });
     return ['TODOS', ...Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR'))];
-  }, [settings.barbers, clients, vales]);
+  }, [settings.barbers, clients, operationalVales]);
 
   const scheduleBarberOptions = useMemo(() => {
     const names = new Set<string>();
@@ -849,7 +854,7 @@ const App: React.FC = () => {
   }, [clients, selectedDate, selectedBarberFilter]);
 
   const filteredVales = useMemo(() => {
-    const filtered = vales.filter(vale => {
+    const filtered = operationalVales.filter(vale => {
       if (!vale.timestamp) return false;
       const d = new Date(vale.timestamp);
       if (isNaN(d.getTime())) return false;
@@ -862,7 +867,7 @@ const App: React.FC = () => {
       return true;
     });
     return filtered.sort((a, b) => b.timestamp - a.timestamp);
-  }, [vales, selectedDate, selectedBarberFilter]);
+  }, [operationalVales, selectedDate, selectedBarberFilter]);
 
   const filteredAppointments = useMemo(() => {
     return appointments.filter(appointment => {
@@ -1516,6 +1521,11 @@ const App: React.FC = () => {
   };
 
   const handleAddVale = (data: ValeFormData) => {
+    if (!shouldUseLocalFallback) {
+      addToast('Vales ainda nao estao disponiveis no ambiente online.', 'info');
+      return;
+    }
+
     let timestamp = Date.now();
     const todayStr = getTodayString();
     if (selectedDate !== todayStr) {
@@ -1537,6 +1547,11 @@ const App: React.FC = () => {
   };
 
   const handleDeleteVale = (id: string) => {
+    if (!shouldUseLocalFallback) {
+      addToast('Vales ainda nao estao disponiveis no ambiente online.', 'info');
+      return;
+    }
+
     if(window.confirm('Tem certeza que deseja excluir este vale?')) {
       setVales(prev => prev.filter(v => v.id !== id));
       addToast('Vale removido.', 'info');
@@ -1554,7 +1569,7 @@ const App: React.FC = () => {
         }
 
         const rangeClients = clients.filter(c => c.timestamp >= start.start && c.timestamp <= end.end);
-        const rangeVales = vales.filter(v => v.timestamp >= start.start && v.timestamp <= end.end);
+        const rangeVales = operationalVales.filter(v => v.timestamp >= start.start && v.timestamp <= end.end);
         
         // Safe filename
         const dateLabel = startDate === endDate 
@@ -1908,7 +1923,12 @@ const App: React.FC = () => {
                     <button onClick={handleOpenAppointment} className="ui-button ui-button-secondary flex-1 md:flex-none">
                         <Calendar size={18} /> Agendar
                     </button>
-                    <button onClick={() => setValeModalOpen(true)} className="ui-button ui-button-secondary flex-1 md:flex-none">
+                    <button
+                      onClick={() => setValeModalOpen(true)}
+                      disabled={!shouldUseLocalFallback}
+                      title={!shouldUseLocalFallback ? 'Vales ainda nao estao disponiveis no ambiente online.' : undefined}
+                      className="ui-button ui-button-secondary flex-1 md:flex-none"
+                    >
                         <MinusCircle size={18} /> Vale
                     </button>
                     <button id="tour-settings-btn" onClick={() => setSettingsModalOpen(true)} className="ui-button ui-button-secondary shrink-0">
@@ -2120,6 +2140,10 @@ const App: React.FC = () => {
                                 </>
                            )}
                         </>
+                    ) : activeTab === 'vales' && !shouldUseLocalFallback ? (
+                        <InlineNotice tone="info" title="Vales indisponiveis no ambiente online">
+                          A persistencia remota de vales ainda nao esta disponivel. Nenhum vale sera incluido nos totais ou relatorios.
+                        </InlineNotice>
                     ) : (
                         <>
                            {filteredVales.length === 0 ? (
@@ -2203,7 +2227,7 @@ const App: React.FC = () => {
 
         {viewMode === 'monthly' && (
           <React.Suspense fallback={<SectionFallback />}>
-             <MonthlySummary clients={clients} vales={vales} settings={settings} onBack={() => handleOwnerNavigation('appointments')} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+             <MonthlySummary clients={clients} vales={operationalVales} settings={settings} onBack={() => handleOwnerNavigation('appointments')} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
           </React.Suspense>
         )}
       </DashboardShell>
@@ -2212,7 +2236,7 @@ const App: React.FC = () => {
         {isClientModalOpen && (
           <AddClientModal isOpen={isClientModalOpen} onClose={() => setClientModalOpen(false)} settings={settings} onSave={handleSaveClient} initialData={editingClient} />
         )}
-        {isValeModalOpen && (
+        {isValeModalOpen && shouldUseLocalFallback && (
           <AddValeModal isOpen={isValeModalOpen} onClose={() => setValeModalOpen(false)} onAdd={handleAddVale} settings={settings} />
         )}
         {isSettingsModalOpen && (
@@ -2227,7 +2251,7 @@ const App: React.FC = () => {
             ))}
             userProfile={userProfile}
             clients={clients}
-            vales={vales}
+            vales={operationalVales}
             appointments={appointments}
             manageCatalogRemotely={isSupabaseConfigured}
           />

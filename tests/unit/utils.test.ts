@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildCsvContent, calculateClientCommission, getLocalDayBounds, parseLocalDateInput } from '../../utils';
-import { Client, ClientType, ServiceType } from '../../types';
+import { buildCsvContent, calculateClientCommission, getLocalDayBounds, getOperationalVales, parseLocalDateInput } from '../../utils';
+import { Client, ClientType, ServiceType, Vale } from '../../types';
 
 const makeClient = (overrides: Partial<Client> = {}): Client => ({
   id: 'client-1',
@@ -38,6 +38,25 @@ describe('calculateClientCommission', () => {
     const client = makeClient({ commissionValue: undefined as unknown as number });
 
     expect(calculateClientCommission(client, 50)).toBe(30);
+  });
+});
+
+describe('vale runtime isolation', () => {
+  const vales: Vale[] = [{
+    id: 'vale-1',
+    barberName: 'Barbeiro',
+    value: 20,
+    description: 'Adiantamento local',
+    timestamp: Date.now()
+  }];
+
+  it('excludes ephemeral vales when Supabase is active', () => {
+    expect(getOperationalVales(vales, false)).toEqual([]);
+  });
+
+  it('preserves vales in local fallback mode', () => {
+    expect(getOperationalVales(vales, true)).toBe(vales);
+    expect(getOperationalVales(vales, true)).toHaveLength(1);
   });
 });
 
