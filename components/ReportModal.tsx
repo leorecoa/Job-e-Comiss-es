@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, FileText, FileSpreadsheet, Clock, Filter } from 'lucide-react';
+import { X, FileText, FileSpreadsheet, Clock, Filter } from 'lucide-react';
 
 interface ReportModalProps {
   isOpen: boolean;
