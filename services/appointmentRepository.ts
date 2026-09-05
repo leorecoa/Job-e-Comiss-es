@@ -46,6 +46,12 @@ type DatabasePublicAppointmentSlotRow = {
   status: Appointment['status'];
 };
 
+type DatabaseBarberAppointmentCreateRow = Pick<
+  DatabaseAppointmentRow,
+  'id' | 'barbershop_id' | 'client_name' | 'barber_id' | 'barber_name' |
+  'service_id' | 'service_type' | 'start_at' | 'end_at' | 'status'
+>;
+
 export type DatabaseInternalAppointmentRow = Omit<DatabaseAppointmentRow, 'client_phone' | 'service_value'> & {
   viewer_role: 'owner' | 'barber';
   client_phone: string | null;
@@ -346,7 +352,7 @@ const assertAppointmentTenantIntegrity = async (appointment: Appointment): Promi
   await Promise.all(checks);
 };
 
-export const createAppointment = async ( // Internal owner/barber appointment creation.
+export const createAppointment = async ( // Remote owner creation; local fallback remains shared.
   appointment: Appointment,
   existingAppointments?: Appointment[]
 ): Promise<Appointment> => {
@@ -385,6 +391,65 @@ export const createAppointment = async ( // Internal owner/barber appointment cr
   }
 
   return appointment;
+};
+
+export const createBarberAppointment = async (
+  appointment: Appointment,
+  existingAppointments?: Appointment[]
+): Promise<Appointment> => {
+  const validationErrors = validatePublicAppointmentRecord(appointment);
+
+  if (validationErrors.length > 0) {
+    throw new Error(validationErrors[0]);
+  }
+
+  const appointments = existingAppointments || await listInternalAppointments();
+  if (hasAppointmentConflict(appointments, appointment)) {
+    throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
+  }
+
+  if (shouldUseLocalFallback) {
+    writeLocalAppointments([appointment, ...appointments]);
+    return appointment;
+  }
+  assertOperationalSupabase();
+
+  const { data, error } = await supabase.rpc('create_barber_appointment', {
+    p_service_id: nullableUuid(appointment.serviceId),
+    p_client_name: appointment.clientName,
+    p_client_phone: appointment.clientPhone || '',
+    p_start_at: appointment.startAt,
+    p_notes: appointment.notes || null
+  });
+
+  if (error) {
+    const details = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
+    if (details.includes('APPOINTMENT_ACTIVE_SLOT_CONFLICT')) {
+      throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
+    }
+
+    logOperationalError('appointment-repository:create-barber', error);
+    throw error;
+  }
+
+  const row = (Array.isArray(data) ? data[0] : data) as DatabaseBarberAppointmentCreateRow | null;
+  if (!row?.id) throw new Error('O Supabase nao confirmou a criacao do agendamento.');
+
+  return {
+    ...appointment,
+    id: row.id,
+    barbershopId: row.barbershop_id,
+    barberId: row.barber_id || undefined,
+    barberName: row.barber_name,
+    serviceId: row.service_id || undefined,
+    serviceType: row.service_type,
+    serviceValue: 0,
+    commissionRate: undefined,
+    startAt: row.start_at,
+    endAt: row.end_at,
+    status: row.status,
+    financialRecordId: undefined
+  };
 };
 
 export const createPublicAppointment = async (

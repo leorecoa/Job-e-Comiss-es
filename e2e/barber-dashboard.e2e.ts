@@ -74,7 +74,7 @@ type MockScenario = {
   barbers?: MockBarber[];
   services?: MockService[];
   appointments?: MockAppointment[];
-  appointmentInsertResponse?: {
+  appointmentCreateResponse?: {
     status: number;
     body: unknown;
   };
@@ -212,9 +212,9 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
     }
   ];
 
-  const appointmentInsertResponse = scenario.appointmentInsertResponse ?? {
+  const appointmentCreateResponse = scenario.appointmentCreateResponse ?? {
     status: 201,
-    body: []
+    body: null
   };
 
   const signInRequests: CapturedRequest[] = [];
@@ -342,19 +342,34 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
     }
 
     if (url.pathname === '/rest/v1/appointments') {
-      if (request.method() === 'POST') {
-        appointmentCreateRequests.push({
-          method: request.method(),
-          url: request.url(),
-          body: parseRequestBody(route)
-        });
-
-        await fulfillJson(route, appointmentInsertResponse.status, appointmentInsertResponse.body);
-        return;
-      }
-
       appointmentReadRequests.push(request.url());
       await fulfillJson(route, 403, { message: 'Direct appointment reads are forbidden.' });
+      return;
+    }
+
+    if (url.pathname === '/rest/v1/rpc/create_barber_appointment') {
+      const body = parseRequestBody(route) as Record<string, unknown>;
+      appointmentCreateRequests.push({
+        method: request.method(),
+        url: request.url(),
+        body
+      });
+      const startAt = String(body.p_start_at);
+      const endAt = new Date(startAt);
+      endAt.setMinutes(endAt.getMinutes() + 30);
+
+      await fulfillJson(route, appointmentCreateResponse.status, appointmentCreateResponse.body ?? [{
+        id: 'appointment-created',
+        barbershop_id: BARBERSHOP_ID,
+        client_name: body.p_client_name,
+        barber_id: BARBER_ID,
+        barber_name: BARBER_DISPLAY_NAME,
+        service_id: SERVICE_ID,
+        service_type: 'Corte',
+        start_at: startAt,
+        end_at: endAt.toISOString(),
+        status: 'scheduled'
+      }]);
       return;
     }
 
@@ -461,7 +476,7 @@ test.describe('barber dashboard e2e', () => {
     expect(network.internalAppointmentResponses).toHaveLength(2);
   });
 
-  test('barber creates a manual appointment with barbershopId and barberId from the authenticated session', async ({ page }) => {
+  test('barber creates through the snapshot-derived RPC without sending tenant or financial fields', async ({ page }) => {
     const network = await installBarberSupabaseMocks(page);
 
     await signInAsBarber(page);
@@ -477,13 +492,15 @@ test.describe('barber dashboard e2e', () => {
     const payload = body as Record<string, unknown>;
 
     expect(payload).toMatchObject({
-      barbershop_id: BARBERSHOP_ID,
-      barber_id: BARBER_ID,
-      barber_name: BARBER_DISPLAY_NAME,
-      service_id: SERVICE_ID,
-      service_type: 'Corte',
-      client_name: 'Cliente Novo'
+      p_service_id: SERVICE_ID,
+      p_client_name: 'Cliente Novo',
+      p_client_phone: '81987324097',
+      p_notes: 'teste e2e barbeiro'
     });
+    for (const field of ['p_barbershop_id', 'p_barber_id', 'p_barber_name', 'p_service_type', 'p_service_value', 'p_commission_rate', 'p_end_at', 'p_status']) {
+      expect(payload).not.toHaveProperty(field);
+    }
+    expect(network.appointmentReadRequests).toHaveLength(0);
     expect(JSON.stringify(payload)).not.toContain('Gestao Maxima');
   });
 
@@ -513,13 +530,10 @@ test.describe('barber dashboard e2e', () => {
     const [{ body }] = network.appointmentCreateRequests;
     const payload = body as Record<string, unknown>;
 
-    expect(payload).toMatchObject({
-      barbershop_id: BARBERSHOP_ID,
-      barber_id: BARBER_ID,
-      barber_name: BARBER_DISPLAY_NAME
-    });
-    expect(payload.barber_id).not.toBe('barber-id-from-modal');
-    expect(payload.barber_name).not.toBe('Barber Hack');
+    expect(payload).toMatchObject({ p_service_id: SERVICE_ID });
+    expect(payload).not.toHaveProperty('p_barber_id');
+    expect(payload).not.toHaveProperty('p_barbershop_id');
+    expect(JSON.stringify(payload)).not.toContain('Barber Hack');
   });
 
   test('barber without barberId can sign out once from the pending link state', async ({ page }) => {
