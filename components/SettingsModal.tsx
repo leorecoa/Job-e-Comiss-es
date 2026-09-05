@@ -27,6 +27,7 @@ interface SettingsModalProps {
   vales: Vale[];
   appointments: Appointment[];
   manageCatalogRemotely?: boolean;
+  allowLocalBackupRestore?: boolean;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -38,7 +39,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   clients,
   vales,
   appointments,
-  manageCatalogRemotely = false
+  manageCatalogRemotely = false,
+  allowLocalBackupRestore = false
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [newBarberName, setNewBarberName] = useState('');
@@ -177,6 +179,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleBackup = () => {
+    if (!allowLocalBackupRestore) return;
+
     const data = {
       clients,
       vales,
@@ -201,6 +205,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleRestore = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!allowLocalBackupRestore) {
+      event.target.value = '';
+      return;
+    }
+
     const file = event.target.files?.[0];
 
     if (!file) return;
@@ -540,11 +549,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <h3 className="font-bold text-sm">Segurança de Dados</h3>
             </div>
 
-            <p className="mb-4 text-xs text-muted-foreground">
-              Faça backups regulares para garantir que nunca perca seus dados, mesmo trocando de dispositivo.
-            </p>
+            {allowLocalBackupRestore ? (
+              <>
+                <p className="mb-4 text-xs text-muted-foreground">
+                  Faça backups regulares para garantir que nunca perca seus dados, mesmo trocando de dispositivo.
+                </p>
 
-            <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={handleBackup}
@@ -564,7 +575,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={handleRestore}
                 />
               </label>
-            </div>
+                </div>
+              </>
+            ) : (
+              <p className="ui-inline-notice ui-inline-notice-info text-sm" role="status">
+                Backup e restauração locais estão disponíveis apenas no modo local de demonstração.
+              </p>
+            )}
           </div>
 
           <div className="pt-4 mt-2">
