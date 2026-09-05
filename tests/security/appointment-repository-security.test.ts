@@ -12,7 +12,8 @@ vi.mock('../../lib/supabase', () => ({
   supabase: { rpc: rpcMock, from: fromMock }
 }));
 
-import { listInternalAppointments, updateAppointment } from '../../services/appointmentRepository';
+import { createBarberAppointment, listInternalAppointments, updateAppointment } from '../../services/appointmentRepository';
+import type { Appointment } from '../../types';
 
 const baseRow = {
   id: '60000000-0000-4000-8000-000000000001',
@@ -100,6 +101,72 @@ describe('controlled internal appointment access', () => {
       p_barbershop_id: expect.anything(),
       p_financial_record_id: expect.anything()
     }));
+  });
+
+  it('creates a barber appointment without sending tenant, barber, duration, or financial snapshots', async () => {
+    const appointment: Appointment = {
+      id: 'client-generated-id',
+      barbershopId: 'untrusted-tenant',
+      barberId: 'untrusted-barber',
+      serviceId: baseRow.service_id,
+      clientName: 'Cliente Teste',
+      clientPhone: '85999999999',
+      barberName: 'Nome adulterado',
+      serviceType: 'Servico adulterado',
+      serviceValue: 999,
+      commissionRate: 100,
+      startAt: '2099-08-24T12:00:00.000Z',
+      endAt: '2099-08-24T18:00:00.000Z',
+      status: 'scheduled',
+      notes: 'Observacao permitida',
+      createdAt: '2099-08-20T12:00:00.000Z',
+      updatedAt: '2099-08-20T12:00:00.000Z'
+    };
+    rpcMock.mockResolvedValue({
+      data: [{
+        id: baseRow.id,
+        barbershop_id: baseRow.barbershop_id,
+        client_name: appointment.clientName,
+        barber_id: baseRow.barber_id,
+        barber_name: baseRow.barber_name,
+        service_id: baseRow.service_id,
+        service_type: baseRow.service_type,
+        start_at: appointment.startAt,
+        end_at: '2099-08-24T12:30:00.000Z',
+        status: 'scheduled'
+      }],
+      error: null
+    });
+
+    const created = await createBarberAppointment(appointment, []);
+
+    expect(rpcMock).toHaveBeenCalledWith('create_barber_appointment', {
+      p_service_id: baseRow.service_id,
+      p_client_name: appointment.clientName,
+      p_client_phone: appointment.clientPhone,
+      p_start_at: appointment.startAt,
+      p_notes: appointment.notes
+    });
+    expect(rpcMock.mock.calls[0]?.[1]).not.toEqual(expect.objectContaining({
+      p_barbershop_id: expect.anything(),
+      p_barber_id: expect.anything(),
+      p_service_value: expect.anything(),
+      p_commission_rate: expect.anything(),
+      p_end_at: expect.anything()
+    }));
+    expect(created).toMatchObject({
+      id: baseRow.id,
+      barbershopId: baseRow.barbershop_id,
+      barberId: baseRow.barber_id,
+      barberName: baseRow.barber_name,
+      serviceType: baseRow.service_type,
+      serviceValue: 0,
+      commissionRate: undefined,
+      endAt: '2099-08-24T12:30:00.000Z',
+      status: 'scheduled'
+    });
+    expect(created.serviceValue).not.toBe(appointment.serviceValue);
+    expect(fromMock).not.toHaveBeenCalled();
   });
 
   it('contains no direct appointment delete path', () => {

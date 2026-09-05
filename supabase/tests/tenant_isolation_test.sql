@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(232);
+select plan(255);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -24,6 +24,16 @@ select ok(not has_function_privilege('anon', 'public.update_owner_appointment(uu
 select ok(not has_function_privilege('service_role', 'public.get_internal_appointments()', 'execute'), 'service role has no unnecessary internal appointment read execute');
 select ok(not has_function_privilege('service_role', 'public.update_owner_appointment(uuid,text,text,uuid,text,uuid,text,numeric,numeric,timestamptz,timestamptz,text,text)', 'execute'), 'service role has no unnecessary owner appointment update execute');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name in ('get_internal_appointments', 'update_owner_appointment') and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute internal appointment RPCs');
+select ok(not exists(select 1 from pg_policies where schemaname = 'public' and tablename = 'appointments' and policyname = 'appointments_barber_insert_own'), 'direct barber appointment insert policy is absent');
+select ok(to_regprocedure('public.create_barber_appointment(uuid,text,text,timestamptz,text)') is not null, 'barber appointment creation RPC exists');
+select is((select pg_get_function_identity_arguments(p.oid) from pg_proc p where p.oid = 'public.create_barber_appointment(uuid,text,text,timestamptz,text)'::regprocedure), 'p_service_id uuid, p_client_name text, p_client_phone text, p_start_at timestamp with time zone, p_notes text', 'barber creation accepts no tenant, barber, duration, or financial snapshot arguments');
+select ok(position('service_value' in lower(pg_get_function_result('public.create_barber_appointment(uuid,text,text,timestamptz,text)'::regprocedure))) = 0 and position('commission_rate' in lower(pg_get_function_result('public.create_barber_appointment(uuid,text,text,timestamptz,text)'::regprocedure))) = 0 and position('financial_record_id' in lower(pg_get_function_result('public.create_barber_appointment(uuid,text,text,timestamptz,text)'::regprocedure))) = 0, 'barber creation response excludes financial fields');
+select is((select prosecdef from pg_proc where oid = 'public.create_barber_appointment(uuid,text,text,timestamptz,text)'::regprocedure), true, 'barber creation RPC is security definer');
+select is((select proconfig from pg_proc where oid = 'public.create_barber_appointment(uuid,text,text,timestamptz,text)'::regprocedure), array['search_path=pg_catalog'], 'barber creation RPC keeps a controlled search path');
+select ok(has_function_privilege('authenticated', 'public.create_barber_appointment(uuid,text,text,timestamptz,text)', 'execute'), 'authenticated can execute barber creation RPC');
+select ok(not has_function_privilege('anon', 'public.create_barber_appointment(uuid,text,text,timestamptz,text)', 'execute'), 'anon cannot execute barber creation RPC');
+select ok(not has_function_privilege('service_role', 'public.create_barber_appointment(uuid,text,text,timestamptz,text)', 'execute'), 'service role has no unnecessary barber creation execute');
+select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'create_barber_appointment' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute barber creation RPC');
 select is((select count(*) from pg_proc where oid in ('public.get_internal_appointments()'::regprocedure, 'public.update_owner_appointment(uuid,text,text,uuid,text,uuid,text,numeric,numeric,timestamptz,timestamptz,text,text)'::regprocedure) and prosecdef), 2::bigint, 'internal appointment RPCs are security definer');
 select is((select count(*) from pg_proc where oid in ('public.get_internal_appointments()'::regprocedure, 'public.update_owner_appointment(uuid,text,text,uuid,text,uuid,text,numeric,numeric,timestamptz,timestamptz,text,text)'::regprocedure) and proconfig = array['search_path=pg_catalog']), 2::bigint, 'internal appointment RPCs keep controlled search paths');
 select is(pg_get_function_result('public.get_internal_appointments()'::regprocedure), 'TABLE(viewer_role text, id uuid, barbershop_id uuid, client_name text, client_phone text, barber_id uuid, barber_name text, service_id uuid, service_type text, service_value numeric, commission_rate numeric, start_at timestamp with time zone, end_at timestamp with time zone, status text, notes text, financial_record_id text, created_at timestamp with time zone, updated_at timestamp with time zone)', 'internal appointment read signature is explicit');
@@ -185,6 +195,9 @@ select throws_ok($test$insert into storage.objects (bucket_id, name, owner_id) v
 select results_eq($test$update storage.objects set metadata = '{"blocked":true}'::jsonb where bucket_id = 'barbershop-branding' and name = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/owner-source.png' returning 1$test$, array[]::integer[], 'Owner B cannot update Tenant Alpha branding');
 
 reset role;
+insert into public.services (id, name, price, duration_minutes, commission_rate, active, barbershop_id)
+values ('99999999-9999-4999-8999-999999999999', 'Inactive Service', 999, 90, 99, false, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
+
 set local role authenticated;
 set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000002","role":"authenticated"}';
 select ok(not exists(select 1 from pg_policies where schemaname = 'public' and tablename = 'appointments' and policyname = 'appointments_barber_update_own'), 'barber appointment update policy is absent');
@@ -207,7 +220,10 @@ select is((select count(*) from storage.objects where bucket_id = 'barbershop-br
 select throws_ok($test$insert into storage.objects (bucket_id, name, owner_id) values ('barbershop-branding', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/barber.png', 'aaaa0000-0000-4000-8000-000000000002')$test$, '42501'::char(5), null, 'Barber A cannot insert branding objects');
 select results_eq($test$update storage.objects set metadata = '{"blocked":true}'::jsonb where bucket_id = 'barbershop-branding' returning 1$test$, array[]::integer[], 'Barber A cannot update branding objects');
 select ok(private.current_user_role() <> 'owner', 'Barber A does not satisfy branding delete policy');
-select lives_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Barber Scheduled', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '70 days', now() + interval '70 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, 'barber inserts own scheduled appointment');
+select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Barber Direct', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Forged Service', 999, now() + interval '70 days', now() + interval '70 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'barber direct insert is denied');
+select lives_ok($test$select * from public.create_barber_appointment('33333333-3333-4333-8333-333333333333', 'Barber RPC', '(919) 222-3333', date_trunc('minute', now()) + interval '70 days', 'Allowed note')$test$, 'barber creates a legitimate scheduled appointment through RPC');
+select throws_ok($test$select * from public.create_barber_appointment('44444444-4444-4444-8444-444444444444', 'Cross Tenant Service', '9192223334', date_trunc('minute', now()) + interval '78 days', null)$test$, 'P0001'::char(5), 'BARBER_APPOINTMENT_INVALID_SERVICE', 'barber cannot select a service from another tenant');
+select throws_ok($test$select * from public.create_barber_appointment('99999999-9999-4999-8999-999999999999', 'Inactive Service', '9192223335', date_trunc('minute', now()) + interval '79 days', null)$test$, 'P0001'::char(5), 'BARBER_APPOINTMENT_INVALID_SERVICE', 'barber cannot select an inactive service');
 select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Barber Confirmed', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '71 days', now() + interval '71 days 30 minutes', 'confirmed', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'barber cannot insert confirmed appointment');
 select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Barber Completed', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '72 days', now() + interval '72 days 30 minutes', 'completed', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'barber cannot insert completed appointment');
 select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Barber Cancelled', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '73 days', now() + interval '73 days 30 minutes', 'cancelled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1')$test$, '42501'::char(5), null, 'barber cannot insert cancelled appointment');
@@ -217,6 +233,18 @@ select throws_ok($test$insert into public.appointments (client_name, client_phon
 select throws_ok($test$insert into public.appointments (client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id) values ('Other Tenant', '0000000000', '22222222-2222-4222-8222-222222222222', 'Barber Beta', '44444444-4444-4444-8444-444444444444', 'Service Beta', 55, now() + interval '77 days', now() + interval '77 days 30 minutes', 'scheduled', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2')$test$, '42501'::char(5), null, 'barber cannot insert in another tenant');
 select throws_ok($test$delete from public.appointments where id = '60000000-0000-4000-8000-000000000001'$test$, '42501'::char(5), null, 'barber cannot delete appointments without direct SELECT privilege');
 select is((select count(*) from public.get_internal_appointments() where id = '60000000-0000-4000-8000-000000000001'), 1::bigint, 'barber appointment remains after delete attempt');
+
+reset role;
+select is((select count(*) from public.appointments where client_name = 'Barber RPC'), 1::bigint, 'barber RPC creates exactly one appointment');
+select is((select barbershop_id from public.appointments where client_name = 'Barber RPC'), 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid, 'barber RPC derives tenant from the authenticated profile');
+select is((select barber_id from public.appointments where client_name = 'Barber RPC'), '11111111-1111-4111-8111-111111111111'::uuid, 'barber RPC derives barber id from the authenticated profile');
+select is((select barber_name from public.appointments where client_name = 'Barber RPC'), 'Barber Alpha', 'barber RPC derives barber name from the catalog');
+select is((select service_type from public.appointments where client_name = 'Barber RPC'), 'Service Alpha', 'barber RPC derives service name from the catalog');
+select is((select service_value from public.appointments where client_name = 'Barber RPC'), 40::numeric, 'barber RPC derives service price from the catalog');
+select is((select commission_rate from public.appointments where client_name = 'Barber RPC'), (select commission_rate from public.services where id = '33333333-3333-4333-8333-333333333333'), 'barber RPC derives commission rate from the catalog');
+select is((select end_at from public.appointments where client_name = 'Barber RPC'), (select start_at + make_interval(mins => duration_minutes) from public.appointments join public.services on services.id = appointments.service_id where client_name = 'Barber RPC'), 'barber RPC derives end time from service duration');
+select is((select status from public.appointments where client_name = 'Barber RPC'), 'scheduled', 'barber RPC forces scheduled status');
+select ok((select financial_record_id is null from public.appointments where client_name = 'Barber RPC'), 'barber RPC starts without a financial record');
 
 reset role;
 set local role authenticated;
