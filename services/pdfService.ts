@@ -3,7 +3,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatCurrency, formatTime } from "../utils";
-import { Client, Vale, ServiceType } from "../types";
+import { Client, Vale } from "../types";
 
 export const generateReportPDF = (
   shopName: string,
@@ -23,7 +23,6 @@ export const generateReportPDF = (
   const colorDark = "#111827"; // Gray 900
   const colorGold = "#f59e0b"; // Gold 500
   const colorGray = "#6b7280"; // Gray 500
-  const colorLightGray = "#f3f4f6";
 
   // --- HEADER ---
   // Background

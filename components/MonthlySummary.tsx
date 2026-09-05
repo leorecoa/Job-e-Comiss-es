@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Client, Vale, AppSettings, ServiceType } from '../types';
+import { Client, Vale, AppSettings } from '../types';
 import { formatCurrency, calculateClientCommission } from '../utils';
 import { StatsCard } from './StatsCard';
 import { DashboardCharts } from './DashboardCharts';

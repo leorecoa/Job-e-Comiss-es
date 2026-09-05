@@ -1,7 +1,7 @@
 
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, DailyHistory, ClientType, UserProfile, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
-import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, getBarberNameById, resolveOwnerScopedBarbershopId } from './utils';
+import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, ClientType, UserProfile, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
+import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, parseLocalDateInput, resolveOwnerScopedBarbershopId } from './utils';
 import { 
   BarbershopBrandingImageType,
   BarbershopBrandingInput,
@@ -1387,66 +1387,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Function for barber to update appointments with a patch
-  const handleUpdateAppointmentPatch = async (
-    id: string,
-    patch: Partial<Appointment>
-  ) => {
-    const currentAppointment = appointments.find((appointment) => appointment.id === id);
-
-    if (!currentAppointment) {
-      addToast('Agendamento nao encontrado.', 'error');
-      return;
-    }
-
-    const updatedAppointment: Appointment = {
-      ...currentAppointment,
-      ...patch,
-      updatedAt: patch.updatedAt || new Date().toISOString()
-    };
-
-    let persistencePatch: Partial<Appointment> = {
-      ...patch,
-      updatedAt: updatedAppointment.updatedAt
-    };
-
-    let createdFinancialRecord = false;
-
-    if (updatedAppointment.status === 'completed' && !currentAppointment.financialRecordId) {
-      if (!shouldUseLocalFallback) {
-        try {
-          const completion = await completeAppointmentWithFinancialRecord(id);
-          const completedAppointment = {
-            ...updatedAppointment,
-            status: 'completed' as const,
-            financialRecordId: completion.financialRecordId
-          };
-          setAppointments(prev => prev.map(item => item.id === id ? completedAppointment : item));
-          setClients(prev => prev.some(client => client.appointmentId === id)
-            ? prev
-            : [appointmentToClient(completedAppointment, settings, completion.financialRecordId), ...prev]);
-          addToast('Agendamento concluido e financeiro lancado!', 'success');
-        } catch (error) {
-          logOperationalError('barber-dashboard:complete-appointment', error);
-          addToast(getOperationalErrorMessage(error, 'Nao foi possivel concluir o agendamento e salvar o financeiro.'), 'error');
-        }
-        return;
-      }
-
-      const result = completeAppointmentFinancialRecord(updatedAppointment, clients, settings, generateId);
-      createdFinancialRecord = result.created;
-      setClients(result.clients);
-
-      if (createdFinancialRecord) {
-        persistencePatch = { ...persistencePatch, financialRecordId: result.clients[0]?.id };
-      }
-    }
-
-    await updateAppointmentRecord(id, persistencePatch);
-    setAppointments(prev => prev.map(item => item.id === id ? updatedAppointment : item));
-    addToast('Agendamento atualizado!', 'success');
-  };
-
   const handleCreatePublicAppointment = async (appointment: Appointment) => {
     if (hasAppointmentConflict(appointments, appointment)) {
       throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
@@ -1683,11 +1623,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleOpenAddClient = () => {
-    setEditingClient(null);
-    setClientModalOpen(true);
-  };
-  
   const handleLogout = async (confirmLogout = true) => {
     if (confirmLogout && !window.confirm('Deseja sair?')) return;
 

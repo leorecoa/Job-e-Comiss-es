@@ -151,7 +151,6 @@ const writeLocalBarbershop = (barbershop: Barbershop): void => {
   }
 };
 
-const BRANDING_SELECT = 'id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,primary_color,secondary_color,active';
 const BRANDING_WITH_HOURS_SELECT = 'id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,primary_color,secondary_color,business_hours,slot_step_minutes,active';
 const BASIC_SELECT = 'id,name,slug,phone,address,active';
 
