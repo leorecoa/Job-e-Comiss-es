@@ -786,6 +786,17 @@ test.describe('owner operational dashboard e2e', () => {
     await expect(page.getByRole('heading', { name: 'Registrar Vale' })).toHaveCount(0);
   });
 
+  test('remote settings do not expose local backup or restore actions', async ({ page }) => {
+    await installOwnerSupabaseMocks(page);
+    await signInAsOwner(page);
+    await page.locator('#tour-settings-btn').click();
+
+    await expect(page.getByText('Backup e restauração locais estão disponíveis apenas no modo local de demonstração.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Baixar Backup' })).toHaveCount(0);
+    await expect(page.getByText('Restaurar Dados')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Salvar Alterações' })).toBeVisible();
+  });
+
   test('owner management workspace is responsive and returns to the agenda', async ({ page }) => {
     await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/, (route) => route.abort());
     await page.emulateMedia({ reducedMotion: 'reduce' });

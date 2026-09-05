@@ -25,6 +25,7 @@ const renderSettings = (manageCatalogRemotely: boolean) => renderToStaticMarkup(
     vales={[]}
     appointments={[]}
     manageCatalogRemotely={manageCatalogRemotely}
+    allowLocalBackupRestore={!manageCatalogRemotely}
   />
 );
 
@@ -52,6 +53,18 @@ describe('settings catalog source of truth', () => {
     for (const field of legacyCatalogFields) {
       expect(html).toContain(`name="${field}"`);
     }
+  });
+
+  it('isolates local backup and restore controls from remote settings', () => {
+    const remoteHtml = renderSettings(true);
+    const localHtml = renderSettings(false);
+
+    expect(remoteHtml).not.toContain('Baixar Backup');
+    expect(remoteHtml).not.toContain('Restaurar Dados');
+    expect(remoteHtml).toContain('Backup e restauração locais estão disponíveis apenas no modo local de demonstração.');
+    expect(localHtml).toContain('Baixar Backup');
+    expect(localHtml).toContain('Restaurar Dados');
+    expect(localHtml).toContain('accept=".json"');
   });
 
   it('keeps remote service price, duration and commission controls in OwnerCatalogManager', () => {

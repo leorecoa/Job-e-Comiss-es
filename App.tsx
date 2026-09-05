@@ -2254,6 +2254,7 @@ const App: React.FC = () => {
             vales={operationalVales}
             appointments={appointments}
             manageCatalogRemotely={isSupabaseConfigured}
+            allowLocalBackupRestore={shouldUseLocalFallback}
           />
         )}
         {isAppointmentModalOpen && (
