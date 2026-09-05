@@ -772,6 +772,20 @@ test.describe('owner operational dashboard e2e', () => {
     expect(network.appointmentReadRequests).toHaveLength(0);
   });
 
+  test('remote owner cannot create an ephemeral vale', async ({ page }) => {
+    await installOwnerSupabaseMocks(page);
+    await signInAsOwner(page);
+
+    const valeButton = page.getByRole('button', { name: 'Vale', exact: true });
+    await expect(valeButton).toBeDisabled();
+    await page.getByRole('navigation', { name: 'Secoes do painel', exact: true })
+      .getByRole('button', { name: 'Vales' })
+      .click();
+
+    await expect(page.getByRole('status', { name: 'Vales indisponiveis no ambiente online' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Registrar Vale' })).toHaveCount(0);
+  });
+
   test('owner management workspace is responsive and returns to the agenda', async ({ page }) => {
     await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/, (route) => route.abort());
     await page.emulateMedia({ reducedMotion: 'reduce' });

@@ -1,6 +1,10 @@
 
-import { Appointment, Client, ServiceType, AppSettings } from './types';
+import { Appointment, Client, ServiceType, AppSettings, Vale } from './types';
 import { BarberOption } from './types';
+
+export const getOperationalVales = (vales: Vale[], allowLocalFallback: boolean): Vale[] => (
+  allowLocalFallback ? vales : []
+);
 
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
