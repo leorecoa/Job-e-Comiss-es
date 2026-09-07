@@ -32,7 +32,7 @@ import { completeAppointmentWithFinancialRecord, listFinancialRecords, mapFinanc
 import { resolveClientEditTarget } from './clientEditing';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
 import { linkBarberProfileByEmail } from './services/profileLinkingRepository';
-import { createService, listServices, removeService, updateService } from './services/serviceRepository';
+import { createService, listPublicServices, listServices, removeService, updateService } from './services/serviceRepository';
 import { AppRole, AuthSession, canAccessInternalPanel, getCurrentAuthSession, signInWithPassword, signOut as signOutAuth, signUpWithPassword } from './services/authRepository';
 import { 
   Scissors, 
@@ -666,7 +666,9 @@ const App: React.FC = () => {
         const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([ //
           isPublicBookingRoute ? listPublicAppointmentSlots(publicBookingSlug!, currentBarbershopId) : listInternalAppointments(currentBarbershopId, authSession?.barberId),
           listBarbers(currentBarbershopId),
-          listServices(currentBarbershopId)
+          isPublicBookingRoute
+            ? listPublicServices(publicBookingSlug!, currentBarbershopId)
+            : listServices(currentBarbershopId)
         ]);
 
         const remoteFinancialRecords = isPublicBookingRoute

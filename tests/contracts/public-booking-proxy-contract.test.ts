@@ -8,17 +8,21 @@ describe('public booking proxy contract', () => {
   const repository = read('services/appointmentRepository.ts');
   const createEndpoint = read('api/public-booking/create.ts');
   const slotsEndpoint = read('api/public-booking/slots.ts');
+  const catalogEndpoint = read('api/public-booking/catalog.ts');
+  const serviceRepository = read('services/serviceRepository.ts');
   const shared = read('api/public-booking/_shared.ts');
   const rollout = read('docs/public-booking-vercel-proxy.md');
 
   it('uses distinct same-origin endpoints without direct browser RPC fallback', () => {
     expect(repository).toContain("'/api/public-booking/create'");
     expect(repository).toContain('`/api/public-booking/slots?slug=');
+    expect(serviceRepository).toContain('`/api/public-booking/catalog?slug=');
     expect(repository).not.toMatch(/supabase\.rpc\(['"](?:create_public_appointment|get_public_appointment_slots)/);
+    expect(serviceRepository).not.toMatch(/supabase\.rpc\(['"]get_public_services_by_slug/);
   });
 
   it('does not interpret client IP headers or implement an in-memory counter', () => {
-    const serverSource = `${createEndpoint}\n${slotsEndpoint}\n${shared}`;
+    const serverSource = `${createEndpoint}\n${slotsEndpoint}\n${catalogEndpoint}\n${shared}`;
     expect(serverSource).not.toMatch(/x-forwarded-for|cf-connecting-ip|x-real-ip/i);
     expect(serverSource).not.toMatch(/rateLimitMap|new Map|clientIp/i);
   });
@@ -41,8 +45,10 @@ describe('public booking proxy contract', () => {
     const vercelConfig = JSON.parse(read('vercel.json')) as { rewrites?: Array<{ source: string; destination: string }> };
     expect(existsSync(resolve(process.cwd(), 'api/public-booking/create.ts'))).toBe(true);
     expect(existsSync(resolve(process.cwd(), 'api/public-booking/slots.ts'))).toBe(true);
+    expect(existsSync(resolve(process.cwd(), 'api/public-booking/catalog.ts'))).toBe(true);
     expect(vercelConfig.rewrites).toEqual([{ source: '/(.*)', destination: '/index.html' }]);
     expect(createEndpoint).toContain("request.method !== 'POST'");
     expect(slotsEndpoint).toContain("request.method !== 'GET'");
+    expect(catalogEndpoint).toContain("request.method !== 'GET'");
   });
 });
