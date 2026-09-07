@@ -21,7 +21,7 @@ vi.mock('../../lib/supabase', () => ({
 
 import { createAppointment, createPublicAppointment, listInternalAppointments, listPublicAppointmentSlots } from '../../services/appointmentRepository';
 import { listBarbers } from '../../services/barberRepository';
-import { listServices } from '../../services/serviceRepository';
+import { listPublicServices } from '../../services/serviceRepository';
 
 const createOrderedBarbersQuery = (result: {
   data: Array<{ id: string; name: string; barbershop_id: string | null; active: boolean }>;
@@ -35,27 +35,6 @@ const createOrderedBarbersQuery = (result: {
   query.order.mockReturnValue({
     returns: vi.fn().mockResolvedValue(result)
   });
-  return query;
-};
-
-const createOrderedServicesQuery = (result: {
-  data: Array<{
-    id: string;
-    name: string;
-    barbershop_id: string | null;
-    price: number;
-    duration_minutes: number;
-    commission_rate: number | null;
-    active: boolean;
-  }>;
-  error: null;
-}) => {
-  const query = {
-    eq: vi.fn(),
-    order: vi.fn()
-  };
-  query.eq.mockReturnValue(query);
-  query.order.mockResolvedValue(result);
   return query;
 };
 
@@ -182,42 +161,25 @@ describe('public booking tenant isolation repositories', () => {
     ]);
   });
 
-  it('filters public services by active status and barbershop_id', async () => {
-    const query = createOrderedServicesQuery({
-      data: [
-        {
-          id: 'service-leo',
-          name: 'Corte Leo',
-          barbershop_id: 'shop-leo',
-          price: 70,
-          duration_minutes: 45,
-          commission_rate: 40,
-          active: true
-        }
-      ],
-      error: null
+  it('loads public services from the slug-scoped proxy without direct table access', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
+      services: [{ id: 'service-leo', name: 'Corte Leo', price: 70, duration_minutes: 45 }]
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+
+    const services = await listPublicServices('shop-leo', 'tenant-leo');
+
+    expect(fetch).toHaveBeenCalledWith('/api/public-booking/catalog?slug=shop-leo', {
+      method: 'GET',
+      headers: { accept: 'application/json' }
     });
-    const select = vi.fn().mockReturnValue(query);
-
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table !== 'services') throw new Error(`Unexpected table ${table}`);
-      return { select };
-    });
-
-    const services = await listServices('shop-leo');
-
-    expect(supabaseMock.from).toHaveBeenCalledWith('services');
-    expect(select).toHaveBeenCalledWith('id,name,barbershop_id,price,duration_minutes,commission_rate,active');
-    expect(query.eq).toHaveBeenNthCalledWith(1, 'barbershop_id', 'shop-leo');
-    expect(query.eq).toHaveBeenNthCalledWith(2, 'active', true);
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('services');
     expect(services).toEqual([
       {
         id: 'service-leo',
         name: 'Corte Leo',
-        barbershopId: 'shop-leo',
+        barbershopId: 'tenant-leo',
         price: 70,
         durationMinutes: 45,
-        commissionRate: 40,
         active: true
       }
     ]);

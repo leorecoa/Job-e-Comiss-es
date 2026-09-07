@@ -185,6 +185,7 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
 
   const barbersRequests: string[] = [];
   const servicesRequests: string[] = [];
+  const directServicesRequests: string[] = [];
   const slotRequests: CapturedRequest[] = [];
   const appointmentRequests: CapturedRequest[] = [];
   const appointmentReadRequests: CapturedRequest[] = [];
@@ -200,6 +201,16 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
         .filter((slot) => slot.barbershop_id === shop?.id)
         .map(({ barbershop_id: _barbershopId, ...slot }) => slot);
       await fulfillJson(route, 200, { slots });
+      return;
+    }
+
+    if (url.pathname === '/api/public-booking/catalog') {
+      servicesRequests.push(request.url());
+      const shop = state.barbershops.find((candidate) => candidate.slug === url.searchParams.get('slug') && candidate.active);
+      const services = state.services
+        .filter((service) => service.barbershop_id === shop?.id && service.active)
+        .map(({ id, name, price, duration_minutes }) => ({ id, name, price, duration_minutes }));
+      await fulfillJson(route, 200, { services });
       return;
     }
 
@@ -270,19 +281,8 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
     }
 
     if (url.pathname === '/rest/v1/services') {
-      servicesRequests.push(request.url());
-      const barbershopId = toEqValue(url.searchParams.get('barbershop_id'));
-      const id = toEqValue(url.searchParams.get('id'));
-      const active = toEqValue(url.searchParams.get('active'));
-
-      const rows = state.services.filter((service) => {
-        if (barbershopId && service.barbershop_id !== barbershopId) return false;
-        if (id && service.id !== id) return false;
-        if (active === 'true' && !service.active) return false;
-        return true;
-      });
-
-      await fulfillJson(route, 200, rows);
+      directServicesRequests.push(request.url());
+      await fulfillJson(route, 403, { message: 'Public booking must not access services directly' });
       return;
     }
 
@@ -338,6 +338,7 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
   return {
     barbersRequests,
     servicesRequests,
+    directServicesRequests,
     slotRequests,
     appointmentRequests,
     appointmentReadRequests
@@ -380,8 +381,8 @@ test.describe('public booking /book/:slug', () => {
 
     expect(network.barbersRequests.some((url) => url.includes(`barbershop_id=eq.${LEO_BARBERSHOP_ID}`))).toBeTruthy();
     expect(network.barbersRequests.some((url) => url.includes('active=eq.true'))).toBeTruthy();
-    expect(network.servicesRequests.some((url) => url.includes(`barbershop_id=eq.${LEO_BARBERSHOP_ID}`))).toBeTruthy();
-    expect(network.servicesRequests.some((url) => url.includes('active=eq.true'))).toBeTruthy();
+    expect(network.servicesRequests.some((url) => url.includes('/api/public-booking/catalog?slug=leo-do-leo'))).toBeTruthy();
+    expect(network.directServicesRequests).toHaveLength(0);
     expect(network.slotRequests.some((request) => (
       request.method === 'GET'
       && request.url.includes('/api/public-booking/slots?slug=leo-do-leo')

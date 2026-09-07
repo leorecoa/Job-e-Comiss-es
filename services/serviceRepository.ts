@@ -15,6 +15,8 @@ type DatabaseServiceRow = {
   active: boolean;
 };
 
+type DatabasePublicServiceRow = Pick<DatabaseServiceRow, 'id' | 'name' | 'price' | 'duration_minutes'>;
+
 export type ListServicesOptions = {
   includeInactive?: boolean;
 };
@@ -130,6 +132,31 @@ export const listServices = async (barbershopId?: string, options?: ListServices
 
   if (error) throw error;
   return ((data || []) as DatabaseServiceRow[]).map(mapServiceFromDb);
+};
+
+export const listPublicServices = async (barbershopSlug: string, barbershopId?: string): Promise<Service[]> => {
+  const scopedSlug = barbershopSlug.trim().toLowerCase();
+
+  if (!scopedSlug) throw new Error('Barbearia nao encontrada ou indisponivel.');
+  if (shouldUseLocalFallback) return listLocalServices(barbershopId);
+  assertOperationalSupabase();
+
+  const response = await fetch(`/api/public-booking/catalog?slug=${encodeURIComponent(scopedSlug)}`, {
+    method: 'GET',
+    headers: { accept: 'application/json' }
+  });
+  const body = await response.json().catch(() => null) as { services?: DatabasePublicServiceRow[]; code?: string } | null;
+
+  if (!response.ok) throw new Error(body?.code || 'PUBLIC_BOOKING_UNAVAILABLE');
+
+  return (body?.services || []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    barbershopId,
+    price: Number(row.price) || 0,
+    durationMinutes: Number(row.duration_minutes) || 30,
+    active: true
+  }));
 };
 
 export const createService = async (service: CreateServiceInput): Promise<Service> => {

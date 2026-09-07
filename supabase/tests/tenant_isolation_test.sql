@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(255);
+select plan(269);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -65,6 +65,19 @@ select is((select proconfig from pg_proc where oid = 'public.get_public_appointm
 select ok(has_function_privilege('service_role', 'public.get_public_appointment_slots_by_slug(text)', 'execute'), 'proxy credential can execute slug slots RPC');
 select ok(not has_function_privilege('anon', 'public.get_public_appointment_slots_by_slug(text)', 'execute') and not has_function_privilege('authenticated', 'public.get_public_appointment_slots_by_slug(text)', 'execute'), 'browser roles cannot execute slug slots RPC');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'get_public_appointment_slots_by_slug' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute slug slots RPC');
+select ok(not has_table_privilege('anon', 'public.services', 'select'), 'anon has no direct services select');
+select ok(not exists(select 1 from pg_policies where schemaname = 'public' and tablename = 'services' and policyname = 'services_public_read_active'), 'public services read policy is absent');
+select ok(has_table_privilege('authenticated', 'public.services', 'select') and has_table_privilege('authenticated', 'public.services', 'insert') and has_table_privilege('authenticated', 'public.services', 'update') and has_table_privilege('authenticated', 'public.services', 'delete'), 'authenticated services privileges remain unchanged');
+select ok(to_regprocedure('public.get_public_services_by_slug(text)') is not null, 'proxy catalog RPC exists with slug input');
+select is(pg_get_function_result('public.get_public_services_by_slug(text)'::regprocedure), 'TABLE(id uuid, name text, price numeric, duration_minutes integer)', 'proxy catalog RPC exposes only the minimal projection');
+select is((select prosecdef from pg_proc where oid = 'public.get_public_services_by_slug(text)'::regprocedure), true, 'proxy catalog RPC is security definer');
+select is((select proconfig from pg_proc where oid = 'public.get_public_services_by_slug(text)'::regprocedure), array['search_path=pg_catalog'], 'proxy catalog RPC keeps controlled search path');
+select ok(has_function_privilege('service_role', 'public.get_public_services_by_slug(text)', 'execute'), 'proxy credential can execute catalog RPC');
+select ok(not has_function_privilege('anon', 'public.get_public_services_by_slug(text)', 'execute') and not has_function_privilege('authenticated', 'public.get_public_services_by_slug(text)', 'execute'), 'browser roles cannot execute catalog RPC');
+select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'public' and routine_name = 'get_public_services_by_slug' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC cannot execute catalog RPC');
+select is((select count(*) from public.get_public_services_by_slug('tenant-alpha')), 1::bigint, 'catalog RPC returns active services for the resolved tenant');
+select is((select count(*) from public.get_public_services_by_slug('tenant-alpha') where id = '44444444-4444-4444-8444-444444444444'), 0::bigint, 'catalog RPC does not return another tenant service');
+select throws_ok($test$select * from public.get_public_services_by_slug('missing-tenant')$test$, 'P0001'::char(5), 'PUBLIC_APPOINTMENT_INVALID_TENANT', 'catalog RPC fails closed for an unknown slug');
 
 select ok(not exists(select 1 from information_schema.table_privileges where table_schema = 'public' and table_name = 'profiles' and grantee = 'PUBLIC'), 'PUBLIC has no direct profiles privileges');
 select ok(not has_table_privilege('anon', 'public.profiles', 'select') and not has_table_privilege('anon', 'public.profiles', 'insert') and not has_table_privilege('anon', 'public.profiles', 'update') and not has_table_privilege('anon', 'public.profiles', 'delete') and not has_table_privilege('anon', 'public.profiles', 'truncate') and not has_table_privilege('anon', 'public.profiles', 'references') and not has_table_privilege('anon', 'public.profiles', 'trigger'), 'anon has no direct profiles privileges');
@@ -197,6 +210,7 @@ select results_eq($test$update storage.objects set metadata = '{"blocked":true}'
 reset role;
 insert into public.services (id, name, price, duration_minutes, commission_rate, active, barbershop_id)
 values ('99999999-9999-4999-8999-999999999999', 'Inactive Service', 999, 90, 99, false, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
+select is((select count(*) from public.get_public_services_by_slug('tenant-alpha') where id = '99999999-9999-4999-8999-999999999999'), 0::bigint, 'catalog RPC excludes inactive services');
 
 set local role authenticated;
 set local "request.jwt.claims" = '{"sub":"aaaa0000-0000-4000-8000-000000000002","role":"authenticated"}';
