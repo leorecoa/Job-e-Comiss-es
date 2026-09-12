@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { Client, Vale, AppSettings } from '../types';
-import { formatCurrency, calculateClientCommission } from '../utils';
+import { formatCurrency, calculateClientCommission, getFinancialBarberKey } from '../utils';
 import { StatsCard } from './StatsCard';
 import { DashboardCharts } from './DashboardCharts';
 import { ArrowLeft, DollarSign, TrendingUp, Calendar, MinusCircle, Users } from 'lucide-react';
@@ -57,7 +57,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
     // Agrupar por dia
     const daysMap: Record<string, { sales: number; commission: number; vales: number; count: number }> = {};
     // Agrupar por barbeiro.
-    const barbersMap: Record<string, { sales: number; commission: number; vales: number; count: number }> = {};
+    const barbersMap: Record<string, { name: string; sales: number; commission: number; vales: number; count: number }> = {};
 
     // Processar Clientes
     filteredClients.forEach(c => {
@@ -72,10 +72,11 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
 
       // Por Barbeiro
       const barberName = c.barberName || 'Desconhecido';
-      if (!barbersMap[barberName]) barbersMap[barberName] = { sales: 0, commission: 0, vales: 0, count: 0 };
-      barbersMap[barberName].sales += c.totalValue;
-      barbersMap[barberName].commission += comm;
-      barbersMap[barberName].count += 1;
+      const barberKey = getFinancialBarberKey(c);
+      if (!barbersMap[barberKey]) barbersMap[barberKey] = { name: barberName, sales: 0, commission: 0, vales: 0, count: 0 };
+      barbersMap[barberKey].sales += c.totalValue;
+      barbersMap[barberKey].commission += comm;
+      barbersMap[barberKey].count += 1;
     });
 
     // Processar Vales
@@ -87,8 +88,9 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
 
       // Por Barbeiro
       const barberName = v.barberName || 'Desconhecido';
-      if (!barbersMap[barberName]) barbersMap[barberName] = { sales: 0, commission: 0, vales: 0, count: 0 };
-      barbersMap[barberName].vales += v.value;
+      const barberKey = getFinancialBarberKey(v);
+      if (!barbersMap[barberKey]) barbersMap[barberKey] = { name: barberName, sales: 0, commission: 0, vales: 0, count: 0 };
+      barbersMap[barberKey].vales += v.value;
     });
 
     // Converter para array e ordenar (Dias)
@@ -102,7 +104,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
 
     // Converter para array (Barbeiros)
     const teamBreakdown = Object.entries(barbersMap)
-      .map(([name, data]) => ({ name, ...data }))
+      .map(([id, data]) => ({ id, ...data }))
       .sort((a, b) => b.sales - a.sales); // Quem vendeu mais primeiro
 
     return {
@@ -243,7 +245,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                     {monthlyData.teamBreakdown.map((barber) => {
                         const net = barber.commission - barber.vales;
                         return (
-                            <tr key={barber.name} className="ui-owner-table-row transition-colors">
+                            <tr key={barber.id} className="ui-owner-table-row transition-colors">
                                 <td className="p-4 font-bold text-foreground">{barber.name}</td>
                                 <td className="p-4 text-center text-foreground">{barber.count}</td>
                                 <td className="p-4 text-right text-foreground">{formatCurrency(barber.sales)}</td>

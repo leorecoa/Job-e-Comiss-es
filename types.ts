@@ -103,6 +103,7 @@ export interface Appointment {
 export interface Client {
   id: string;
   appointmentId?: string;
+  barberId?: string;
   name: string;
   phone?: string;        // Optional Phone
   birthDate?: string;    // Optional Birth Date (YYYY-MM-DD)

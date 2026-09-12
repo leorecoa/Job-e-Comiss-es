@@ -1,7 +1,7 @@
 
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, ClientType, UserProfile, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
-import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, getOperationalVales, parseLocalDateInput, resolveOwnerScopedBarbershopId } from './utils';
+import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, getOperationalVales, getFinancialBarberKey, parseLocalDateInput, resolveOwnerScopedBarbershopId } from './utils';
 import { 
   BarbershopBrandingImageType,
   BarbershopBrandingInput,
@@ -791,19 +791,25 @@ const App: React.FC = () => {
   );
 
   const barberFilterOptions = useMemo(() => {
-    const names = new Set<string>();
-    (settings.barbers || []).forEach(barber => { // settings.barbers is now BarberOption[]
-      if (barber.name?.trim()) names.add(barber.name.trim());
+    const options = new Map<string, string>();
+    (settings.barbers || []).forEach(barber => {
+      if (barber.name?.trim()) options.set(getFinancialBarberKey({
+        barberId: shouldUseLocalFallback ? undefined : barber.id,
+        barberName: barber.name
+      }), barber.name);
     });
 
     clients.forEach(client => {
-      if (client.barberName?.trim()) names.add(client.barberName.trim());
+      if (client.barberName?.trim()) options.set(getFinancialBarberKey(client), client.barberName);
     });
     operationalVales.forEach(vale => {
-      if (vale.barberName?.trim()) names.add(vale.barberName.trim());
+      if (vale.barberName?.trim()) options.set(getFinancialBarberKey(vale), vale.barberName);
     });
-    return ['TODOS', ...Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR'))];
+    return [{ id: 'TODOS', name: 'Todos os barbeiros' }, ...Array.from(options, ([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))];
   }, [settings.barbers, clients, operationalVales]);
+
+  const selectedBarberLabel = barberFilterOptions.find(barber => barber.id === selectedBarberFilter)?.name;
 
   const scheduleBarberOptions = useMemo(() => {
     const names = new Set<string>();
@@ -822,11 +828,11 @@ const App: React.FC = () => {
 
   const chartClients = useMemo(() => {
     if (selectedBarberFilter === 'TODOS') return clients;
-    return clients.filter(client => client.barberName === selectedBarberFilter);
+    return clients.filter(client => getFinancialBarberKey(client) === selectedBarberFilter);
   }, [clients, selectedBarberFilter]);
 
   useEffect(() => {
-    if (selectedBarberFilter !== 'TODOS' && !barberFilterOptions.includes(selectedBarberFilter)) {
+    if (selectedBarberFilter !== 'TODOS' && !barberFilterOptions.some(barber => barber.id === selectedBarberFilter)) {
       setSelectedBarberFilter('TODOS');
     }
   }, [selectedBarberFilter, barberFilterOptions]);
@@ -849,7 +855,7 @@ const App: React.FC = () => {
       const day = String(d.getDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
       if (dateString !== selectedDate) return false;
-      if (selectedBarberFilter !== 'TODOS' && client.barberName !== selectedBarberFilter) return false;
+      if (selectedBarberFilter !== 'TODOS' && getFinancialBarberKey(client) !== selectedBarberFilter) return false;
       return true;
     });
     return filtered.sort((a, b) => b.timestamp - a.timestamp);
@@ -865,7 +871,7 @@ const App: React.FC = () => {
       const day = String(d.getDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
       if (dateString !== selectedDate) return false;
-      if (selectedBarberFilter !== 'TODOS' && vale.barberName !== selectedBarberFilter) return false;
+      if (selectedBarberFilter !== 'TODOS' && getFinancialBarberKey(vale) !== selectedBarberFilter) return false;
       return true;
     });
     return filtered.sort((a, b) => b.timestamp - a.timestamp);
@@ -1441,7 +1447,7 @@ const App: React.FC = () => {
         setAppointments(prev => prev.map(item => item.id === appointment.id ? completedAppointment : item));
         setClients(prev => prev.some(client => client.appointmentId === appointment.id)
           ? prev
-          : [appointmentToClient(completedAppointment, settings, completion.financialRecordId), ...prev]);
+          : [{ ...appointmentToClient(completedAppointment, settings, completion.financialRecordId), barberId: completedAppointment.barberId }, ...prev]);
         addToast(appointment.financialRecordId
           ? 'Agendamento concluido sem duplicar financeiro.'
           : 'Agendamento concluido e financeiro lancado!', 'success');
@@ -1957,10 +1963,10 @@ const App: React.FC = () => {
                                 value={selectedBarberFilter}
                                 onChange={(e) => setSelectedBarberFilter(e.target.value)}
                                 className="ui-owner-filter text-sm rounded-xl pl-9 pr-3 py-2.5 appearance-none min-w-[180px]"
-                            > {/* This filter still uses names, which is fine for display */}
+                            >
                                 {barberFilterOptions.map((barber) => (
-                                    <option key={barber} value={barber}>
-                                        {barber === 'TODOS' ? 'Todos os barbeiros' : barber}
+                                    <option key={barber.id} value={barber.id}>
+                                        {barber.name}
                                     </option>
                                 ))}
                             </select>
@@ -2033,7 +2039,7 @@ const App: React.FC = () => {
                            {filteredClients.length === 0 ? (
                             <div className="ui-owner-empty m-4 text-center">
                               <p className="font-bold text-foreground">
-                                {selectedBarberFilter === 'TODOS' ? 'Nenhum atendimento registrado ainda.' : `Nenhum atendimento para ${selectedBarberFilter}.`}
+                                {selectedBarberFilter === 'TODOS' ? 'Nenhum atendimento registrado ainda.' : `Nenhum atendimento para ${selectedBarberLabel}.`}
                               </p>
                               <p className="mx-auto mt-2 max-w-md text-sm">
                                 Quando voce registrar um atendimento manual ou concluir agendamentos, o historico de clientes aparecera aqui.
@@ -2154,7 +2160,7 @@ const App: React.FC = () => {
                            {filteredVales.length === 0 ? (
                             <div className="ui-owner-empty m-4 text-center">
                               <p className="font-bold text-foreground">
-                                {selectedBarberFilter === 'TODOS' ? 'Nenhum vale registrado ainda.' : `Nenhum vale para ${selectedBarberFilter}.`}
+                                {selectedBarberFilter === 'TODOS' ? 'Nenhum vale registrado ainda.' : `Nenhum vale para ${selectedBarberLabel}.`}
                               </p>
                               <p className="mx-auto mt-2 max-w-md text-sm">
                                 Vales lancados para barbeiros aparecem aqui e entram no resumo financeiro do periodo.
