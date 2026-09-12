@@ -14,7 +14,6 @@ import {
 } from './services/barbershopRepository';
 import {
   APPOINTMENT_STORAGE_KEY,
-  appointmentToClient,
   completeAppointmentFinancialRecord,
   createAppointmentConflictError,
   getAppointmentDateInput,
@@ -1445,9 +1444,22 @@ const App: React.FC = () => {
           financialRecordId: completion.financialRecordId
         };
         setAppointments(prev => prev.map(item => item.id === appointment.id ? completedAppointment : item));
-        setClients(prev => prev.some(client => client.appointmentId === appointment.id)
-          ? prev
-          : [{ ...appointmentToClient(completedAppointment, settings, completion.financialRecordId), barberId: completedAppointment.barberId }, ...prev]);
+        try {
+          if (!appointment.barbershopId) throw new Error('Financial record tenant unavailable.');
+          const records = await listFinancialRecords(appointment.barbershopId);
+          const record = records.find(item => item.id === completion.financialRecordId && item.appointment_id === appointment.id);
+          if (!record || !Number.isFinite(Date.parse(record.completed_at))) {
+            throw new Error('Persisted financial completion time unavailable.');
+          }
+          const client = mapFinancialRecordToClient(record, completedAppointment);
+          setClients(prev => prev.some(item => item.appointmentId === appointment.id)
+            ? prev.map(item => item.appointmentId === appointment.id ? client : item)
+            : [client, ...prev]);
+        } catch (error) {
+          logOperationalError('dashboard:load-completed-financial-record', error);
+          addToast('Atendimento concluido, mas nao foi possivel atualizar o financeiro. Atualize a pagina.', 'error');
+          return;
+        }
         addToast(appointment.financialRecordId
           ? 'Agendamento concluido sem duplicar financeiro.'
           : 'Agendamento concluido e financeiro lancado!', 'success');
