@@ -88,7 +88,7 @@ describe('appointment persistence mappers', () => {
       barbershop_id: 'shop-1',
       barber_id: 'barber-1',
       service_id: 'service-1',
-      service_type: 'Corte',
+      service_type: 'Corte personalizado',
       service_value: 50,
       commission_rate: 40,
       commission_value: 20,
@@ -100,6 +100,7 @@ describe('appointment persistence mappers', () => {
     expect(mapped.appointmentId).toBe(appointment.id);
     expect(mapped.totalValue).toBe(50);
     expect(mapped.commissionValue).toBe(20);
+    expect(mapped.serviceType).toBe('Corte personalizado');
   });
 
   it('maps empty uuid fields to null before sending to database', () => {

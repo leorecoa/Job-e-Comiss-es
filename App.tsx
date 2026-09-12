@@ -29,7 +29,7 @@ import type { TourStep } from './components/tourUtils';
 import { isProductionWithoutSupabase, isSupabaseConfigured, PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE, shouldUseLocalFallback } from './lib/supabase';
 import { createAppointment as createAppointmentRecord, createBarberAppointment, createPublicAppointment, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { completeAppointmentWithFinancialRecord, listFinancialRecords, mapFinancialRecordToClient } from './services/financialRecordRepository';
-import { resolveClientEditTarget } from './clientEditing';
+import { canDeleteClientHistory, getClientHistoryEditLabel, resolveClientEditTarget } from './clientEditing';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
 import { linkBarberProfileByEmail } from './services/profileLinkingRepository';
 import { createService, listPublicServices, listServices, removeService, updateService } from './services/serviceRepository';
@@ -1942,9 +1942,12 @@ const App: React.FC = () => {
                     <button onClick={() => handleOwnerNavigation('reports')} className="ui-owner-toolbar-button px-4 py-2.5 rounded-xl shrink-0">
                         <BarChart3 size={18} />
                     </button>
+                    {activeTab === 'clients' && !shouldUseLocalFallback && (
+                      <span className="shrink-0 text-xs font-semibold text-muted-foreground">Data de conclusão</span>
+                    )}
                     <div className="ui-owner-date-control flex items-center rounded-xl p-0.5 flex-1 justify-between md:flex-none min-w-[140px]" id="tour-date-picker">
                         <button type="button" aria-label="Dia anterior" onClick={() => changeDate(-1)} className="p-2"><ChevronLeft size={20} aria-hidden="true" /></button>
-                        <input aria-label="Data operacional" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="ui-owner-date-input text-sm text-center w-full md:w-32" />
+                        <input aria-label={activeTab === 'clients' && !shouldUseLocalFallback ? 'Data de conclusão' : 'Data operacional'} type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="ui-owner-date-input text-sm text-center w-full md:w-32" />
                         <button type="button" aria-label="Proximo dia" onClick={() => changeDate(1)} className="p-2"><ChevronRight size={20} aria-hidden="true" /></button>
                     </div>
                     {barberFilterOptions.length > 1 && (
@@ -2084,17 +2087,17 @@ const App: React.FC = () => {
                                                 <div className="flex gap-3 border-t border-border pt-3">
                                                     <button 
                                                         onClick={() => handleEditClient(c)} 
-                                                        aria-label={`Editar atendimento de ${c.name}`}
+                                                        aria-label={`${getClientHistoryEditLabel(c, appointments)} atendimento de ${c.name}`}
                                                         className="flex-1 flex items-center justify-center gap-2 bg-blue-500/10 text-blue-400 py-2.5 rounded-lg text-sm font-bold active:bg-blue-500/20 transition-colors"
                                                     >
-                                                        <Pencil size={16}/> Editar
+                                                        <Pencil size={16}/> {getClientHistoryEditLabel(c, appointments)}
                                                     </button>
-                                                    <button 
+                                                    {canDeleteClientHistory(c, shouldUseLocalFallback) && <button
                                                         onClick={() => handleDeleteClient(c.id)} 
                                                         className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 text-red-400 py-2.5 rounded-lg text-sm font-bold active:bg-red-500/20 transition-colors"
                                                     >
                                                         <Trash2 size={16}/> Excluir
-                                                    </button>
+                                                    </button>}
                                                 </div>
                                             </div>
                                         ))}
@@ -2131,8 +2134,8 @@ const App: React.FC = () => {
                                                         </td>
                                                         <td className="p-4 text-right font-bold text-foreground whitespace-nowrap">{formatCurrency(c.totalValue)}</td>
                                                         <td className="p-4 flex justify-end gap-2">
-                                                            <button onClick={() => handleEditClient(c)} aria-label={`Editar atendimento de ${c.name}`} className="text-blue-400 hover:bg-blue-500/10 p-2 rounded"><Pencil size={16}/></button>
-                                                            <button onClick={() => handleDeleteClient(c.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>
+                                                            <button onClick={() => handleEditClient(c)} aria-label={`${getClientHistoryEditLabel(c, appointments)} atendimento de ${c.name}`} className="text-blue-400 hover:bg-blue-500/10 p-2 rounded"><Pencil size={16}/></button>
+                                                            {canDeleteClientHistory(c, shouldUseLocalFallback) && <button onClick={() => handleDeleteClient(c.id)} aria-label={`Excluir atendimento de ${c.name}`} className="text-red-400 hover:bg-red-500/10 p-2 rounded"><Trash2 size={16}/></button>}
                                                         </td>
                                                     </tr>
                                                 ))}

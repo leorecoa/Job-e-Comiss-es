@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveClientEditTarget } from '../../clientEditing';
+import { canDeleteClientHistory, getClientHistoryEditLabel, resolveClientEditTarget } from '../../clientEditing';
 import { Appointment, Client, ClientType, ServiceType } from '../../types';
 
 const appointment: Appointment = {
@@ -57,6 +57,12 @@ describe('resolveClientEditTarget', () => {
       appointment: completed,
       readOnly: true
     });
+    expect(getClientHistoryEditLabel(client, [completed])).toBe('Ver detalhes');
+  });
+
+  it('hides false deletion for remote history and preserves local deletion', () => {
+    expect(canDeleteClientHistory(client, false)).toBe(false);
+    expect(canDeleteClientHistory(client, true)).toBe(true);
   });
 
   it('does not fall back to legacy editing when a linked appointment is missing', () => {

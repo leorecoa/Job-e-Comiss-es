@@ -664,8 +664,10 @@ test.describe('owner operational dashboard e2e', () => {
     expect(network.completionRequests).toHaveLength(1);
 
     await page.getByRole('button', { name: 'Clientes' }).click();
+    await expect(page.getByText('Data de conclusão', { exact: true })).toBeVisible();
     await expect(page.getByRole('cell', { name: /Cliente Leo/ }).first()).toBeVisible();
-    await page.getByRole('button', { name: 'Editar atendimento de Cliente Leo' }).click();
+    await expect(page.getByRole('button', { name: 'Excluir atendimento de Cliente Leo' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Ver detalhes atendimento de Cliente Leo' }).click();
     await expect(page.getByRole('heading', { name: 'Detalhes do agendamento' })).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Cliente', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Salvar agendamento' })).toHaveCount(0);
