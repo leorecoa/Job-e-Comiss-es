@@ -7,6 +7,7 @@ import {
   normalizeBarbershopSlug
 } from '../services/barbershopRepository';
 import { Barbershop } from '../types';
+import { requireFinancialTimezone, suggestFinancialTimezone } from '../utils/financialTimezone';
 import { AuthLayout, Badge, Button, EmptyState, InlineNotice, Input, Label, Surface, Textarea } from './ui';
 
 type OwnerBarbershopOnboardingProps = {
@@ -22,6 +23,8 @@ type OwnerBarbershopOnboardingFormState = {
   address: string;
   whatsapp: string;
   description: string;
+  financialTimezone?: string;
+  confirmFinancialTimezone?: boolean;
 };
 
 export const getOwnerBarbershopOnboardingPreview = (slug: string): string => {
@@ -37,7 +40,10 @@ export const getOwnerBarbershopOnboardingPayload = (
   phone: form.phone.trim(),
   address: form.address.trim(),
   whatsapp: form.whatsapp.trim(),
-  description: form.description.trim()
+  description: form.description.trim(),
+  ...(form.confirmFinancialTimezone
+    ? { financialTimezone: requireFinancialTimezone(form.financialTimezone || '') }
+    : {})
 });
 
 export const OwnerBarbershopOnboarding: React.FC<OwnerBarbershopOnboardingProps> = ({
@@ -45,14 +51,16 @@ export const OwnerBarbershopOnboarding: React.FC<OwnerBarbershopOnboardingProps>
   onCreate,
   onComplete
 }) => {
-  const [form, setForm] = useState<OwnerBarbershopOnboardingFormState>({
+  const [form, setForm] = useState<OwnerBarbershopOnboardingFormState>(() => ({
     name: '',
     slug: '',
     phone: '',
     address: '',
     whatsapp: '',
-    description: ''
-  });
+    description: '',
+    financialTimezone: suggestFinancialTimezone(),
+    confirmFinancialTimezone: false
+  }));
   const [slugTouched, setSlugTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -174,6 +182,19 @@ export const OwnerBarbershopOnboarding: React.FC<OwnerBarbershopOnboardingProps>
                 rows={3}
                 />
               </div>
+            </div>
+
+            <div className="ui-field mt-4">
+              <Label htmlFor="onboarding-financial-timezone">Timezone financeira IANA (opcional)</Label>
+              <Input id="onboarding-financial-timezone" value={form.financialTimezone || ''} disabled={saving}
+                onChange={event => setForm(prev => ({ ...prev, financialTimezone: event.target.value, confirmFinancialTimezone: false }))} />
+              <p className="mt-2 text-sm text-muted-foreground">Sugestão do navegador. Definirá períodos financeiros futuramente; não altera relatórios, booking ou agenda nesta versão.</p>
+              <label className="mt-2 flex min-h-11 items-center gap-2 text-foreground">
+                <input type="checkbox" checked={form.confirmFinancialTimezone || false} disabled={saving}
+                  onChange={event => setForm(prev => ({ ...prev, confirmFinancialTimezone: event.target.checked }))} />
+                Confirmo a timezone financeira da barbearia
+              </label>
+              <p className="text-sm text-muted-foreground">Sem confirmação, a timezone permanece não configurada.</p>
             </div>
 
             <div className="ui-onboarding-actions">

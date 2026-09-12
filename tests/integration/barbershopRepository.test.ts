@@ -16,6 +16,9 @@ vi.mock('../../lib/supabase', () => ({
 import {
   createBarbershopForCurrentOwner,
   updateCurrentBarbershopBranding,
+  updateBarbershopFinancialTimezone,
+  getBarbershopById,
+  getBarbershopBySlug,
   getBarbershopPublicBookingPath,
   normalizeBarbershopSlug
 } from '../../services/barbershopRepository';
@@ -29,6 +32,50 @@ describe('barbershop onboarding repository', () => {
   it('normalizes the onboarding slug into a public-friendly path', () => {
     expect(normalizeBarbershopSlug(' Barbearia Sao Joao Premium! ')).toBe('barbearia-sao-joao-premium');
     expect(getBarbershopPublicBookingPath('barbearia-sao-joao-premium')).toBe('/book/barbearia-sao-joao-premium');
+  });
+
+  it('passes only a confirmed timezone to the nine-argument onboarding overload', async () => {
+    supabaseMock.rpc.mockReturnValue({ single: vi.fn().mockResolvedValue({ data: {
+      id: 'shop-1', name: 'Shop', slug: 'shop', active: true, financial_timezone: 'America/Recife'
+    }, error: null }) });
+    const created = await createBarbershopForCurrentOwner({ name: 'Shop', slug: 'shop', financialTimezone: 'America/Recife' });
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('create_owner_barbershop', expect.objectContaining({ p_financial_timezone: 'America/Recife' }));
+    expect(created.financialTimezone).toBe('America/Recife');
+  });
+
+  it('updates only financial_timezone within the requested tenant', async () => {
+    const query = { eq: vi.fn(), select: vi.fn(), single: vi.fn().mockResolvedValue({ data: {
+      id: 'shop-1', name: 'Shop', slug: 'shop', active: true, financial_timezone: 'America/New_York'
+    }, error: null }) };
+    query.eq.mockReturnValue(query);
+    query.select.mockReturnValue(query);
+    const update = vi.fn().mockReturnValue(query);
+    supabaseMock.from.mockReturnValue({ update });
+    const saved = await updateBarbershopFinancialTimezone('shop-1', 'America/New_York');
+    expect(update).toHaveBeenCalledWith({ financial_timezone: 'America/New_York' });
+    expect(query.eq).toHaveBeenCalledWith('id', 'shop-1');
+    expect(saved.financialTimezone).toBe('America/New_York');
+  });
+
+  it('rejects invalid timezone before any persistence', async () => {
+    await expect(updateBarbershopFinancialTimezone('shop-1', 'Not/AZone')).rejects.toThrow();
+    await expect(createBarbershopForCurrentOwner({ name: 'Shop', slug: 'shop', financialTimezone: 'Not/AZone' })).rejects.toThrow();
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([null, 'America/Recife'])('reads stored timezone %s without writing and excludes it from public selects', async financialTimezone => {
+    const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn().mockResolvedValue({ data: {
+      id: 'shop-1', name: 'Shop', slug: 'shop', active: true, financial_timezone: financialTimezone
+    }, error: null }) };
+    query.select.mockReturnValue(query);
+    query.eq.mockReturnValue(query);
+    supabaseMock.from.mockReturnValue(query);
+    expect((await getBarbershopById('shop-1'))?.financialTimezone).toBe(financialTimezone);
+    expect(query.select).toHaveBeenLastCalledWith(expect.stringContaining('financial_timezone'));
+    await getBarbershopBySlug('shop');
+    expect(query.select).toHaveBeenLastCalledWith(expect.not.stringContaining('financial_timezone'));
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
   });
 
   it('maps an unauthenticated RPC response to a friendly error', async () => {
