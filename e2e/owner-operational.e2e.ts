@@ -114,6 +114,7 @@ type MockScenario = {
   financialRecords?: MockFinancialRecord[];
   rpcResponse?: MockRpcResponse;
   completionRpcResponse?: MockRpcResponse;
+  completedAt?: string;
   onboardingRpcResponse?: MockRpcResponse;
 };
 
@@ -497,7 +498,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
           service_value: appointment.service_value,
           commission_rate: 50,
           commission_value: 30,
-          completed_at: new Date().toISOString(),
+          completed_at: scenario.completedAt ?? new Date().toISOString(),
           created_at: new Date().toISOString()
         });
       }
@@ -599,6 +600,82 @@ const openOwnerManagement = async (page: Page) => {
 };
 
 test.describe('owner operational dashboard e2e', () => {
+  test.describe('canonical financial completion time', () => {
+    test.use({ timezoneId: 'UTC' });
+
+    for (const [startDay, completedDay] of [['2026-09-15', '2026-09-16'], ['2026-09-30', '2026-10-01']]) {
+      test(`preserves completion date and totals across reload: ${startDay} to ${completedDay}`, async ({ page }) => {
+        const completedAt = `${completedDay}T00:10:00.000Z`;
+        await page.clock.setFixedTime(new Date(completedAt));
+        const appointment = makeAppointmentRow({
+          id: 'appointment-boundary', clientName: 'Cliente Fronteira', barberId: OWNER_BARBER_ID,
+          barberName: 'Leo Barber', barbershopId: OWNER_BARBERSHOP_ID, date: startDay, time: '23:30'
+        });
+        appointment.start_at = `${startDay}T23:30:00.000Z`;
+        appointment.end_at = `${completedDay}T00:00:00.000Z`;
+        const network = await installOwnerSupabaseMocks(page, { appointments: [appointment], completedAt });
+        await signInAsOwner(page);
+        await page.getByLabel('Data operacional', { exact: true }).fill(startDay);
+        await page.getByRole('button', { name: 'Concluir', exact: true }).click();
+        await expect(page.getByText('Agendamento concluido e financeiro lancado!')).toBeVisible();
+        await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+
+        const assertCanonicalHistory = async () => {
+          const date = page.getByLabel('Data de conclusão', { exact: true });
+          await date.fill(startDay);
+          await expect(page.getByRole('cell', { name: /Cliente Fronteira/ })).toHaveCount(0);
+          await date.fill(completedDay);
+          const row = page.getByRole('row').filter({ has: page.getByRole('cell', { name: /Cliente Fronteira/ }) });
+          await expect(row).toBeVisible();
+          await expect(row).toContainText('00:10');
+          await expect(row).toContainText('R$ 60,00');
+          await expect(page.locator('#tour-stats')).toContainText('R$ 60,00');
+          await expect(page.locator('#tour-stats')).toContainText('R$ 30,00');
+        };
+
+        await assertCanonicalHistory();
+        await page.reload();
+        await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+        await assertCanonicalHistory();
+        expect(appointment.start_at).toBe(`${startDay}T23:30:00.000Z`);
+        expect(network.completionRequests).toHaveLength(1);
+        expect(network.appointmentUpdateRequests).toHaveLength(0);
+      });
+    }
+
+    for (const status of [200, 500]) {
+      test(`does not invent finance when the post-completion read is unavailable (${status})`, async ({ page }) => {
+        const completedAt = '2026-10-01T10:10:00.000Z';
+        await page.clock.setFixedTime(new Date(completedAt));
+        const appointment = makeAppointmentRow({
+          id: 'appointment-read-failure', clientName: 'Cliente Leitura', barberId: OWNER_BARBER_ID,
+          barberName: 'Leo Barber', barbershopId: OWNER_BARBERSHOP_ID, date: '2026-10-01', time: '06:00'
+        });
+        const financialRecords: MockFinancialRecord[] = [];
+        const network = await installOwnerSupabaseMocks(page, { appointments: [appointment], financialRecords, completedAt });
+        await signInAsOwner(page);
+        await expect(page.getByRole('button', { name: 'Concluir', exact: true })).toBeVisible();
+        const financialUrl = `${SUPABASE_URL}/rest/v1/financial_records*`;
+        await page.route(financialUrl, route => fulfillJson(route, status, status === 200 ? [] : { message: 'Read unavailable' }));
+        await page.getByRole('button', { name: 'Concluir', exact: true }).click();
+        await expect(page.getByText('Atendimento concluido, mas nao foi possivel atualizar o financeiro. Atualize a pagina.')).toBeVisible();
+        expect(appointment.status).toBe('completed');
+        expect(financialRecords).toHaveLength(1);
+        expect(financialRecords[0].completed_at).toBe(completedAt);
+        await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+        await expect(page.getByRole('cell', { name: /Cliente Leitura/ })).toHaveCount(0);
+        await expect(page.locator('#tour-stats')).not.toContainText('R$ 60,00');
+        await page.unroute(financialUrl);
+        await page.reload();
+        await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+        const row = page.getByRole('row').filter({ has: page.getByRole('cell', { name: /Cliente Leitura/ }) });
+        await expect(row).toContainText('10:10');
+        expect(network.completionRequests).toHaveLength(1);
+        expect(financialRecords).toHaveLength(1);
+      });
+    }
+  });
+
   test('new owner completes onboarding atomically and reaches dashboard without reload', async ({ page }) => {
     const network = await installOwnerSupabaseMocks(page, {
       profile: {

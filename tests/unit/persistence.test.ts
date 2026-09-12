@@ -80,8 +80,11 @@ describe('appointment persistence mappers', () => {
     });
   });
 
-  it.each(['financial-barber-1', null])('maps a persisted financial record preserving barber_id=%s', (barberId) => {
-    const appointment = makeAppointment({ status: 'completed' });
+  it.each([
+    ['financial-barber-1', '2026-09-15T23:30:00-03:00', '2026-09-16T00:10:00-03:00'],
+    [null, '2026-09-30T23:30:00-03:00', '2026-10-01T00:10:00-03:00']
+  ] as const)('maps persisted finance preserving barber_id=%s and completion time', (barberId, startAt, completedAt) => {
+    const appointment = makeAppointment({ status: 'completed', startAt });
     const mapped = mapFinancialRecordToClient({
       id: 'financial-1',
       appointment_id: appointment.id,
@@ -92,7 +95,7 @@ describe('appointment persistence mappers', () => {
       service_value: 50,
       commission_rate: 40,
       commission_value: 20,
-      completed_at: appointment.updatedAt,
+      completed_at: completedAt,
       created_at: appointment.updatedAt
     }, appointment);
 
@@ -103,6 +106,9 @@ describe('appointment persistence mappers', () => {
     expect(mapped.totalValue).toBe(50);
     expect(mapped.commissionValue).toBe(20);
     expect(mapped.serviceType).toBe('Corte personalizado');
+    expect(mapped.timestamp).toBe(Date.parse(completedAt));
+    expect(mapped.timestamp).not.toBe(Date.parse(appointment.startAt));
+    expect(appointment.startAt).toBe(startAt);
   });
 
   it('maps empty uuid fields to null before sending to database', () => {
