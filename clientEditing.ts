@@ -24,3 +24,16 @@ export const resolveClientEditTarget = (
     readOnly: appointment.status === 'completed' || Boolean(appointment.financialRecordId)
   };
 };
+
+export const getClientHistoryEditLabel = (
+  client: Client,
+  appointments: Appointment[]
+): 'Editar' | 'Ver detalhes' => {
+  const target = resolveClientEditTarget(client, appointments);
+  return target.type === 'appointment' && target.readOnly ? 'Ver detalhes' : 'Editar';
+};
+
+export const canDeleteClientHistory = (
+  client: Client,
+  useLocalFallback: boolean
+): boolean => useLocalFallback || !client.appointmentId;

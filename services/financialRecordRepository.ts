@@ -37,9 +37,7 @@ export const mapFinancialRecordToClient = (
   name: appointment.clientName,
   phone: appointment.clientPhone,
   barberName: appointment.barberName,
-  serviceType: Object.values(ServiceType).includes(row.service_type as ServiceType)
-    ? row.service_type as ServiceType
-    : ServiceType.OTHER,
+  serviceType: row.service_type as ServiceType,
   clientType: ClientType.RETURNING,
   serviceValue: Number(row.service_value),
   extraValue: 0,
