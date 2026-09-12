@@ -10,6 +10,7 @@ import {
   getBarbershopBySlug,
   getBarbershopPublicBookingPath,
   updateCurrentBarbershopBranding,
+  updateBarbershopFinancialTimezone,
   uploadBarbershopBrandingImage
 } from './services/barbershopRepository';
 import {
@@ -57,6 +58,7 @@ import { AUTH_CALLBACK_PATH, AuthCallbackScreen } from './components/AuthCallbac
 import { DashboardShell, type DashboardNavigationItem } from './components/DashboardShell';
 import { InlineNotice, LoadingState, Surface } from './components/ui';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
+import { FinancialTimezoneSettings } from './components/FinancialTimezoneSettings';
 import {
   getOwnerNavigationHash,
   getOwnerNavigationRoute,
@@ -973,6 +975,7 @@ const App: React.FC = () => {
   };
   const handleCreateOwnerBarbershop = async (input: {
     name: string;
+    financialTimezone?: string;
     slug: string;
     phone?: string | null;
     address?: string | null;
@@ -1889,6 +1892,7 @@ const App: React.FC = () => {
           <React.Suspense fallback={<SectionFallback />}>
             <SettingsWorkspace
               publicPresence={(
+                <>
                 <BarbershopBrandingSettings
                   barbershop={ownerBarbershop}
                   role={authSession?.role || 'owner'}
@@ -1899,6 +1903,14 @@ const App: React.FC = () => {
                   onSave={handleSaveOwnerBarbershopBranding}
                   onUploadImage={handleUploadOwnerBarbershopBrandingImage}
                 />
+                {!shouldUseLocalFallback && authSession?.role === 'owner' && ownerBarbershop && (
+                  <FinancialTimezoneSettings key={ownerBarbershop.id} barbershop={ownerBarbershop}
+                    onSave={async timezone => {
+                      const updated = await updateBarbershopFinancialTimezone(ownerBarbershop.id, timezone);
+                      setOwnerBarbershop(updated);
+                    }} />
+                )}
+                </>
               )}
               readiness={(
                 <OwnerSetupChecklist

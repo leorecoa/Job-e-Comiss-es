@@ -38,6 +38,7 @@ export type BarbershopBusinessHours = Record<BarbershopBusinessDayKey, Barbersho
 
 export type Barbershop = {
   id: string;
+  financialTimezone?: string | null;
   name: string;
   slug: string;
   phone?: string | null;

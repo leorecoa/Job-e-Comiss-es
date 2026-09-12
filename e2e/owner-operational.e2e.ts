@@ -28,6 +28,7 @@ type MockProfile = {
 
 type MockBarbershop = {
   id: string;
+  financial_timezone?: string | null;
   name: string;
   slug: string;
   phone: string | null;
@@ -254,8 +255,8 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
   };
 
   const barbershops: MockBarbershop[] = scenario.barbershops ?? [
-    ownerBarbershop,
-    otherBarbershop
+    { ...ownerBarbershop },
+    { ...otherBarbershop }
   ];
 
   const barbers: MockBarber[] = scenario.barbers ?? [
@@ -311,6 +312,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
   const completionRequests: CapturedRequest[] = [];
   const appointmentUpdateRequests: CapturedRequest[] = [];
   const onboardingRequests: CapturedRequest[] = [];
+  const financialTimezoneRequests: CapturedRequest[] = [];
 
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
     const request = route.request();
@@ -396,6 +398,17 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
         if (active === 'true' && !shop.active) return false;
         return true;
       });
+      if (request.method() === 'PATCH') {
+        const body = parseRequestBody(route) as Record<string, unknown>;
+        if ('financial_timezone' in body) {
+          financialTimezoneRequests.push({ method: request.method(), url: request.url(), body });
+          if (profile.role !== 'owner' || !profile.active || id !== profile.barbershop_id) {
+            await fulfillJson(route, 403, { message: 'Forbidden' });
+            return;
+          }
+          rows.forEach(shop => { shop.financial_timezone = String(body.financial_timezone); });
+        }
+      }
       const accept = request.headers()['accept'] || '';
 
       if (accept.includes('application/vnd.pgrst.object+json')) {
@@ -545,6 +558,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
 
       const created: MockBarbershop = {
         id: '01300000-0000-4000-8000-000000000010',
+        financial_timezone: (body.p_financial_timezone as string | undefined) ?? null,
         name: String(body.p_name),
         slug: String(body.p_slug),
         phone: body.p_phone as string | null,
@@ -578,7 +592,8 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
     rpcRequests,
     completionRequests,
     appointmentUpdateRequests,
-    onboardingRequests
+    onboardingRequests,
+    financialTimezoneRequests
   };
 };
 
@@ -600,6 +615,67 @@ const openOwnerManagement = async (page: Page) => {
 };
 
 test.describe('owner operational dashboard e2e', () => {
+  test.describe('financial timezone configuration', () => {
+    test.use({ timezoneId: 'America/New_York' });
+
+    for (const confirmed of [false, true]) {
+      test(`onboarding persists timezone only when confirmed=${confirmed}`, async ({ page }) => {
+        const failedRequests: string[] = [];
+        page.on('requestfailed', request => failedRequests.push(`${new URL(request.url()).pathname}: ${request.failure()?.errorText}`));
+        const network = await installOwnerSupabaseMocks(page, { profile: {
+          id: OWNER_USER_ID, display_name: OWNER_DISPLAY_NAME, role: 'owner', active: true, barbershop_id: null, barber_id: null
+        }, barbershops: [] });
+        await signInAsOwner(page);
+        await expect(page.getByLabel('Timezone financeira IANA (opcional)')).toHaveValue('America/New_York');
+        expect(network.onboardingRequests).toHaveLength(0);
+        await page.getByLabel('Nome da barbearia').fill('Timezone Shop');
+        if (confirmed) await page.getByLabel('Confirmo a timezone financeira da barbearia').check();
+        const financialLoaded = page.waitForResponse(response => response.url().includes('/rest/v1/financial_records'));
+        await page.getByRole('button', { name: 'Criar barbearia', exact: true }).click();
+        await page.waitForURL(url => url.pathname === '/');
+        await expect(page.getByRole('heading', { name: 'Agenda do dia' })).toBeVisible();
+        await (await financialLoaded).finished();
+        if (confirmed) expect(network.onboardingRequests[0].body).toHaveProperty('p_financial_timezone', 'America/New_York');
+        else expect(network.onboardingRequests[0].body).not.toHaveProperty('p_financial_timezone');
+        await openOwnerManagement(page);
+        await expect(page.getByText(confirmed ? 'Timezone atual: America/New_York' : 'Timezone financeira não configurada', { exact: true })).toBeVisible();
+        expect(network.financialTimezoneRequests).toHaveLength(0);
+        // The existing onboarding redirect cancels in-flight requests from the old page.
+        expect(failedRequests.filter(failure => !failure.endsWith(': net::ERR_ABORTED'))).toEqual([]);
+      });
+    }
+
+    test('existing null requires confirmation and saved timezone survives reload and login', async ({ page }) => {
+      const network = await installOwnerSupabaseMocks(page);
+      await signInAsOwner(page, '/#management-public-presence');
+      await expect(page.getByText('Timezone financeira não configurada', { exact: true })).toBeVisible();
+      const input = page.getByLabel('Timezone IANA', { exact: true });
+      await expect(input).toHaveValue('America/New_York');
+      expect(network.financialTimezoneRequests).toHaveLength(0);
+      await input.fill('Not/AZone');
+      await page.getByRole('button', { name: 'Confirmar e salvar timezone' }).click();
+      await expect(page.getByText('Informe uma timezone IANA válida.')).toBeVisible();
+      expect(network.financialTimezoneRequests).toHaveLength(0);
+      await input.fill('America/Recife');
+      await page.getByRole('button', { name: 'Confirmar e salvar timezone' }).click();
+      await expect(page.getByText('Timezone atual: America/Recife')).toBeVisible();
+      expect(network.financialTimezoneRequests[0].body).toEqual({ financial_timezone: 'America/Recife' });
+      await page.reload();
+      await expect(input).toHaveValue('America/Recife');
+      expect(network.financialTimezoneRequests).toHaveLength(1);
+      await input.fill('America/Sao_Paulo');
+      await page.getByRole('button', { name: 'Confirmar e salvar timezone' }).click();
+      await expect(page.getByText('Timezone atual: America/Sao_Paulo')).toBeVisible();
+      await page.route(`${SUPABASE_URL}/auth/v1/logout*`, route => route.fulfill({ status: 204, headers: CORS_HEADERS }));
+      page.once('dialog', dialog => dialog.accept());
+      await page.getByRole('button', { name: 'Sair', exact: true }).click();
+      await expect(page.getByRole('heading', { name: /Painel interno/i })).toBeVisible();
+      await signInAsOwner(page, '/#management-public-presence');
+      await expect(input).toHaveValue('America/Sao_Paulo');
+      expect(network.financialTimezoneRequests).toHaveLength(2);
+    });
+  });
+
   test.describe('canonical financial completion time', () => {
     test.use({ timezoneId: 'UTC' });
 
