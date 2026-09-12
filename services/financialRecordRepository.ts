@@ -34,6 +34,7 @@ export const mapFinancialRecordToClient = (
 ): Client => ({
   id: row.id,
   appointmentId: row.appointment_id,
+  barberId: row.barber_id ?? undefined,
   name: appointment.clientName,
   phone: appointment.clientPhone,
   barberName: appointment.barberName,

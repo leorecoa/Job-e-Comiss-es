@@ -80,13 +80,13 @@ describe('appointment persistence mappers', () => {
     });
   });
 
-  it('maps a persisted financial record back into the dashboard client model', () => {
+  it.each(['financial-barber-1', null])('maps a persisted financial record preserving barber_id=%s', (barberId) => {
     const appointment = makeAppointment({ status: 'completed' });
     const mapped = mapFinancialRecordToClient({
       id: 'financial-1',
       appointment_id: appointment.id,
       barbershop_id: 'shop-1',
-      barber_id: 'barber-1',
+      barber_id: barberId,
       service_id: 'service-1',
       service_type: 'Corte personalizado',
       service_value: 50,
@@ -98,6 +98,8 @@ describe('appointment persistence mappers', () => {
 
     expect(mapped.id).toBe('financial-1');
     expect(mapped.appointmentId).toBe(appointment.id);
+    expect(mapped.barberId).toBe(barberId ?? undefined);
+    expect(mapped.barberName).toBe(appointment.barberName);
     expect(mapped.totalValue).toBe(50);
     expect(mapped.commissionValue).toBe(20);
     expect(mapped.serviceType).toBe('Corte personalizado');

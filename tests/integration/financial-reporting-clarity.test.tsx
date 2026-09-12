@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MonthlySummary } from '../../components/MonthlySummary';
 import { BarberDashboard } from '../../components/BarberDashboard';
 import { AppSettings, Client, ClientType, ServiceType, Vale } from '../../types';
+import { formatCurrency, getFinancialBarberKey } from '../../utils';
 
 const { jsPdfMock, autoTableMock, docMock } = vi.hoisted(() => {
   const doc = {
@@ -103,9 +104,52 @@ const vales: Vale[] = [
   }
 ];
 
+const getTeamRows = (records: Client[], advances: Vale[] = []) => {
+  const html = renderToStaticMarkup(
+    <MonthlySummary clients={records} vales={advances} settings={settings}
+      selectedMonth="2026-01" onMonthChange={vi.fn()} onBack={vi.fn()} />
+  );
+  const teamBody = html.match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? '';
+  return Array.from(teamBody.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/g), row => (
+    Array.from(row[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g), cell => cell[1])
+  ));
+};
+
 describe('financial reporting clarity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('keeps homonymous barbers separate and aggregates renamed snapshots only by the same ID', () => {
+    const rows = getTeamRows([
+      { ...clients[0], barberId: 'barber-1' },
+      { ...clients[0], id: 'client-2', barberId: 'barber-2', serviceValue: 60, totalValue: 60, commissionValue: 24 },
+      { ...clients[0], id: 'client-3', barberId: 'barber-1', barberName: 'Leo atualizado', serviceValue: 20, totalValue: 20, commissionValue: 8 }
+    ]);
+
+    expect(rows).toEqual([
+      ['Leo', '2', formatCurrency(120), formatCurrency(58), '-', formatCurrency(58)],
+      ['Leo', '1', formatCurrency(60), formatCurrency(24), '-', formatCurrency(24)]
+    ]);
+  });
+
+  it('preserves name-based local totals and vales for records without barber IDs', () => {
+    expect(getTeamRows([clients[0], { ...clients[0], id: 'client-2' }], vales)).toEqual([
+      ['Leo', '2', formatCurrency(200), formatCurrency(100), `- ${formatCurrency(10)}`, formatCurrency(90)]
+    ]);
+  });
+
+  it('uses stable financial filter keys without mixing homonyms or legacy names with IDs', () => {
+    const first = { ...clients[0], barberId: 'barber-1' };
+    const second = { ...clients[0], id: 'client-2', barberId: 'barber-2' };
+    const renamed = { ...first, id: 'client-3', barberName: 'Leo atualizado' };
+    const selectedKey = getFinancialBarberKey(first);
+
+    expect([first, second, renamed, clients[0]].filter(client => getFinancialBarberKey(client) === selectedKey))
+      .toEqual([first, renamed]);
+    expect(getFinancialBarberKey(clients[0])).toBe(getFinancialBarberKey(vales[0]));
+    expect(getFinancialBarberKey({ barberId: 'Leo', barberName: 'Leo' }))
+      .not.toBe(getFinancialBarberKey(clients[0]));
   });
 
   it('labels owner monthly summary as gross revenue, calculated commission, and estimated balances', () => {

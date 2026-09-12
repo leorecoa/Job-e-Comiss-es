@@ -6,6 +6,10 @@ export const getOperationalVales = (vales: Vale[], allowLocalFallback: boolean):
   allowLocalFallback ? vales : []
 );
 
+export const getFinancialBarberKey = ({ barberId, barberName }: Pick<Client, 'barberId' | 'barberName'>): string => (
+  barberId ? `id:${barberId}` : `name:${barberName || 'Desconhecido'}`
+);
+
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
