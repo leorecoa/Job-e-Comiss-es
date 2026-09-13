@@ -2,59 +2,35 @@
 import React from 'react';
 import { formatCurrency } from '../utils';
 import { Client, ServiceType } from '../types';
+import { addCalendarDays, calendarDaySequence, financialDateKey, financialToday } from '../utils/financialTimezone';
 
 interface DashboardChartsProps {
   clients: Client[];
   period?: 'weekly' | 'monthly';
   selectedDate?: string; // YYYY-MM format for monthly view
+  financialTimezone?: string;
 }
 
 export const DashboardCharts: React.FC<DashboardChartsProps> = ({ 
     clients, 
     period = 'weekly',
-    selectedDate
+    selectedDate,
+    financialTimezone
 }) => {
   
   // 1. Bar Chart Data Generator
   const getChartData = () => {
-    const data = [];
-
-    if (period === 'monthly' && selectedDate) {
-        // Monthly Logic: 1 to 31 (or end of month)
-        const [year, month] = selectedDate.split('-').map(Number);
-        const daysInMonth = new Date(year, month, 0).getDate();
-        
-        for (let i = 1; i <= daysInMonth; i++) {
-            const currentDayDate = new Date(year, month - 1, i);
-            const dayStr = String(i).padStart(2, '0');
-            
-            const startOfDay = currentDayDate.setHours(0,0,0,0);
-            const endOfDay = currentDayDate.setHours(23,59,59,999);
-
-            const dayTotal = clients
-                .filter(c => c.timestamp >= startOfDay && c.timestamp <= endOfDay)
-                .reduce((acc, c) => acc + c.totalValue, 0);
-
-            data.push({ day: dayStr, value: dayTotal, fullDate: currentDayDate });
-        }
-    } else {
-        // Weekly Logic: Last 7 Days
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            const dayStr = `${d.getDate()}/${d.getMonth() + 1}`;
-            
-            const startOfDay = new Date(d.setHours(0,0,0,0)).getTime();
-            const endOfDay = new Date(d.setHours(23,59,59,999)).getTime();
-            
-            const dayTotal = clients
-                .filter(c => c.timestamp >= startOfDay && c.timestamp <= endOfDay)
-                .reduce((acc, c) => acc + c.totalValue, 0);
-
-            data.push({ day: dayStr, value: dayTotal });
-        }
-    }
-    return data;
+    const monthly = period === 'monthly' && selectedDate;
+    const end = monthly
+      ? addCalendarDays(`${selectedDate}-${new Date(Date.UTC(Number(selectedDate.slice(0, 4)), Number(selectedDate.slice(5)), 0)).getUTCDate()}`, 0)
+      : financialToday(financialTimezone);
+    const start = monthly ? `${selectedDate}-01` : addCalendarDays(end, -6);
+    return calendarDaySequence(start, end).map(key => ({
+      key,
+      day: monthly ? key.slice(8) : `${Number(key.slice(8))}/${Number(key.slice(5, 7))}`,
+      value: clients.filter(c => financialDateKey(c.timestamp, financialTimezone) === key)
+        .reduce((sum, c) => sum + c.totalValue, 0)
+    }));
   };
 
   const barData = getChartData();
@@ -63,12 +39,16 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
   // 2. Pie Chart Data (Service Types)
   const getServiceDistribution = () => {
     const counts: Record<string, number> = {};
-    clients.forEach(c => {
+    const periodKeys = new Set(barData.map(day => day.key));
+    const periodClients = financialTimezone
+      ? clients.filter(c => periodKeys.has(financialDateKey(c.timestamp, financialTimezone)))
+      : clients;
+    periodClients.forEach(c => {
         const type = c.serviceType;
         counts[type] = (counts[type] || 0) + 1;
     });
     
-    const total = clients.length || 1;
+    const total = periodClients.length || 1;
     return Object.entries(counts).map(([name, value]) => ({
         name,
         value,

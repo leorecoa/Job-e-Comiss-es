@@ -2,7 +2,8 @@
 
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { formatCurrency, formatTime } from "../utils";
+import { formatCurrency } from "../utils";
+import { formatCalendarDate, formatFinancialDate, formatFinancialTime } from '../utils/financialTimezone';
 import { Client, Vale } from "../types";
 
 export const generateReportPDF = (
@@ -15,7 +16,8 @@ export const generateReportPDF = (
     netCommission: number;
   },
   clients: Client[],
-  vales: Vale[]
+  vales: Vale[],
+  financialTimezone?: string
 ) => {
   const doc = new jsPDF();
   
@@ -58,8 +60,7 @@ export const generateReportPDF = (
   
   // Format ISO date if detected
   if (dateRangeStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-     const [year, month, day] = dateRangeStr.split('-').map(Number);
-     displayDate = new Date(year, month - 1, day).toLocaleDateString('pt-BR', {
+     displayDate = formatCalendarDate(dateRangeStr, {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
      }).toUpperCase();
   }
@@ -126,7 +127,7 @@ export const generateReportPDF = (
   const sortedClients = [...clients].sort((a, b) => b.timestamp - a.timestamp);
 
   const clientRows = sortedClients.map(c => {
-    const datePart = new Date(c.timestamp).toLocaleDateString('pt-BR');
+    const datePart = formatFinancialDate(c.timestamp, financialTimezone);
     let serviceDisplay: string = c.serviceType;
     
     // Append product names if exists
@@ -140,7 +141,7 @@ export const generateReportPDF = (
     }
 
     return [
-        `${datePart} ${formatTime(c.timestamp)}`,
+        `${datePart} ${formatFinancialTime(c.timestamp, financialTimezone)}`,
         c.name,
         serviceDisplay,
         c.barberName,
@@ -190,9 +191,9 @@ export const generateReportPDF = (
     const sortedVales = [...vales].sort((a, b) => b.timestamp - a.timestamp);
 
     const valeRows = sortedVales.map(v => {
-        const datePart = new Date(v.timestamp).toLocaleDateString('pt-BR');
+        const datePart = formatFinancialDate(v.timestamp, financialTimezone);
         return [
-            `${datePart} ${formatTime(v.timestamp)}`,
+            `${datePart} ${formatFinancialTime(v.timestamp, financialTimezone)}`,
             v.barberName,
             v.description,
             formatCurrency(v.value)

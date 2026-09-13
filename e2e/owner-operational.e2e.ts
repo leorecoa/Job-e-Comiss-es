@@ -615,6 +615,66 @@ const openOwnerManagement = async (page: Page) => {
 };
 
 test.describe('owner operational dashboard e2e', () => {
+  for (const browserZone of ['UTC', 'America/Recife', 'America/New_York']) {
+    test.describe(`financial calendar in ${browserZone}`, () => {
+      test.use({ timezoneId: browserZone });
+      test('uses tenant calendar for history, presets and CSV without changing agenda', async ({ page }) => {
+        await page.clock.setFixedTime(new Date('2026-10-01T02:45:00Z'));
+        const appointments = ['Included', 'Excluded'].map((name, index) => {
+          const appointment = makeAppointmentRow({ id: `zone-${index}`, clientName: name,
+            barberId: OWNER_BARBER_ID, barberName: 'Leo Barber', barbershopId: OWNER_BARBERSHOP_ID, date: '2026-09-29', time: '10:00' });
+          appointment.status = 'completed';
+          appointment.financial_record_id = `finance-${index}`;
+          return appointment;
+        });
+        const financialRecords: MockFinancialRecord[] = appointments.map((a, index) => ({
+          id: a.financial_record_id!, appointment_id: a.id, barbershop_id: a.barbershop_id,
+          barber_id: a.barber_id, service_id: a.service_id, service_type: a.service_type,
+          service_value: 60, commission_rate: 50, commission_value: 30,
+          completed_at: index === 0 ? '2026-10-01T02:30:00Z' : '2026-10-01T03:30:00Z',
+          created_at: '2026-10-01T03:30:00Z'
+        }));
+        await installOwnerSupabaseMocks(page, { appointments, financialRecords,
+          barbershops: [{ ...ownerBarbershop, financial_timezone: 'America/Recife' }] });
+        await signInAsOwner(page);
+        await expect(page.getByLabel('Data financeira', { exact: true })).toHaveValue('2026-09-30');
+        const operational = await page.getByLabel('Data operacional', { exact: true }).inputValue();
+        await page.getByLabel('Data financeira', { exact: true }).fill('2026-09-29');
+        await expect(page.getByLabel('Data operacional', { exact: true })).toHaveValue(operational);
+        await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+        await page.getByLabel('Data de conclusão', { exact: true }).fill('2026-09-30');
+        await expect(page.getByRole('cell', { name: /^Included/ })).toBeVisible();
+        await expect(page.getByRole('cell', { name: /^Excluded/ })).toHaveCount(0);
+        await expect(page.locator('#tour-stats')).toContainText('R$ 60,00');
+        await page.getByTitle('Exportar Dados (PDF/Excel)').click();
+        await page.getByRole('button', { name: 'Hoje', exact: true }).click();
+        const download = page.waitForEvent('download');
+        await page.getByRole('button', { name: 'Gerar Excel' }).click();
+        const stream = await (await download).createReadStream();
+        let csv = '';
+        for await (const chunk of stream!) csv += chunk.toString();
+        expect(csv).toContain('Included');
+        expect(csv).not.toContain('Excluded');
+        expect(csv).toContain('30/09/2026;23:30');
+        const pdfDownload = page.waitForEvent('download');
+        await page.getByTitle('Baixar Relatório do Dia (PDF)').click();
+        const pdfStream = await (await pdfDownload).createReadStream();
+        let pdf = '';
+        for await (const chunk of pdfStream!) pdf += chunk.toString('latin1');
+        expect(pdf).toContain('Included');
+        expect(pdf).not.toContain('Excluded');
+        expect(pdf).toContain('30/09/2026 23:30');
+        await page.getByRole('button', { name: 'Relatórios', exact: true }).click();
+        await expect(page.locator('input[type="month"]')).toHaveValue('2026-09');
+        await expect(page.getByText('30/09/2026', { exact: true })).toBeVisible();
+        await page.reload();
+        await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+        await expect(page.getByLabel('Data de conclusão', { exact: true })).toHaveValue('2026-09-30');
+        await expect(page.getByRole('cell', { name: /^Included/ })).toBeVisible();
+        await expect(page.getByRole('cell', { name: /^Excluded/ })).toHaveCount(0);
+      });
+    });
+  }
   test.describe('financial timezone configuration', () => {
     test.use({ timezoneId: 'America/New_York' });
 

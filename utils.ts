@@ -1,6 +1,7 @@
 
 import { Appointment, Client, ServiceType, AppSettings, Vale } from './types';
 import { BarberOption } from './types';
+import { formatFinancialDate, formatFinancialTime } from './utils/financialTimezone';
 
 export const getOperationalVales = (vales: Vale[], allowLocalFallback: boolean): Vale[] => (
   allowLocalFallback ? vales : []
@@ -134,7 +135,8 @@ const escapeCsvCell = (value: unknown, neutralizeFormula = true): string => {
 
 export const buildCsvContent = (
   clients: any[], 
-  vales: any[]
+  vales: any[],
+  financialTimezone?: string
 ): string => {
   // Cabeçalho do CSV
   const headers = ["Data", "Hora", "Tipo Movimento", "Cliente", "Detalhe/Produto", "Profissional", "Serviço", "Valor (R$)"];
@@ -144,9 +146,8 @@ export const buildCsvContent = (
 
   // Adicionar Clientes (Entradas)
   clients.forEach(c => {
-    const date = new Date(c.timestamp);
-    const dateStr = date.toLocaleDateString('pt-BR');
-    const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = formatFinancialDate(c.timestamp, financialTimezone);
+    const timeStr = formatFinancialTime(c.timestamp, financialTimezone);
     const valueStr = c.totalValue.toFixed(2).replace('.', ','); // Formato Excel PT-BR
     
     // Improved description logic for CSV
@@ -178,9 +179,8 @@ export const buildCsvContent = (
 
   // Adicionar Vales (Saídas)
   vales.forEach(v => {
-    const date = new Date(v.timestamp);
-    const dateStr = date.toLocaleDateString('pt-BR');
-    const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = formatFinancialDate(v.timestamp, financialTimezone);
+    const timeStr = formatFinancialTime(v.timestamp, financialTimezone);
     const valueStr = `-${v.value.toFixed(2).replace('.', ',')}`; // Valor negativo
 
     const textCells = [
@@ -202,9 +202,10 @@ export const buildCsvContent = (
 export const generateAndDownloadCSV = (
   filename: string, 
   clients: any[], 
-  vales: any[]
+  vales: any[],
+  financialTimezone?: string
 ) => {
-  const csvContent = buildCsvContent(clients, vales);
+  const csvContent = buildCsvContent(clients, vales, financialTimezone);
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   
   // Link de Download

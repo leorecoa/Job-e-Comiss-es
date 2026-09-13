@@ -1,15 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, FileText, FileSpreadsheet, Clock, Filter } from 'lucide-react';
+import { financialPreset } from '../utils/financialTimezone';
 
 interface ReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDownload: (startDate: string, endDate: string, format: 'pdf' | 'csv') => void;
   initialDate: string; // YYYY-MM-DD
+  financialTimezone?: string;
 }
 
-export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onDownload, initialDate }) => {
+export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onDownload, initialDate, financialTimezone }) => {
   const [startDate, setStartDate] = useState(initialDate);
   const [endDate, setEndDate] = useState(initialDate);
 
@@ -29,30 +31,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onDow
   };
 
   const setPreset = (type: 'today' | 'yesterday' | 'week' | 'month') => {
-      const end = new Date();
-      const start = new Date();
-
-      if (type === 'today') {
-          // Start and End are today
-      } else if (type === 'yesterday') {
-          start.setDate(end.getDate() - 1);
-          end.setDate(end.getDate() - 1);
-      } else if (type === 'week') {
-          start.setDate(end.getDate() - 6); // Last 7 days including today
-      } else if (type === 'month') {
-          start.setDate(1); // 1st of current month
-      }
-
-      // Format YYYY-MM-DD safe for local time
-      const formatDate = (d: Date) => {
-          const year = d.getFullYear();
-          const month = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          return `${year}-${month}-${day}`;
-      };
-
-      setStartDate(formatDate(start));
-      setEndDate(formatDate(end));
+      const { start, end } = financialPreset(type, financialTimezone);
+      setStartDate(start);
+      setEndDate(end);
   };
 
   return (

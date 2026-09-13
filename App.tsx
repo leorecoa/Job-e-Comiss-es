@@ -1,7 +1,8 @@
 
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { Client, ClientFormData, Vale, ValeFormData, AppSettings, DEFAULT_SETTINGS, ServiceType, ClientType, UserProfile, Appointment, AppointmentStatus, BarberOption, Service, Barbershop } from './types';
-import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getLocalDayBounds, getOperationalVales, getFinancialBarberKey, parseLocalDateInput, resolveOwnerScopedBarbershopId } from './utils';
+import { formatCurrency, formatTime, generateId, generateAndDownloadCSV, calculateClientCommission, getOperationalVales, getFinancialBarberKey, resolveOwnerScopedBarbershopId } from './utils';
+import { addCalendarDays, financialDateKey, financialMonthKey, financialToday, formatCalendarDate, formatFinancialTime, inFinancialRange, resolveFinancialTimezone } from './utils/financialTimezone';
 import { 
   BarbershopBrandingImageType,
   BarbershopBrandingInput,
@@ -346,7 +347,8 @@ const App: React.FC = () => {
     initialOwnerNavigation.managementSection
   );
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
-  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthString());
+  const [localSelectedMonth, setLocalSelectedMonth] = useState<string>(getCurrentMonthString());
+  const [financialSelection, setFinancialSelection] = useState<{ context: string; day?: string; month?: string }>({ context: '' });
   const [selectedBarberFilter, setSelectedBarberFilter] = useState<string>('TODOS');
   const [selectedScheduleBarber, setSelectedScheduleBarber] = useState<string>('');
   
@@ -365,6 +367,19 @@ const App: React.FC = () => {
   const [isAuthLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [authError, setAuthError] = useState<string | null>(null);
   const [ownerBarbershop, setOwnerBarbershop] = useState<Barbershop | null>(null);
+  const financialTimezone = resolveFinancialTimezone(shouldUseLocalFallback ? null : ownerBarbershop?.financialTimezone);
+  const financialContext = `${authSession?.barbershopId || ''}:${financialTimezone || 'browser-fallback'}`;
+  const currentFinancialSelection = financialSelection.context === financialContext ? financialSelection : undefined;
+  const financialDate = shouldUseLocalFallback ? selectedDate : currentFinancialSelection?.day ?? financialToday(financialTimezone);
+  const selectedMonth = shouldUseLocalFallback ? localSelectedMonth : currentFinancialSelection?.month ?? financialMonthKey(Date.now(), financialTimezone);
+  const setFinancialDate = (day: string) => {
+    if (shouldUseLocalFallback) setSelectedDate(day);
+    else setFinancialSelection({ ...currentFinancialSelection, context: financialContext, day });
+  };
+  const setSelectedMonth = (month: string) => {
+    if (shouldUseLocalFallback) setLocalSelectedMonth(month);
+    else setFinancialSelection({ ...currentFinancialSelection, context: financialContext, month });
+  };
   const [isOwnerBarbershopLoading, setOwnerBarbershopLoading] = useState(false);
   const [ownerBarbershopError, setOwnerBarbershopError] = useState<string | null>(null);
   const [ownerBarbershopSuccess, setOwnerBarbershopSuccess] = useState<string | null>(null);
@@ -849,18 +864,12 @@ const App: React.FC = () => {
   const filteredClients = useMemo(() => {
     const filtered = clients.filter(client => {
       if (!client.timestamp) return false;
-      const d = new Date(client.timestamp);
-      if (isNaN(d.getTime())) return false;
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateString = `${year}-${month}-${day}`;
-      if (dateString !== selectedDate) return false;
+      if (financialDateKey(client.timestamp, financialTimezone) !== financialDate) return false;
       if (selectedBarberFilter !== 'TODOS' && getFinancialBarberKey(client) !== selectedBarberFilter) return false;
       return true;
     });
     return filtered.sort((a, b) => b.timestamp - a.timestamp);
-  }, [clients, selectedDate, selectedBarberFilter]);
+  }, [clients, financialDate, financialTimezone, selectedBarberFilter]);
 
   const filteredVales = useMemo(() => {
     const filtered = operationalVales.filter(vale => {
@@ -1583,16 +1592,15 @@ const App: React.FC = () => {
 
   const handleDownloadRange = async (startDate: string, endDate: string, format: 'pdf' | 'csv') => {
     try {
-        const start = getLocalDayBounds(startDate);
-        const end = getLocalDayBounds(endDate);
-
-        if (start.start > end.end) {
+        if (startDate > endDate) {
             addToast('A data inicial deve ser anterior ou igual à data final.', 'error');
             return;
         }
 
-        const rangeClients = clients.filter(c => c.timestamp >= start.start && c.timestamp <= end.end);
-        const rangeVales = operationalVales.filter(v => v.timestamp >= start.start && v.timestamp <= end.end);
+        // Validate calendar inputs even when the tenant has no financial records.
+        addCalendarDays(startDate, 0); addCalendarDays(endDate, 0);
+        const rangeClients = clients.filter(c => inFinancialRange(c.timestamp, startDate, endDate, financialTimezone));
+        const rangeVales = operationalVales.filter(v => inFinancialRange(v.timestamp, startDate, endDate, financialTimezone));
         
         // Safe filename
         const dateLabel = startDate === endDate 
@@ -1601,7 +1609,7 @@ const App: React.FC = () => {
         const safeName = `Relatorio_${dateLabel.replace(/\//g, '-').replace(/ /g, '_')}`;
 
         if (format === 'csv') {
-            generateAndDownloadCSV(safeName, rangeClients, rangeVales);
+            generateAndDownloadCSV(safeName, rangeClients, rangeVales, financialTimezone);
             addToast('Planilha Excel (CSV) gerada!', 'success');
             return;
         }
@@ -1627,7 +1635,7 @@ const App: React.FC = () => {
 
         const displayLabel = startDate === endDate 
             ? startDate // This is fine, just a string for display
-            : `De ${parseLocalDateInput(startDate).toLocaleDateString('pt-BR')} a ${parseLocalDateInput(endDate).toLocaleDateString('pt-BR')}`;
+            : `De ${formatCalendarDate(startDate)} a ${formatCalendarDate(endDate)}`;
 
         const { generateReportPDF } = await import('./services/pdfService');
         generateReportPDF(
@@ -1635,7 +1643,8 @@ const App: React.FC = () => {
             displayLabel,
             rangeStats,
             rangeClients,
-            rangeVales
+            rangeVales,
+            financialTimezone
         );
         addToast('Relatório PDF gerado!', 'success');
     } catch (e) {
@@ -1649,10 +1658,11 @@ const App: React.FC = () => {
       const { generateReportPDF } = await import('./services/pdfService');
       generateReportPDF(
         activeShopName,
-        selectedDate,
+        financialDate,
         stats,
         filteredClients,
-        filteredVales
+        filteredVales,
+        financialTimezone
       );
       addToast('Relatório do dia baixado!', 'success');
     } catch (e) {
@@ -1713,6 +1723,10 @@ const App: React.FC = () => {
   };
 
   const changeDate = (days: number) => {
+    if (activeTab === 'clients' && !shouldUseLocalFallback) {
+      setFinancialDate(addCalendarDays(financialDate, days));
+      return;
+    }
     const [year, month, day] = selectedDate.split('-').map(Number);
     const d = new Date(year, month - 1, day);
     d.setDate(d.getDate() + days);
@@ -1865,7 +1879,7 @@ const App: React.FC = () => {
       )}
       {isReportModalOpen && (
         <React.Suspense fallback={null}>
-          <ReportModal isOpen={isReportModalOpen} onClose={() => setReportModalOpen(false)} onDownload={handleDownloadRange} initialDate={selectedDate} />
+          <ReportModal isOpen={isReportModalOpen} onClose={() => setReportModalOpen(false)} onDownload={handleDownloadRange} initialDate={financialDate} financialTimezone={financialTimezone} />
         </React.Suspense>
       )}
 
@@ -1977,7 +1991,7 @@ const App: React.FC = () => {
                     )}
                     <div className="ui-owner-date-control flex items-center rounded-xl p-0.5 flex-1 justify-between md:flex-none min-w-[140px]" id="tour-date-picker">
                         <button type="button" aria-label="Dia anterior" onClick={() => changeDate(-1)} className="p-2"><ChevronLeft size={20} aria-hidden="true" /></button>
-                        <input aria-label={activeTab === 'clients' && !shouldUseLocalFallback ? 'Data de conclusão' : 'Data operacional'} type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="ui-owner-date-input text-sm text-center w-full md:w-32" />
+                        <input aria-label={activeTab === 'clients' && !shouldUseLocalFallback ? 'Data de conclusão' : 'Data operacional'} type="date" value={activeTab === 'clients' && !shouldUseLocalFallback ? financialDate : selectedDate} onChange={(e) => activeTab === 'clients' && !shouldUseLocalFallback ? setFinancialDate(e.target.value) : setSelectedDate(e.target.value)} className="ui-owner-date-input text-sm text-center w-full md:w-32" />
                         <button type="button" aria-label="Proximo dia" onClick={() => changeDate(1)} className="p-2"><ChevronRight size={20} aria-hidden="true" /></button>
                     </div>
                     {barberFilterOptions.length > 1 && (
@@ -2018,10 +2032,16 @@ const App: React.FC = () => {
              {/* New Dashboard Charts */}
              <div className="mb-6">
                 <React.Suspense fallback={<SectionFallback />}>
-                  <DashboardCharts clients={chartClients} />
+                  <DashboardCharts clients={chartClients} financialTimezone={financialTimezone} />
                 </React.Suspense>
              </div>
 
+             {!shouldUseLocalFallback && activeTab !== 'clients' && (
+               <label className="mb-4 flex items-center gap-2 text-sm text-foreground">
+                 Data financeira
+                 <input aria-label="Data financeira" type="date" className="ui-input w-auto" value={financialDate} onChange={event => setFinancialDate(event.target.value)} />
+               </label>
+             )}
              <div id="tour-stats" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <StatsCard title="Atendimentos" value={stats.totalClients.toString()} icon={<Users size={20} />} />
                 <StatsCard title="Faturamento bruto" value={formatCurrency(stats.totalSales)} icon={<DollarSign size={20} />} colorClass="ui-owner-metric" />
@@ -2080,7 +2100,7 @@ const App: React.FC = () => {
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="ui-owner-badge flex items-center gap-1 rounded px-2 py-1 font-mono text-xs">
-                                                            <Clock size={12}/> {formatTime(c.timestamp)}
+                                                            <Clock size={12}/> {formatFinancialTime(c.timestamp, financialTimezone)}
                                                         </span>
                                                         <span className={`text-[10px] font-bold px-2 py-1 rounded ${c.clientType === ClientType.NEW ? 'bg-green-900/30 text-green-400' : 'bg-gold-500/10 text-gold-500'}`}>
                                                             {c.clientType === ClientType.NEW ? 'NOVO' : 'CASA'}
@@ -2148,7 +2168,7 @@ const App: React.FC = () => {
                                             <tbody>
                                                 {filteredClients.map(c => (
                                                     <tr key={c.id} className="ui-owner-table-row group">
-                                                        <td className="p-4 font-mono text-xs whitespace-nowrap text-muted-foreground">{formatTime(c.timestamp)}</td>
+                                                        <td className="p-4 font-mono text-xs whitespace-nowrap text-muted-foreground">{formatFinancialTime(c.timestamp, financialTimezone)}</td>
                                                         <td className="min-w-[100px] p-4 font-medium text-foreground">
                                                             {c.name}
                                                             <span className={`block text-[10px] ${c.clientType === ClientType.NEW ? 'text-green-400' : 'text-gold-500'}`}>{c.clientType}</span>
@@ -2262,7 +2282,7 @@ const App: React.FC = () => {
 
         {viewMode === 'monthly' && (
           <React.Suspense fallback={<SectionFallback />}>
-             <MonthlySummary clients={clients} vales={operationalVales} settings={settings} onBack={() => handleOwnerNavigation('appointments')} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+             <MonthlySummary clients={clients} vales={operationalVales} settings={settings} onBack={() => handleOwnerNavigation('appointments')} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} financialTimezone={financialTimezone} />
           </React.Suspense>
         )}
       </DashboardShell>

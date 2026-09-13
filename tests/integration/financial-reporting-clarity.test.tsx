@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MonthlySummary } from '../../components/MonthlySummary';
 import { BarberDashboard } from '../../components/BarberDashboard';
 import { AppSettings, Client, ClientType, ServiceType, Vale } from '../../types';
-import { formatCurrency, getFinancialBarberKey } from '../../utils';
+import { buildCsvContent, formatCurrency, getFinancialBarberKey } from '../../utils';
+import { inFinancialRange } from '../../utils/financialTimezone';
 
 const { jsPdfMock, autoTableMock, docMock } = vi.hoisted(() => {
   const doc = {
@@ -118,6 +119,32 @@ const getTeamRows = (records: Client[], advances: Vale[] = []) => {
 describe('financial reporting clarity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('keeps monthly/day/team/chart/PDF/CSV selection aligned at a financial month boundary', async () => {
+    const records = [
+      { ...clients[0], name: 'Included', barberName: 'Inside', timestamp: Date.parse('2026-10-01T02:30Z') },
+      { ...clients[0], id: 'excluded', name: 'Excluded', barberName: 'Outside', timestamp: Date.parse('2026-10-01T03:30Z') }
+    ];
+    const zone = 'America/Recife';
+    const selected = records.filter(c => inFinancialRange(c.timestamp, '2026-09-01', '2026-09-30', zone));
+    expect(selected.map(c => c.name)).toEqual(['Included']);
+    const html = renderToStaticMarkup(<MonthlySummary clients={records} vales={[]} settings={settings}
+      selectedMonth="2026-09" financialTimezone={zone} onBack={vi.fn()} onMonthChange={vi.fn()} />);
+    expect(html).toContain('Inside');
+    expect(html).not.toContain('Outside');
+    expect(html).toContain('30/09/2026');
+    expect(html).toContain(formatCurrency(100));
+    const { generateReportPDF } = await import('../../services/pdfService');
+    generateReportPDF('Shop', '2026-09-30', { totalClients: 1, totalSales: 100, totalVales: 0, netCommission: 50 }, selected, [], zone);
+    const pdf = JSON.stringify(autoTableMock.mock.calls);
+    expect(pdf).toContain('Included');
+    expect(pdf).not.toContain('Excluded');
+    expect(pdf).toContain('30/09/2026 23:30');
+    const csv = buildCsvContent(selected, [], zone);
+    expect(csv).toContain('Included');
+    expect(csv).not.toContain('Excluded');
+    expect(csv).toContain('30/09/2026;23:30');
   });
 
   it('keeps homonymous barbers separate and aggregates renamed snapshots only by the same ID', () => {
