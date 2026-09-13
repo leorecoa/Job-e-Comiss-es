@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { Client, Vale, AppSettings } from '../types';
 import { formatCurrency, calculateClientCommission, getFinancialBarberKey } from '../utils';
 import { StatsCard } from './StatsCard';
+import { financialDateKey, financialMonthKey, formatCalendarDate } from '../utils/financialTimezone';
 import { DashboardCharts } from './DashboardCharts';
 import { ArrowLeft, DollarSign, TrendingUp, Calendar, MinusCircle, Users } from 'lucide-react';
 
@@ -13,6 +14,7 @@ interface MonthlySummaryProps {
   onBack: () => void;
   selectedMonth: string; // YYYY-MM
   onMonthChange: (month: string) => void;
+  financialTimezone?: string;
 }
 
 export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
@@ -21,24 +23,20 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
   settings,
   onBack,
   selectedMonth,
-  onMonthChange
+  onMonthChange,
+  financialTimezone
 }) => {
   
   // Filtra e calcula dados baseados no mês selecionado
   const monthlyData = useMemo(() => {
-    const [yearStr, monthStr] = selectedMonth.split('-');
-    const year = parseInt(yearStr);
-    const month = parseInt(monthStr) - 1; // JS months are 0-11
 
     // Filtrar itens do mês
     const filteredClients = clients.filter(c => {
-      const d = new Date(c.timestamp);
-      return d.getFullYear() === year && d.getMonth() === month;
+      return financialMonthKey(c.timestamp, financialTimezone) === selectedMonth;
     });
 
     const filteredVales = vales.filter(v => {
-      const d = new Date(v.timestamp);
-      return d.getFullYear() === year && d.getMonth() === month;
+      return financialMonthKey(v.timestamp, financialTimezone) === selectedMonth;
     });
 
     // Função auxiliar usando a lógica centralizada
@@ -64,7 +62,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
       const comm = getCommission(c);
       
       // Por dia
-      const dayKey = new Date(c.timestamp).toLocaleDateString('pt-BR');
+      const dayKey = financialDateKey(c.timestamp, financialTimezone);
       if (!daysMap[dayKey]) daysMap[dayKey] = { sales: 0, commission: 0, vales: 0, count: 0 };
       daysMap[dayKey].sales += c.totalValue;
       daysMap[dayKey].commission += comm;
@@ -82,7 +80,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
     // Processar Vales
     filteredVales.forEach(v => {
       // Por dia
-      const dayKey = new Date(v.timestamp).toLocaleDateString('pt-BR');
+      const dayKey = financialDateKey(v.timestamp, financialTimezone);
       if (!daysMap[dayKey]) daysMap[dayKey] = { sales: 0, commission: 0, vales: 0, count: 0 };
       daysMap[dayKey].vales += v.value;
 
@@ -96,11 +94,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
     // Converter para array e ordenar (Dias)
     const dailyBreakdown = Object.entries(daysMap)
       .map(([date, data]) => ({ date, ...data }))
-      .sort((a, b) => {
-        const [da, ma, ya] = a.date.split('/').map(Number);
-        const [db, mb, yb] = b.date.split('/').map(Number);
-        return new Date(yb, mb - 1, db).getTime() - new Date(ya, ma - 1, da).getTime(); 
-      });
+      .sort((a, b) => b.date.localeCompare(a.date));
 
     // Converter para array (Barbeiros)
     const teamBreakdown = Object.entries(barbersMap)
@@ -119,14 +113,14 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
       dailyBreakdown,
       teamBreakdown
     };
-  }, [clients, vales, selectedMonth, settings.commissionRate]);
+  }, [clients, vales, selectedMonth, settings.commissionRate, financialTimezone]);
 
   const selectedMonthLabel = useMemo(() => {
     const [year, month] = selectedMonth.split('-').map(Number);
 
     if (!year || !month) return selectedMonth;
 
-    return new Date(year, month - 1, 1).toLocaleDateString('pt-BR', {
+    return formatCalendarDate(`${selectedMonth}-01`, {
       month: 'long',
       year: 'numeric'
     });
@@ -217,6 +211,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
             clients={monthlyData.filteredClients} 
             period="monthly" 
             selectedDate={selectedMonth} 
+            financialTimezone={financialTimezone}
          />
       </div>
 
@@ -294,7 +289,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                 {monthlyData.dailyBreakdown.map((day) => {
                     return (
                         <tr key={day.date} className="ui-owner-table-row transition-colors">
-                            <td className="p-4 font-medium text-foreground">{day.date}</td>
+                            <td className="p-4 font-medium text-foreground">{formatCalendarDate(day.date)}</td>
                             <td className="p-4 text-center text-foreground">{day.count}</td>
                             <td className="p-4 text-right text-foreground">{formatCurrency(day.sales)}</td>
                             <td className="p-4 text-right text-gold-300">{formatCurrency(day.commission)}</td>

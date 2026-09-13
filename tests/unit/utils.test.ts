@@ -18,6 +18,14 @@ const makeClient = (overrides: Partial<Client> = {}): Client => ({
 });
 
 describe('calculateClientCommission', () => {
+  it('formats CSV dates in the financial zone without changing amounts or instants', () => {
+    const client = makeClient({ timestamp: Date.parse('2027-01-01T02:30:00Z') });
+    const snapshot = { ...client };
+    expect(buildCsvContent([client], [], 'America/Recife')).toContain('31/12/2026;23:30;');
+    expect(buildCsvContent([client], [], 'UTC')).toContain('01/01/2027;02:30;');
+    expect(buildCsvContent([client], [], 'America/Recife')).toContain('60,00');
+    expect(client).toEqual(snapshot);
+  });
   it('preserves a manually saved zero commission', () => {
     const client = makeClient({ commissionValue: 0 });
 
