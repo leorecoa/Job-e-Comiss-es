@@ -46,7 +46,8 @@ select results_eq($$with changed as(update public.barber_working_hours set end_t
 select ok((select updated_at=now() from public.barber_working_hours where barber_id='eeee0024-0000-4000-8000-000000000003'),'barber_working_hours standard updated_at trigger applied');
 select results_eq($$with changed as(update public.barber_working_hours set end_time='11:00' where barber_id='22222222-2222-4222-8222-222222222222' returning id) select count(*) from changed$$,$$select 0::bigint$$,'barber_working_hours owner cannot update foreign tenant');
 select throws_ok($$update public.barber_working_hours set barbershop_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',barber_id='22222222-2222-4222-8222-222222222222' where barber_id='eeee0024-0000-4000-8000-000000000003'$$,'42501',null,'barber_working_hours owner cannot move row to foreign tenant');
-select throws_ok($$update public.barber_working_hours set barber_id='22222222-2222-4222-8222-222222222222' where barber_id='eeee0024-0000-4000-8000-000000000003'$$,'23503',null,'barber_working_hours update cannot introduce mismatched barber');
+-- Keep this FK test independent of the overlap constraint introduced in 025.
+select throws_ok($$update public.barber_working_hours set barber_id='22222222-2222-4222-8222-222222222222', weekday=2 where barber_id='eeee0024-0000-4000-8000-000000000003'$$,'23503',null,'barber_working_hours update cannot introduce mismatched barber');
 select results_eq($$with changed as(delete from public.barber_working_hours where barber_id='22222222-2222-4222-8222-222222222222' returning id) select count(*) from changed$$,$$select 0::bigint$$,'barber_working_hours owner cannot delete foreign tenant');
 set local role authenticated;
 set local "request.jwt.claims" = '{"sub":"eeee0024-0000-4000-8000-000000000002","role":"authenticated"}';
