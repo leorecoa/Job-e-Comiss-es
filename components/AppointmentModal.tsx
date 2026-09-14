@@ -19,6 +19,7 @@ interface AppointmentModalProps {
   initialData?: Appointment | null;
   createId: () => string;
   readOnly?: boolean;
+  durationFromService?: boolean;
 }
 
 const normalizeBarberOptions = (
@@ -54,7 +55,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   selectedBarber,
   initialData,
   createId,
-  readOnly = false
+  readOnly = false,
+  durationFromService = false
 }) => {
   const fallbackService = settings.services[0];
 
@@ -139,7 +141,9 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
     const now = new Date().toISOString();
     const startAt = buildLocalDateTimeIso(dateInput, timeInput);
-    const endAt = addMinutesIso(startAt, Math.max(1, Number(durationMinutes) || 30));
+    const endAt = addMinutesIso(startAt, durationFromService
+      ? selectedService?.durationMinutes ?? 30
+      : Math.max(1, Number(durationMinutes) || 30));
 
     const barberId =
       selectedBarberOption?.id && !selectedBarberOption.id.startsWith('fallback:')
@@ -310,7 +314,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 min="1"
                 required
                 disabled={readOnly}
-                value={durationMinutes}
+                readOnly={durationFromService}
+                value={durationFromService ? selectedService?.durationMinutes ?? 30 : durationMinutes}
                 onChange={(e) => setDurationMinutes(e.target.value)}
                 className="ui-input"
               />

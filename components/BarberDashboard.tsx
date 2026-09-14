@@ -368,6 +368,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
           setAppointmentModalOpen(false);
         }}
         onSave={handleSaveAppointment}
+        durationFromService
         settings={barberScopedSettings}
         selectedDate={selectedDate}
         selectedBarber={barberName}
