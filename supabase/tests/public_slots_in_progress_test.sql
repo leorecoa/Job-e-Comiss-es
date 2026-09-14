@@ -3,6 +3,10 @@ create extension if not exists pgtap with schema extensions;
 select plan(8);
 
 -- Transactional fixtures: no records survive this test.
+-- Model rows that predate enforcement. Only fixture installation bypasses the
+-- new writer trigger; every reader assertion runs with the trigger re-enabled.
+-- The dedicated 027 tests prove writer enforcement separately.
+alter table public.appointments disable trigger appointments_availability_before;
 insert into public.appointments (
   client_name, client_phone, barber_id, barber_name, service_id, service_type,
   barbershop_id, start_at, end_at, status
@@ -20,6 +24,7 @@ cross join (values
 ) v(starts, ends, status)
 where b.id = '11111111-1111-4111-8111-111111111111'
   and s.id = '33333333-3333-4333-8333-333333333333';
+alter table public.appointments enable trigger appointments_availability_before;
 
 select is((select count(*) from public.get_public_appointment_slots('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') where start_at < now()), 1::bigint, 'started but unfinished appointment remains occupied');
 select is((select count(*) from public.get_public_appointment_slots('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') where start_at > now()), 1::bigint, 'future adjacent appointment remains occupied');
