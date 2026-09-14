@@ -185,6 +185,7 @@ export const normalizeBarbershopBusinessHours = (
 };
 
 export const normalizeBarbershopSlotStepMinutes = (value?: number | null): number => {
+  if (value == null) return DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES;
   const numeric = Number(value);
 
   if (!Number.isFinite(numeric)) {

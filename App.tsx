@@ -1386,29 +1386,14 @@ const App: React.FC = () => {
   // Function for barber to create appointments
   const handleCreateBarberAppointment = async (appointment: Appointment) => {
     if (hasAppointmentConflict(appointments, appointment)) {
-      addToast('Horario indisponivel para este barbeiro.', 'error');
-      return;
+      throw createAppointmentConflictError('Horario indisponivel para este barbeiro.');
     }
 
-    try {
-      const savedAppointment = await createBarberAppointment(appointment, appointments);
+    const savedAppointment = await createBarberAppointment(appointment, appointments);
 
-      setAppointments(prev => [savedAppointment, ...prev]);
-      setSelectedDate(getAppointmentDateInput(savedAppointment));
-      setSelectedScheduleBarber(savedAppointment.barberName);
-
-      addToast('Agendamento criado!', 'success');
-    } catch (error) {
-      logOperationalError('barber-dashboard:create-appointment', error);
-      addToast(getOperationalErrorMessage(
-        error,
-        'Nao foi possivel criar o agendamento. Tente novamente.',
-        {
-          authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de criar o agendamento.',
-          networkMessage: 'Nao foi possivel conectar ao Supabase para criar o agendamento.'
-        }
-      ), 'error');
-    }
+    setAppointments(prev => [savedAppointment, ...prev]);
+    setSelectedDate(getAppointmentDateInput(savedAppointment));
+    setSelectedScheduleBarber(savedAppointment.barberName);
   };
 
   const handleCreatePublicAppointment = async (appointment: Appointment) => {

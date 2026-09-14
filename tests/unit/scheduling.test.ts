@@ -16,6 +16,7 @@ import {
   PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE,
   validatePublicAppointmentRecord,
   normalizeBarbershopBusinessHours,
+  normalizeBarbershopSlotStepMinutes,
   TimeSlot,
   validatePublicBookingInput
 } from '../../scheduling';
@@ -43,6 +44,43 @@ const settings: AppSettings = {
   ...DEFAULT_SETTINGS,
   commissionRate: 50
 };
+
+describe('slot step and catalog duration', () => {
+  it.each([null, undefined, NaN])('uses 30 for missing/invalid step %s', (value) => {
+    expect(normalizeBarbershopSlotStepMinutes(value)).toBe(30);
+  });
+
+  it.each([5, 15, 30, 45, 60, 120])('preserves configured step %s', (value) => {
+    expect(normalizeBarbershopSlotStepMinutes(value)).toBe(value);
+  });
+
+  it.each([30, 45, 60])('keeps exact %s minute duration with step 30', (duration) => {
+    const slots = getAvailableTimeSlots({
+      date: '2026-06-10', barbershopId: 'shop-1', barberId: 'barber-1',
+      barberName: 'Carlos', serviceDurationMinutes: duration, appointments: [],
+      workdayStart: '09:30', workdayEnd: '12:00', slotStepMinutes: 30,
+      now: new Date(2026, 5, 9)
+    });
+    expect(slots[0].label).toBe('09:30');
+    expect(slots[1].label).toBe('10:00');
+    expect(new Date(slots[0].endAt).getTime() - new Date(slots[0].startAt).getTime()).toBe(duration * 60000);
+  });
+
+  it('keeps an already started appointment occupied until its end', () => {
+    const slots = getAvailableTimeSlots({
+      date: '2026-06-10', barbershopId: 'shop-1', barberId: 'barber-1',
+      barberName: 'Carlos', serviceDurationMinutes: 30,
+      appointments: [makeAppointment({
+        startAt: new Date(2026, 5, 10, 9).toISOString(),
+        endAt: new Date(2026, 5, 10, 10).toISOString()
+      })],
+      workdayStart: '09:00', workdayEnd: '11:00', slotStepMinutes: 30,
+      now: new Date(2026, 5, 10, 9, 15)
+    });
+    expect(slots.find(slot => slot.label === '09:30')?.available).toBe(false);
+    expect(slots.find(slot => slot.label === '10:00')?.available).toBe(true);
+  });
+});
 
 describe('hasAppointmentConflict', () => {
   it('detects overlapping appointments for the same barber', () => {

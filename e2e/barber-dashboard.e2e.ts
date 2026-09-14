@@ -482,6 +482,8 @@ test.describe('barber dashboard e2e', () => {
     await signInAsBarber(page);
     await openNewAppointmentModal(page);
     await fillBarberAppointmentModal(page, 'Cliente Novo');
+    await expect(page.getByLabel('Min', { exact: true })).toHaveAttribute('readonly', '');
+    await expect(page.getByLabel('Min', { exact: true })).toHaveValue('30');
     await page.getByRole('button', { name: /Salvar agendamento/i }).click();
 
     await expect(page.getByText(/Agendamento criado!/i).first()).toBeVisible();
@@ -502,6 +504,34 @@ test.describe('barber dashboard e2e', () => {
     }
     expect(network.appointmentReadRequests).toHaveLength(0);
     expect(JSON.stringify(payload)).not.toContain('Gestao Maxima');
+  });
+
+  test('barber creation failure keeps the form open without success feedback', async ({ page }) => {
+    const network = await installBarberSupabaseMocks(page, {
+      appointmentCreateResponse: { status: 409, body: { message: 'APPOINTMENT_ACTIVE_SLOT_CONFLICT', code: 'P0001' } }
+    });
+    const unhandled: string[] = [];
+    page.on('pageerror', error => unhandled.push(error.message));
+    await signInAsBarber(page);
+    await openNewAppointmentModal(page);
+    await fillBarberAppointmentModal(page, 'Cliente Falha');
+    await page.getByRole('button', { name: /Salvar agendamento/i }).click();
+    await expect.poll(() => network.appointmentCreateRequests.length).toBe(1);
+    await expect(page.getByText('Nao foi possivel salvar o agendamento. Tente novamente.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Novo agendamento/i })).toBeVisible();
+    await expect(page.getByLabel('Cliente')).toHaveValue('Cliente Falha');
+    await expect(page.getByText(/Agendamento criado!/i)).toHaveCount(0);
+    expect(unhandled).toEqual([]);
+  });
+
+  test('barber duration follows the selected service without manual override', async ({ page }) => {
+    await installBarberSupabaseMocks(page);
+    await signInAsBarber(page);
+    await openNewAppointmentModal(page);
+    await expect(page.getByLabel('Min', { exact: true })).toHaveValue('30');
+    await page.getByLabel('Servico').selectOption({ label: 'Barba' });
+    await expect(page.getByLabel('Min', { exact: true })).toHaveValue('20');
+    await expect(page.getByLabel('Min', { exact: true })).not.toBeEditable();
   });
 
   test('barber input tampering does not override the session barber ownership', async ({ page }) => {
