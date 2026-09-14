@@ -86,7 +86,10 @@ update public.appointments set status='confirmed' where id='eeee0026-0000-4000-8
 select is((select count(*) from public.get_public_availability_by_slug('availability-engine','eeee0026-0000-4000-8000-000000000005','eeee0026-0000-4000-8000-000000000003','2030-01-07')),5::bigint,'confirmed blocking contract');
 update public.appointments set status='completed' where id='eeee0026-0000-4000-8000-000000000007';
 select is((select count(*) from public.get_public_availability_by_slug('availability-engine','eeee0026-0000-4000-8000-000000000005','eeee0026-0000-4000-8000-000000000003','2030-01-07')),6::bigint,'completed blocking contract');
-update public.appointments set status='cancelled' where id='eeee0026-0000-4000-8000-000000000007';
+-- Independent status fixture: completed history cannot be reactivated by 027.
+delete from public.appointments where id='eeee0026-0000-4000-8000-000000000007';
+insert into public.appointments(id,barbershop_id,barber_id,barber_name,service_id,service_type,service_value,client_name,client_phone,start_at,end_at,status) values
+('eeee0026-0000-4000-8000-000000000007','eeee0026-0000-4000-8000-000000000001','eeee0026-0000-4000-8000-000000000003','Fixture barber','eeee0026-0000-4000-8000-000000000005','Fixture service',50,'Fixture client','11999999999','2030-01-07T09:30Z','2030-01-07T10:00Z','cancelled');
 select is((select count(*) from public.get_public_availability_by_slug('availability-engine','eeee0026-0000-4000-8000-000000000005','eeee0026-0000-4000-8000-000000000003','2030-01-07')),6::bigint,'cancelled blocking contract');
 update public.appointments set status='no_show' where id='eeee0026-0000-4000-8000-000000000007';
 select is((select count(*) from public.get_public_availability_by_slug('availability-engine','eeee0026-0000-4000-8000-000000000005','eeee0026-0000-4000-8000-000000000003','2030-01-07')),6::bigint,'no_show blocking contract');

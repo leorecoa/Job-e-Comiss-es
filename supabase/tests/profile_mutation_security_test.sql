@@ -21,6 +21,12 @@ select ok(not exists(select 1 from information_schema.routine_privileges where r
 select ok(not has_function_privilege('service_role', 'public.link_barber_profile_by_email(text,uuid)', 'execute'), 'service_role cannot execute link RPC');
 select ok(position('FOR UPDATE' in upper(pg_get_functiondef('public.link_barber_profile_by_email(text,uuid)'::regprocedure))) > 0, 'link RPC serializes mutable rows');
 
+-- Valid operational configuration for the post-027 writer fixtures.
+update public.barbershops set operational_timezone='UTC',slot_step_minutes=5,
+business_hours=(select jsonb_object_agg(d,jsonb_build_object('active',true,'open','09:00','close','18:00'))
+from unnest(array['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])d)
+where id in ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2');
+
 insert into auth.users (id, aud, role, email, raw_user_meta_data, created_at, updated_at)
 values
   ('01400000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'owner-security@example.test', '{"role":"owner","display_name":"Security Owner"}', now(), now()),
@@ -38,8 +44,8 @@ update public.profiles set barbershop_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1
 
 insert into public.appointments (id, client_name, client_phone, barber_id, barber_name, service_id, service_type, service_value, start_at, end_at, status, barbershop_id)
 values
-  ('01400000-0000-4000-8000-000000000020', 'Own Security Client', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '70 days', now() + interval '70 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'),
-  ('01400000-0000-4000-8000-000000000021', 'Other Security Client', '0000000000', '01400000-0000-4000-8000-000000000010', 'Second Alpha Barber', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, now() + interval '71 days', now() + interval '71 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
+  ('01400000-0000-4000-8000-000000000020', 'Own Security Client', '0000000000', '11111111-1111-4111-8111-111111111111', 'Barber Alpha', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, (date_trunc('day', now()) + interval '10 hours') + interval '70 days', (date_trunc('day', now()) + interval '10 hours') + interval '70 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'),
+  ('01400000-0000-4000-8000-000000000021', 'Other Security Client', '0000000000', '01400000-0000-4000-8000-000000000010', 'Second Alpha Barber', '33333333-3333-4333-8333-333333333333', 'Service Alpha', 40, (date_trunc('day', now()) + interval '10 hours') + interval '71 days', (date_trunc('day', now()) + interval '10 hours') + interval '71 days 30 minutes', 'scheduled', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
 
 set local role authenticated;
 set local "request.jwt.claims" = '{"sub":"01400000-0000-4000-8000-000000000002","role":"authenticated"}';
