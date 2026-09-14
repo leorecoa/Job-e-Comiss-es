@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const supabaseMock = vi.hoisted(() => ({
+  localFallback: false,
   from: vi.fn(),
   rpc: vi.fn()
 }));
@@ -8,7 +9,7 @@ const supabaseMock = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({
   isSupabaseConfigured: true,
   isProductionWithoutSupabase: false,
-  shouldUseLocalFallback: false,
+  get shouldUseLocalFallback() { return supabaseMock.localFallback; },
   assertOperationalSupabase: vi.fn(),
   supabase: supabaseMock
 }));
@@ -17,6 +18,7 @@ import {
   createBarbershopForCurrentOwner,
   updateCurrentBarbershopBranding,
   updateBarbershopFinancialTimezone,
+  updateBarbershopOperationalTimezone,
   getBarbershopById,
   getBarbershopBySlug,
   getBarbershopPublicBookingPath,
@@ -27,11 +29,73 @@ import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
 describe('barbershop onboarding repository', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    supabaseMock.localFallback = false;
   });
 
   it('normalizes the onboarding slug into a public-friendly path', () => {
     expect(normalizeBarbershopSlug(' Barbearia Sao Joao Premium! ')).toBe('barbearia-sao-joao-premium');
     expect(getBarbershopPublicBookingPath('barbearia-sao-joao-premium')).toBe('/book/barbearia-sao-joao-premium');
+  });
+
+  it('preserves local demo without creating a local operational timezone store', async () => {
+    supabaseMock.localFallback = true;
+    const storage = { getItem: vi.fn().mockReturnValue(null), setItem: vi.fn() };
+    vi.stubGlobal('localStorage', storage);
+    try {
+      expect(await getBarbershopById('local-barbershop')).toMatchObject({ id: 'local-barbershop', slotStepMinutes: 30, active: true });
+      await expect(updateBarbershopOperationalTimezone('local-barbershop', 'America/Recife')).rejects.toThrow();
+      expect(storage.setItem).not.toHaveBeenCalled();
+      expect(supabaseMock.from).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+      supabaseMock.localFallback = false;
+    }
+  });
+
+  it('creates through the compatible overload only with confirmed operational timezone', async () => {
+    supabaseMock.rpc.mockReturnValue({ single: vi.fn().mockResolvedValue({ data: {
+      id: 'shop-1', name: 'Shop', slug: 'shop', active: true, operational_timezone: 'America/New_York', financial_timezone: null
+    }, error: null }) });
+    const created = await createBarbershopForCurrentOwner({ name: 'Shop', slug: 'shop', operationalTimezone: 'America/New_York' });
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('create_owner_barbershop', expect.objectContaining({ p_operational_timezone: 'America/New_York', p_financial_timezone: null }));
+    expect(created.operationalTimezone).toBe('America/New_York');
+    expect(created.financialTimezone).toBeNull();
+  });
+
+  it.each(['America/Recife', 'America/New_York'])('updates only operational timezone to %s', async timezone => {
+    const query = { eq: vi.fn(), select: vi.fn(), single: vi.fn().mockResolvedValue({ data: {
+      id: 'shop-1', name: 'Shop', slug: 'shop', active: true, operational_timezone: timezone, financial_timezone: 'UTC'
+    }, error: null }) };
+    query.eq.mockReturnValue(query);
+    query.select.mockReturnValue(query);
+    const update = vi.fn().mockReturnValue(query);
+    supabaseMock.from.mockReturnValue({ update });
+    const saved = await updateBarbershopOperationalTimezone('shop-1', timezone);
+    expect(update).toHaveBeenCalledWith({ operational_timezone: timezone });
+    expect(query.eq).toHaveBeenCalledWith('id', 'shop-1');
+    expect(saved.operationalTimezone).toBe(timezone);
+    expect(saved.financialTimezone).toBe('UTC');
+  });
+
+  it('rejects invalid operational timezone before persistence', async () => {
+    await expect(updateBarbershopOperationalTimezone('shop-1', 'Not/AZone')).rejects.toThrow();
+    await expect(createBarbershopForCurrentOwner({ name: 'Shop', slug: 'shop', operationalTimezone: 'Not/AZone' })).rejects.toThrow();
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([null, 'America/New_York'])('reads operational timezone %s without writes and without public exposure', async operationalTimezone => {
+    const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn().mockResolvedValue({ data: {
+      id: 'shop-1', name: 'Shop', slug: 'shop', active: true, operational_timezone: operationalTimezone
+    }, error: null }) };
+    query.select.mockReturnValue(query);
+    query.eq.mockReturnValue(query);
+    supabaseMock.from.mockReturnValue(query);
+    expect((await getBarbershopById('shop-1'))?.operationalTimezone).toBe(operationalTimezone);
+    expect(query.select).toHaveBeenLastCalledWith(expect.stringContaining('operational_timezone'));
+    await getBarbershopBySlug('shop');
+    expect(query.select).toHaveBeenLastCalledWith(expect.not.stringContaining('operational_timezone'));
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
   });
 
   it('passes only a confirmed timezone to the nine-argument onboarding overload', async () => {

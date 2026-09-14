@@ -1,6 +1,7 @@
 import { assertOperationalSupabase, shouldUseLocalFallback, supabase } from '../lib/supabase';
 import { Barbershop, BarbershopBusinessHours } from '../types';
 import { FINANCIAL_TIMEZONE_ERROR, requireFinancialTimezone } from '../utils/financialTimezone';
+import { OPERATIONAL_TIMEZONE_ERROR, requireOperationalTimezone } from '../utils/operationalTimezone';
 import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES, normalizeBarbershopBusinessHours, normalizeBarbershopSlotStepMinutes } from '../scheduling';
 
 const DEFAULT_LOCAL_BARBERSHOP_SLUG = 'barbearia-local';
@@ -9,6 +10,7 @@ const LOCAL_BARBERSHOP_STORAGE_KEY = 'barbearia_barbershop_branding';
 type DatabaseBarbershopRow = {
   id: string;
   financial_timezone?: string | null;
+  operational_timezone?: string | null;
   name: string;
   slug: string;
   phone: string | null;
@@ -48,6 +50,7 @@ export type BarbershopBrandingInput = {
 export type CreateBarbershopForCurrentOwnerInput = {
   name: string;
   financialTimezone?: string;
+  operationalTimezone?: string;
   slug: string;
   phone?: string | null;
   address?: string | null;
@@ -86,6 +89,7 @@ const mapBarbershopRow = (row: DatabaseBarbershopRow | DatabaseBarbershopBrandin
   return {
     id: row.id,
     financialTimezone: row.financial_timezone ?? null,
+    operationalTimezone: row.operational_timezone ?? null,
     name: row.name,
     slug: row.slug,
     phone: row.phone,
@@ -157,7 +161,7 @@ const writeLocalBarbershop = (barbershop: Barbershop): void => {
 
 const BRANDING_WITH_HOURS_SELECT = 'id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,primary_color,secondary_color,business_hours,slot_step_minutes,active';
 const BASIC_SELECT = 'id,name,slug,phone,address,active';
-const INTERNAL_BRANDING_SELECT = `${BRANDING_WITH_HOURS_SELECT},financial_timezone`;
+const INTERNAL_BRANDING_SELECT = `${BRANDING_WITH_HOURS_SELECT},financial_timezone,operational_timezone`;
 
 const getActiveBarbershopBy = async (column: 'id' | 'slug', value: string): Promise<Barbershop | null> => {
   if (!supabase) return null;
@@ -226,6 +230,7 @@ export const normalizeBarbershopSlug = (value: string): string => {
 export const getBarbershopPublicBookingPath = (slug: string): string => `/book/${slug}`;
 
 const OWNER_ONBOARDING_ERROR_MESSAGES: Record<string, string> = {
+  INVALID_OPERATIONAL_TIMEZONE: OPERATIONAL_TIMEZONE_ERROR,
   INVALID_FINANCIAL_TIMEZONE: FINANCIAL_TIMEZONE_ERROR,
   OWNER_ONBOARDING_AUTH_REQUIRED: 'Entre novamente para criar sua barbearia.',
   OWNER_ONBOARDING_PROFILE_NOT_FOUND: 'Seu perfil ainda nao esta disponivel. Entre novamente e tente outra vez.',
@@ -351,6 +356,20 @@ export const updateBarbershopFinancialTimezone = async (barbershopId: string, ti
   return mapBarbershopRow(data);
 };
 
+export const updateBarbershopOperationalTimezone = async (barbershopId: string, timezone: string): Promise<Barbershop> => {
+  if (shouldUseLocalFallback) throw new Error('Esta configuração requer Supabase.');
+  assertOperationalSupabase();
+  const operationalTimezone = requireOperationalTimezone(timezone);
+  const { data, error } = await supabase.from('barbershops')
+    .update({ operational_timezone: operationalTimezone })
+    .eq('id', barbershopId)
+    .select(INTERNAL_BRANDING_SELECT)
+    .single<DatabaseBarbershopBrandingRow>();
+  if (error) throw new Error(error.message?.includes('INVALID_OPERATIONAL_TIMEZONE')
+    ? OPERATIONAL_TIMEZONE_ERROR : 'Não foi possível salvar a timezone operacional. Tente novamente.');
+  return mapBarbershopRow(data);
+};
+
 export const createBarbershopForCurrentOwner = async (
   input: CreateBarbershopForCurrentOwnerInput
 ): Promise<Barbershop> => {
@@ -381,6 +400,12 @@ export const createBarbershopForCurrentOwner = async (
     p_slot_step_minutes: normalizeBarbershopSlotStepMinutes(input.slotStepMinutes),
     ...(input.financialTimezone !== undefined
       ? { p_financial_timezone: requireFinancialTimezone(input.financialTimezone) }
+      : {}),
+    ...(input.operationalTimezone !== undefined
+      ? {
+        p_operational_timezone: requireOperationalTimezone(input.operationalTimezone),
+        p_financial_timezone: input.financialTimezone !== undefined ? requireFinancialTimezone(input.financialTimezone) : null
+      }
       : {})
   };
 

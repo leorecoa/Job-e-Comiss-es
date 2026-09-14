@@ -12,6 +12,7 @@ import {
   getBarbershopPublicBookingPath,
   updateCurrentBarbershopBranding,
   updateBarbershopFinancialTimezone,
+  updateBarbershopOperationalTimezone,
   uploadBarbershopBrandingImage
 } from './services/barbershopRepository';
 import {
@@ -60,6 +61,7 @@ import { DashboardShell, type DashboardNavigationItem } from './components/Dashb
 import { InlineNotice, LoadingState, Surface } from './components/ui';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
 import { FinancialTimezoneSettings } from './components/FinancialTimezoneSettings';
+import { OperationalTimezoneSettings } from './components/OperationalTimezoneSettings';
 import {
   getOwnerNavigationHash,
   getOwnerNavigationRoute,
@@ -1906,6 +1908,13 @@ const App: React.FC = () => {
                   <FinancialTimezoneSettings key={ownerBarbershop.id} barbershop={ownerBarbershop}
                     onSave={async timezone => {
                       const updated = await updateBarbershopFinancialTimezone(ownerBarbershop.id, timezone);
+                      setOwnerBarbershop(updated);
+                    }} />
+                )}
+                {!shouldUseLocalFallback && authSession?.role === 'owner' && ownerBarbershop && (
+                  <OperationalTimezoneSettings key={`operational:${ownerBarbershop.id}`} barbershop={ownerBarbershop}
+                    onSave={async timezone => {
+                      const updated = await updateBarbershopOperationalTimezone(ownerBarbershop.id, timezone);
                       setOwnerBarbershop(updated);
                     }} />
                 )}

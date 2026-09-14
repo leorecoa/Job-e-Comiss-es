@@ -8,6 +8,7 @@ import {
 } from '../services/barbershopRepository';
 import { Barbershop } from '../types';
 import { requireFinancialTimezone, suggestFinancialTimezone } from '../utils/financialTimezone';
+import { requireOperationalTimezone, suggestOperationalTimezone } from '../utils/operationalTimezone';
 import { AuthLayout, Badge, Button, EmptyState, InlineNotice, Input, Label, Surface, Textarea } from './ui';
 
 type OwnerBarbershopOnboardingProps = {
@@ -25,6 +26,8 @@ type OwnerBarbershopOnboardingFormState = {
   description: string;
   financialTimezone?: string;
   confirmFinancialTimezone?: boolean;
+  operationalTimezone?: string;
+  confirmOperationalTimezone?: boolean;
 };
 
 export const getOwnerBarbershopOnboardingPreview = (slug: string): string => {
@@ -41,6 +44,9 @@ export const getOwnerBarbershopOnboardingPayload = (
   address: form.address.trim(),
   whatsapp: form.whatsapp.trim(),
   description: form.description.trim(),
+  ...(form.confirmOperationalTimezone
+    ? { operationalTimezone: requireOperationalTimezone(form.operationalTimezone || '') }
+    : {}),
   ...(form.confirmFinancialTimezone
     ? { financialTimezone: requireFinancialTimezone(form.financialTimezone || '') }
     : {})
@@ -59,7 +65,9 @@ export const OwnerBarbershopOnboarding: React.FC<OwnerBarbershopOnboardingProps>
     whatsapp: '',
     description: '',
     financialTimezone: suggestFinancialTimezone(),
-    confirmFinancialTimezone: false
+    confirmFinancialTimezone: false,
+    operationalTimezone: suggestOperationalTimezone(),
+    confirmOperationalTimezone: false
   }));
   const [slugTouched, setSlugTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -197,6 +205,18 @@ export const OwnerBarbershopOnboarding: React.FC<OwnerBarbershopOnboardingProps>
               <p className="text-sm text-muted-foreground">Sem confirmação, a timezone permanece não configurada.</p>
             </div>
 
+            <div className="ui-field mt-4">
+              <Label htmlFor="onboarding-operational-timezone">Timezone operacional IANA (opcional)</Label>
+              <Input id="onboarding-operational-timezone" value={form.operationalTimezone || ''} disabled={saving}
+                onChange={event => setForm(prev => ({ ...prev, operationalTimezone: event.target.value, confirmOperationalTimezone: false }))} />
+              <p className="mt-2 text-sm text-muted-foreground">Sugestão do navegador para a futura agenda e jornada. Não altera booking ou agenda nesta versão.</p>
+              <label className="mt-2 flex min-h-11 items-center gap-2 text-foreground">
+                <input type="checkbox" checked={form.confirmOperationalTimezone || false} disabled={saving}
+                  onChange={event => setForm(prev => ({ ...prev, confirmOperationalTimezone: event.target.checked }))} />
+                Confirmo a timezone operacional da barbearia
+              </label>
+              <p className="text-sm text-muted-foreground">Sem confirmação, permanece não configurada, independentemente da timezone financeira.</p>
+            </div>
             <div className="ui-onboarding-actions">
               <Button type="submit" loading={saving}>
                 {saving ? 'Criando...' : 'Criar barbearia'}
