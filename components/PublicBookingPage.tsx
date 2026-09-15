@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarCheck, CheckCircle, Clock, MapPin, MessageCircle, Phone, Scissors } from 'lucide-react';
 import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfile } from '../types';
 import { getBarbershopBySlug } from '../services/barbershopRepository';
+import { listPublicAvailability } from '../services/appointmentRepository';
+import { shouldUseLocalFallback } from '../lib/supabase';
 import {
   DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
   createPublicAppointment,
@@ -13,6 +15,7 @@ import {
   PUBLIC_BOOKING_RATE_LIMIT_MESSAGE,
   PublicBookingInput,
   TimeSlot,
+  validatePublicAppointmentRecord,
   validatePublicBookingInput
 } from '../scheduling';
 import { formatCurrency, generateId } from '../utils';
@@ -34,8 +37,13 @@ export type PublicBarberOption = {
   active?: boolean;
 };
 
-const getTodayString = (): string => {
+const getTodayString = (timeZone?: string | null): string => {
   const d = new Date();
+  if (timeZone) {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+    const part = (type: string) => parts.find((item) => item.type === type)?.value;
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  }
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -260,14 +268,15 @@ const formatPublicBookingDateLabel = (dateInput: string): string => {
   });
 };
 
-const formatPublicBookingDateTimeLabel = (isoDate: string): string => {
+const formatPublicBookingDateTimeLabel = (isoDate: string, timeZone?: string | null): string => {
   const date = new Date(isoDate);
 
   if (Number.isNaN(date.getTime())) {
     return 'Horario agendado';
   }
 
-  return `${date.toLocaleDateString('pt-BR')} as ${date.toLocaleTimeString('pt-BR', {
+  return `${date.toLocaleDateString('pt-BR', { timeZone: timeZone || undefined })} as ${date.toLocaleTimeString('pt-BR', {
+    timeZone: timeZone || undefined,
     hour: '2-digit',
     minute: '2-digit'
   })}`;
@@ -314,11 +323,13 @@ export const isValidPublicBookingSlotStepMinutes = (value?: number | null): bool
 export const getPublicBookingReadiness = ({
   barbershop,
   barbers,
-  services
+  services,
+  localAvailability = true
 }: {
   barbershop: Barbershop | null;
   barbers: PublicBarberOption[];
   services: Service[];
+  localAvailability?: boolean;
 }): PublicBookingReadiness => {
   const issues: string[] = [];
 
@@ -341,10 +352,10 @@ export const getPublicBookingReadiness = ({
     if (!hasActiveBarbershop) {
       issues.push('Barbearia inativa.');
     }
-    if (!hasConfiguredBusinessHours) {
+    if (localAvailability && !hasConfiguredBusinessHours) {
       issues.push('Horários de funcionamento não configurados.');
     }
-    if (!hasValidSlotStepMinutes) {
+    if (localAvailability && !hasValidSlotStepMinutes) {
       issues.push('Intervalo de agenda inválido.');
     }
     if (!hasActiveBarbers) {
@@ -496,7 +507,9 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
 }) => {
   const [selectedBarberValue, setSelectedBarberValue] = useState('');
   const [serviceId, setServiceId] = useState(''); // This is the ID of the selected service
-  const [date, setDate] = useState(getTodayString());
+  const [date, setDate] = useState(shouldUseLocalFallback ? getTodayString() : '');
+  const [availabilityRevision, setAvailabilityRevision] = useState(0);
+  const [remoteAvailability, setRemoteAvailability] = useState<{ key: string; slots: TimeSlot[]; error: string | null }>({ key: '', slots: [], error: null });
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -553,7 +566,8 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     () => getPublicBookingReadiness({
       barbershop,
       barbers: barberOptions,
-      services
+      services,
+      localAvailability: shouldUseLocalFallback
     }),
     [barberOptions, barbershop, services]
   );
@@ -659,6 +673,38 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     [services, serviceId]
   );
   const bookingDateLabel = useMemo(() => formatPublicBookingDateLabel(date), [date]);
+  const availabilityKey = JSON.stringify([barbershopSlug, serviceId, selectedBarber?.id, date, barbershop?.operationalTimezone, availabilityRevision]);
+  const canLoadAvailability = Boolean(barbershop && selectedService && selectedBarber && date);
+  const availabilityLoading = !shouldUseLocalFallback && canLoadAvailability && remoteAvailability.key !== availabilityKey;
+  const availabilityError = !shouldUseLocalFallback && remoteAvailability.key === availabilityKey ? remoteAvailability.error : null;
+
+  useEffect(() => {
+    if (!shouldUseLocalFallback && barbershop) setDate((current) => current || getTodayString(barbershop.operationalTimezone));
+  }, [barbershop]);
+
+  useEffect(() => {
+    if (shouldUseLocalFallback) return;
+    setSelectedSlot(null);
+    if (!canLoadAvailability || !barbershopSlug || !selectedBarber) return;
+    setRemoteAvailability({ key: '', slots: [], error: null });
+    const controller = new AbortController();
+    let active = true;
+    listPublicAvailability({ slug: barbershopSlug, serviceId, barberId: selectedBarber.id, localDate: date }, controller.signal)
+      .then((slots) => {
+        if (!active) return;
+        if (!barbershop?.operationalTimezone) throw new Error('A agenda desta barbearia precisa ser configurada. Entre em contato com a barbearia.');
+        const formatter = new Intl.DateTimeFormat('pt-BR', { timeZone: barbershop.operationalTimezone, hour: '2-digit', minute: '2-digit' });
+        setRemoteAvailability({ key: availabilityKey, error: null, slots: slots.map((slot) => ({
+          startAt: slot.start_at, endAt: slot.end_at, available: true, label: formatter.format(new Date(slot.start_at))
+        })) });
+      })
+      .catch((error) => {
+        if (!active) return;
+        const configurationMessage = 'A agenda desta barbearia precisa ser configurada. Entre em contato com a barbearia.';
+        setRemoteAvailability({ key: availabilityKey, slots: [], error: error instanceof Error && error.message === configurationMessage ? configurationMessage : 'Nao foi possivel consultar os horarios. Tente novamente.' });
+      });
+    return () => { active = false; controller.abort(); };
+  }, [availabilityKey, canLoadAvailability]);
   const selectedDateTimeLabel = selectedSlot
     ? `${bookingDateLabel} as ${selectedSlot.label}`
     : 'Selecione data e horario';
@@ -674,7 +720,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     [selectedBarber, selectedService, selectedSlot]
   );
   const selectedWorkday = useMemo(
-    () => bookingReadiness.hasConfiguredBusinessHours
+    () => shouldUseLocalFallback && bookingReadiness.hasConfiguredBusinessHours
       ? getPublicBookingWorkdayForDate(date, barbershop?.businessHours)
       : null,
     [barbershop?.businessHours, bookingReadiness.hasConfiguredBusinessHours, date]
@@ -687,11 +733,11 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     ? getTimeValueInMinutes(selectedWorkday.start) < getTimeValueInMinutes(selectedWorkday.end)
     : false;
 
-  const workdayLabel = selectedWorkday
+  const workdayLabel = !shouldUseLocalFallback ? 'Disponibilidade da barbearia' : selectedWorkday
     ? `${selectedWorkday.start} - ${selectedWorkday.end}`
     : 'Fechado';
 
-  const workdayDescription = selectedWorkday
+  const workdayDescription = !shouldUseLocalFallback ? 'Horarios consultados no sistema de agendamento.' : selectedWorkday
     ? workdayHasValidRange
       ? `Expediente do dia selecionado · intervalos de ${slotStepMinutes} min`
       : 'Horario configurado de forma invalida para este dia'
@@ -701,7 +747,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
         ? 'Intervalo de agenda invalido para esta barbearia.'
         : 'Sem atendimento neste dia';
 
-  const emptySlotsMessage = selectedWorkday
+  const emptySlotsMessage = !shouldUseLocalFallback ? 'Nenhum horário disponível para esta data.' : selectedWorkday
     ? workdayHasValidRange
       ? 'Nenhum horario disponivel para esta combinacao.'
       : 'Horario de funcionamento indisponivel neste dia.'
@@ -715,6 +761,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     : 'Escolha outra data ou tente outro profissional, se houver outro disponivel.';
   
   const availableSlots = useMemo(() => {
+    if (!shouldUseLocalFallback) return remoteAvailability.key === availabilityKey ? remoteAvailability.slots : [];
     if (!bookingReadiness.ready || !selectedBarber || !selectedService || !date) return [];
 
     return getAvailableTimeSlots({
@@ -727,9 +774,20 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
       businessHours: barbershop?.businessHours,
       slotStepMinutes: barbershop?.slotStepMinutes || undefined
     }).filter((slot) => slot.available);
-  }, [appointments, barbershop?.businessHours, barbershop?.slotStepMinutes, bookingReadiness.ready, date, selectedBarber, selectedService]);
+  }, [appointments, barbershop?.businessHours, barbershop?.slotStepMinutes, bookingReadiness.ready, date, selectedBarber, selectedService, remoteAvailability, availabilityKey]);
 
-  const bookingValidation = useMemo(() => validatePublicBookingInput({
+  const validateBooking = (input: PublicBookingInput) => {
+    if (shouldUseLocalFallback) return validatePublicBookingInput(input, appointments, { barbers: barberOptions, services, availableSlots });
+    try {
+      const record = createPublicAppointment(input, 'validation');
+      const errors = validatePublicAppointmentRecord(record);
+      if (!availableSlots.some((slot) => slot.startAt === input.selectedSlot?.startAt && slot.endAt === input.selectedSlot?.endAt)) errors.push('Escolha um horario disponivel.');
+      return { valid: errors.length === 0, errors };
+    } catch {
+      return { valid: false, errors: ['Preencha seus dados e escolha um horario disponivel.'] };
+    }
+  };
+  const bookingValidation = validateBooking({
     clientName,
     clientPhone,
     barbershopId: barbershop?.id || '',
@@ -738,11 +796,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     service: selectedService,
     selectedSlot,
     notes
-  }, appointments, {
-    barbers: barberOptions,
-    services,
-    availableSlots
-  }), [appointments, availableSlots, barberOptions, barbershop?.id, clientName, clientPhone, notes, selectedBarber?.id, selectedBarber?.name, selectedService, selectedSlot, services]);
+  });
 
   const handleBarberChange = (value: string) => {
     setSelectedBarberValue(value);
@@ -803,11 +857,7 @@ const handleSubmit = async (event: React.FormEvent) => {
     clientPhone,
     notes
   });
-  const validation = validatePublicBookingInput(input, appointments, {
-    barbers: barberOptions,
-    services,
-    availableSlots
-  });
+  const validation = validateBooking(input);
 
   if (!validation.valid) {
     setErrors(validation.errors);
@@ -845,6 +895,7 @@ const handleSubmit = async (event: React.FormEvent) => {
   });
 
   const handleNewBooking = () => {
+    if (!shouldUseLocalFallback) setAvailabilityRevision((revision) => revision + 1);
     setCreatedAppointment(null);
     setSelectedSlot(null);
     setClientName('');
@@ -882,7 +933,7 @@ const handleSubmit = async (event: React.FormEvent) => {
 
   if (createdAppointment) {
     const whatsappLink = contactLinks.whatsapp;
-    const whenLabel = formatPublicBookingDateTimeLabel(createdAppointment.startAt);
+    const whenLabel = formatPublicBookingDateTimeLabel(createdAppointment.startAt, shouldUseLocalFallback ? undefined : barbershop?.operationalTimezone);
 
     return (
       <div className="ui-public-shell min-h-screen flex items-center justify-center p-4 font-sans">
@@ -1189,13 +1240,13 @@ const handleSubmit = async (event: React.FormEvent) => {
               <SectionTitle step="03" title="Horario" description="Escolha data e horario livre." />
               <div className="ui-owner-card rounded-2xl p-4" style={subtleAccentStyle}>
                 <label className="ui-label mb-1.5 block">Data</label>
-                <input type="date" required min={getTodayString()} value={date} onChange={(e) => { setDate(e.target.value); setSelectedSlot(null); }} className="ui-input w-full" />
+                <input type="date" required min={getTodayString(shouldUseLocalFallback ? undefined : barbershop?.operationalTimezone)} value={date} onChange={(e) => { setDate(e.target.value); setSelectedSlot(null); }} className="ui-input w-full" />
               </div>
             </div>
 
             <div>
               <label className="ui-label mb-2 block">Horarios disponiveis</label>
-              {availableSlots.length === 0 ? (
+              {availabilityLoading ? <p role="status">Consultando horários...</p> : availabilityError ? <p role="alert" className="ui-owner-status-error">{availabilityError}</p> : availableSlots.length === 0 ? (
                 <p className="ui-owner-empty text-sm">
   {emptySlotsMessage} {emptySlotsNextStep}
 </p>

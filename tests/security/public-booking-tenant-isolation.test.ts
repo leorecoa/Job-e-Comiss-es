@@ -19,7 +19,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: supabaseMock
 }));
 
-import { createAppointment, createPublicAppointment, listInternalAppointments, listPublicAppointmentSlots } from '../../services/appointmentRepository';
+import { createAppointment, createPublicAppointment, listInternalAppointments, listPublicAppointmentSlots, listPublicAvailability } from '../../services/appointmentRepository';
 import { listBarbers } from '../../services/barberRepository';
 import { listPublicServices } from '../../services/serviceRepository';
 
@@ -281,6 +281,15 @@ describe('public booking tenant isolation repositories', () => {
     expect(slots[0]?.barbershopId).toBe('shop-leo');
   });
 
+  it('reads final slots without appointments or direct RPC and preserves offsets', async () => {
+    const slot = { start_at: '2030-01-07T09:00:00-03:00', end_at: '2030-01-07T09:45:00-03:00' };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ slots: [slot] })));
+    expect(await listPublicAvailability({ slug: 'shop-leo', serviceId: 'service', barberId: 'barber', localDate: '2030-01-07' })).toEqual([slot]);
+    expect(fetch).toHaveBeenCalledWith('/api/public-booking/availability?slug=shop-leo&service_id=service&barber_id=barber&local_date=2030-01-07', expect.objectContaining({ method: 'GET' }));
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
+  });
+
   it('rejects public slot lookup with an empty slug before the proxy', async () => {
     await expect(listPublicAppointmentSlots('   ')).rejects.toThrow('Barbearia nao encontrada ou indisponivel.');
 
@@ -291,7 +300,7 @@ describe('public booking tenant isolation repositories', () => {
   it('public booking create flow does not perform SELECT on appointments', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ id: 'created-appointment-id' }), { status: 201 }));
 
-    await expect(createPublicAppointment(makeAppointment(), [])).resolves.toMatchObject({
+    await expect(createPublicAppointment(makeAppointment(), [makeAppointment()])).resolves.toMatchObject({
       id: 'created-appointment-id',
       barbershopId: 'shop-leo'
     });
@@ -300,6 +309,16 @@ describe('public booking tenant isolation repositories', () => {
     expect(supabaseMock.rpc).not.toHaveBeenCalledWith('create_public_appointment', expect.anything());
     expect(supabaseMock.from).not.toHaveBeenCalledWith('public_appointment_slots');
     expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
+  });
+
+  it('does not fall back on availability errors and preserves empty success', async () => {
+    const input = { slug: 'shop-leo', serviceId: 'service', barberId: 'barber', localDate: '2030-01-07' };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ slots: [] })));
+    expect(await listPublicAvailability(input)).toEqual([]);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ code: 'PUBLIC_AVAILABILITY_TIMEZONE_REQUIRED', details: 'private' }), { status: 400 }));
+    await expect(listPublicAvailability(input)).rejects.toThrow('precisa ser configurada');
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
   });
 
   it.each([

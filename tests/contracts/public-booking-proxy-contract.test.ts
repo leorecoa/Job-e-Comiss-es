@@ -8,6 +8,7 @@ describe('public booking proxy contract', () => {
   const repository = read('services/appointmentRepository.ts');
   const createEndpoint = read('api/public-booking/create.ts');
   const slotsEndpoint = read('api/public-booking/slots.ts');
+  const availabilityEndpoint = read('api/public-booking/availability.ts');
   const catalogEndpoint = read('api/public-booking/catalog.ts');
   const serviceRepository = read('services/serviceRepository.ts');
   const shared = read('api/public-booking/_shared.ts');
@@ -16,13 +17,15 @@ describe('public booking proxy contract', () => {
   it('uses distinct same-origin endpoints without direct browser RPC fallback', () => {
     expect(repository).toContain("'/api/public-booking/create'");
     expect(repository).toContain('`/api/public-booking/slots?slug=');
+    expect(repository).toContain('`/api/public-booking/availability?');
+    expect(repository).not.toMatch(/supabase\.rpc\(['"]get_public_availability_by_slug/);
     expect(serviceRepository).toContain('`/api/public-booking/catalog?slug=');
     expect(repository).not.toMatch(/supabase\.rpc\(['"](?:create_public_appointment|get_public_appointment_slots)/);
     expect(serviceRepository).not.toMatch(/supabase\.rpc\(['"]get_public_services_by_slug/);
   });
 
   it('does not interpret client IP headers or implement an in-memory counter', () => {
-    const serverSource = `${createEndpoint}\n${slotsEndpoint}\n${catalogEndpoint}\n${shared}`;
+    const serverSource = `${createEndpoint}\n${slotsEndpoint}\n${catalogEndpoint}\n${availabilityEndpoint}\n${shared}`;
     expect(serverSource).not.toMatch(/x-forwarded-for|cf-connecting-ip|x-real-ip/i);
     expect(serverSource).not.toMatch(/rateLimitMap|new Map|clientIp/i);
   });

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST as createHandler } from '../../api/public-booking/create';
 import { GET as slotsHandler } from '../../api/public-booking/slots';
+import { GET as availabilityHandler } from '../../api/public-booking/availability';
 
 const validPayload = {
   barbershopId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
@@ -30,6 +31,13 @@ describe('public booking Vercel proxy', () => {
     const response = await createHandler(new Request('https://example.test/api/public-booking/create'));
     expect(response.status).toBe(405);
     expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('sanitizes engine errors through the real server transport', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ message: 'PUBLIC_AVAILABILITY_TIMEZONE_REQUIRED', details: 'private SQL', hint: 'private hint' }), { status: 400 }));
+    const response = await availabilityHandler({ method: 'GET', url: `/api/public-booking/availability?slug=shop-test&service_id=${validPayload.serviceId}&barber_id=${validPayload.barberId}&local_date=2030-01-07` } as Request);
+    expect(await response.json()).toEqual({ code: 'PUBLIC_AVAILABILITY_TIMEZONE_REQUIRED' });
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('https://project.supabase.co/rest/v1/rpc/get_public_availability_by_slug');
   });
 
   it('slots accepts only GET', async () => {

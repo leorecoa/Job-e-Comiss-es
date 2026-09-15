@@ -84,7 +84,7 @@ describe('barbershop onboarding repository', () => {
     expect(supabaseMock.rpc).not.toHaveBeenCalled();
   });
 
-  it.each([null, 'America/New_York'])('reads operational timezone %s without writes and without public exposure', async operationalTimezone => {
+  it.each([null, 'America/New_York'])('reads operational timezone %s without writes and exposes it for public presentation', async operationalTimezone => {
     const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn().mockResolvedValue({ data: {
       id: 'shop-1', name: 'Shop', slug: 'shop', active: true, operational_timezone: operationalTimezone
     }, error: null }) };
@@ -94,7 +94,8 @@ describe('barbershop onboarding repository', () => {
     expect((await getBarbershopById('shop-1'))?.operationalTimezone).toBe(operationalTimezone);
     expect(query.select).toHaveBeenLastCalledWith(expect.stringContaining('operational_timezone'));
     await getBarbershopBySlug('shop');
-    expect(query.select).toHaveBeenLastCalledWith(expect.not.stringContaining('operational_timezone'));
+    expect(query.select).toHaveBeenLastCalledWith(expect.stringContaining('operational_timezone'));
+    expect(query.select).toHaveBeenLastCalledWith(expect.not.stringContaining('financial_timezone'));
     expect(supabaseMock.rpc).not.toHaveBeenCalled();
   });
 
