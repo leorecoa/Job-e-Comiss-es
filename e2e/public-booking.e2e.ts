@@ -16,6 +16,7 @@ const CORS_HEADERS = {
 };
 
 type MockBarbershop = {
+  operational_timezone?: string | null;
   id: string;
   name: string;
   slug: string;
@@ -94,6 +95,7 @@ const allDaysBusinessHours = {
 };
 
 const leoBarbershop: MockBarbershop = {
+  operational_timezone: 'America/Recife',
   id: LEO_BARBERSHOP_ID,
   name: 'leo do leo',
   slug: 'leo-do-leo',
@@ -194,12 +196,10 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
     const request = route.request();
     const url = new URL(request.url());
 
-    if (url.pathname === '/api/public-booking/slots') {
+    if (url.pathname === '/api/public-booking/availability') {
       slotRequests.push({ method: request.method(), url: request.url(), body: null });
-      const shop = state.barbershops.find((candidate) => candidate.slug === url.searchParams.get('slug'));
-      const slots = state.slots
-        .filter((slot) => slot.barbershop_id === shop?.id)
-        .map(({ barbershop_id: _barbershopId, ...slot }) => slot);
+      const day = url.searchParams.get('local_date');
+      const slots = [{ start_at: `${day}T09:00:00-03:00`, end_at: `${day}T09:45:00-03:00` }];
       await fulfillJson(route, 200, { slots });
       return;
     }
@@ -360,6 +360,68 @@ const fillValidPublicBookingForm = async (page: Page) => {
 };
 
 test.describe('public booking /book/:slug', () => {
+  test('distinguishes loading and empty without requiring global hours for custom availability', async ({ page }) => {
+    await installSupabaseMocks(page, { barbershops: [{ ...leoBarbershop, business_hours: null, slot_step_minutes: null }] });
+    let finish: (() => Promise<void>) | undefined;
+    await page.route('**/api/public-booking/availability?**', (route) => {
+      finish = () => fulfillJson(route, 200, { slots: [] });
+    });
+    await page.goto('/book/leo-do-leo');
+    await expect(page.getByRole('status')).toHaveText('Consultando horários...');
+    await expect.poll(() => Boolean(finish)).toBe(true);
+    await finish!();
+    await expect(page.getByText('Nenhum horário disponível para esta data.', { exact: false })).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+
+  for (const code of ['PUBLIC_AVAILABILITY_TIMEZONE_REQUIRED', 'PUBLIC_BOOKING_UNAVAILABLE']) {
+    test(`availability error ${code} is not empty or local fallback`, async ({ page }) => {
+      await installSupabaseMocks(page);
+      await page.route('**/api/public-booking/availability?**', (route) => fulfillJson(route, 503, { code, details: 'private upstream detail' }));
+      await page.goto('/book/leo-do-leo');
+      await expect(page.getByRole('alert')).toContainText(code.includes('TIMEZONE') ? 'precisa ser configurada' : 'Nao foi possivel consultar');
+      await expect(page.getByRole('button', { name: /Escolher horario:/ })).toHaveCount(0);
+      await expect(page.getByText(/private upstream detail/)).toHaveCount(0);
+      await expect(page.getByText('Nenhum horário disponível para esta data.', { exact: false })).toHaveCount(0);
+    });
+  }
+
+  test('refetches selection, preserves tenant timezone and ignores stale date responses', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await installSupabaseMocks(page, {
+      barbershops: [{ ...leoBarbershop, business_hours: null }],
+      barbers: [...scenarioDefaults.barbers, { id: OTHER_BARBER_ID, name: 'Segundo', barbershop_id: LEO_BARBERSHOP_ID, active: true }],
+      services: [...scenarioDefaults.services, { id: OTHER_SERVICE_ID, name: 'Especial', barbershop_id: LEO_BARBERSHOP_ID, price: 80, duration_minutes: 45, commission_rate: 40, active: true }]
+    });
+    const requests: URL[] = [];
+    let releaseOld: (() => Promise<void>) | undefined;
+    await page.route('**/api/public-booking/availability?**', async (route) => {
+      const url = new URL(route.request().url());
+      requests.push(url);
+      const date = url.searchParams.get('local_date');
+      const response = { slots: [{ start_at: `${date}T14:00:00Z`, end_at: `${date}T14:45:00Z` }] };
+      if (date === '2030-01-08') {
+        releaseOld = () => fulfillJson(route, 200, { slots: [{ start_at: `${date}T18:00:00Z`, end_at: `${date}T18:45:00Z` }] }).catch(() => undefined);
+      } else await fulfillJson(route, 200, response);
+    });
+    await page.goto('/book/leo-do-leo');
+    await expect(page.getByRole('button', { name: 'Escolher horario: 11:00', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Escolher horario: 11:00', exact: true }).click();
+    await page.getByRole('button', { name: /Escolher servico: Especial/ }).click();
+    await expect.poll(() => requests.at(-1)?.searchParams.get('service_id')).toBe(OTHER_SERVICE_ID);
+    await expect(page.getByRole('button', { name: /Horario selecionado:/ })).toHaveCount(0);
+    await page.getByRole('button', { name: /Escolher barbeiro: Segundo/ }).click();
+    await expect.poll(() => requests.at(-1)?.searchParams.get('barber_id')).toBe(OTHER_BARBER_ID);
+    await page.locator('input[type="date"]').fill('2030-01-08');
+    await expect.poll(() => Boolean(releaseOld)).toBe(true);
+    await expect(page.getByRole('status')).toHaveText('Consultando horários...');
+    await page.locator('input[type="date"]').fill('2030-01-09');
+    await expect(page.getByRole('button', { name: 'Escolher horario: 11:00', exact: true })).toBeVisible();
+    await releaseOld!();
+    await expect(page.getByRole('button', { name: 'Escolher horario: 15:00', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Horario selecionado:/ })).toHaveCount(0);
+  });
+
   test('loads the correct barbershop and tenant-scoped public catalog without fallback', async ({ page }) => {
     const network = await installSupabaseMocks(page);
 
@@ -385,7 +447,7 @@ test.describe('public booking /book/:slug', () => {
     expect(network.directServicesRequests).toHaveLength(0);
     expect(network.slotRequests.some((request) => (
       request.method === 'GET'
-      && request.url.includes('/api/public-booking/slots?slug=leo-do-leo')
+      && request.url.includes('/api/public-booking/availability?slug=leo-do-leo')
     ))).toBeTruthy();
     expect(network.appointmentReadRequests).toHaveLength(0);
   });
@@ -419,6 +481,8 @@ test.describe('public booking /book/:slug', () => {
     expect(method).toBe('POST');
     expect(url).toContain('/api/public-booking/create');
     expect(payload).toMatchObject({
+      startAt: `${tomorrowDate()}T09:00:00-03:00`,
+      endAt: `${tomorrowDate()}T09:45:00-03:00`,
       barbershopId: LEO_BARBERSHOP_ID,
       barberId: LEO_BARBER_ID,
       serviceId: LEO_SERVICE_ID,
@@ -430,6 +494,39 @@ test.describe('public booking /book/:slug', () => {
     expect(payload).not.toHaveProperty('service_value');
     expect(payload).not.toHaveProperty('commission_rate');
     expect(payload).not.toHaveProperty('status');
+  });
+
+  test('new booking refetches the same selection instead of reusing the occupied slot', async ({ page }) => {
+    const network = await installSupabaseMocks(page);
+    await page.goto('/book/leo-do-leo');
+    await fillValidPublicBookingForm(page);
+    await page.getByRole('button', { name: /Reservar horario/i }).click();
+    await expect(page.getByRole('heading', { name: /Horario reservado com sucesso/i })).toBeVisible();
+
+    const previousQuery = new URL(network.slotRequests.at(-1)!.url).search;
+    expect(network.appointmentRequests[0].body).toMatchObject({
+      startAt: `${tomorrowDate()}T09:00:00-03:00`,
+      endAt: `${tomorrowDate()}T09:45:00-03:00`
+    });
+    const refreshedQueries: string[] = [];
+    let finish: (() => Promise<void>) | undefined;
+    await page.route('**/api/public-booking/availability?**', (route) => {
+      refreshedQueries.push(new URL(route.request().url()).search);
+      finish = () => fulfillJson(route, 200, { slots: [{
+        start_at: `${tomorrowDate()}T11:00:00-03:00`,
+        end_at: `${tomorrowDate()}T11:45:00-03:00`
+      }] });
+    });
+    await page.getByRole('button', { name: 'Nova reserva', exact: true }).click();
+    await expect.poll(() => refreshedQueries).toEqual([previousQuery]);
+    await expect(page.getByRole('status')).toContainText('Consultando');
+    await expect(page.getByRole('button', { name: /horario: 09:00/ })).toHaveCount(0);
+    await finish!();
+    await expect(page.getByRole('button', { name: 'Escolher horario: 11:00', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /horario: 09:00/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Horario selecionado:/ })).toHaveCount(0);
+    await expect(page.getByRole('status')).toHaveCount(0);
+    expect(network.appointmentReadRequests).toHaveLength(0);
   });
 
   test('prevents double submit while the public RPC is in flight', async ({ page }) => {

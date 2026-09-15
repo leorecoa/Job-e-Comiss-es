@@ -267,6 +267,30 @@ export const listInternalAppointments = async (barbershopId?: string, barberId?:
   ));
 };
 
+export type PublicAvailabilitySlot = { start_at: string; end_at: string };
+
+export const listPublicAvailability = async (input: {
+  slug: string; serviceId: string; barberId: string; localDate: string;
+}, signal?: AbortSignal): Promise<PublicAvailabilitySlot[]> => {
+  assertOperationalSupabase();
+  const params = new URLSearchParams({ slug: input.slug, service_id: input.serviceId, barber_id: input.barberId, local_date: input.localDate });
+  const response = await fetch(`/api/public-booking/availability?${params}`, {
+    method: 'GET', headers: { accept: 'application/json' }, signal
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    const configuration = ['PUBLIC_AVAILABILITY_TIMEZONE_REQUIRED', 'PUBLIC_AVAILABILITY_SLOT_STEP_REQUIRED', 'PUBLIC_AVAILABILITY_INVALID_BUSINESS_HOURS'].includes(body?.code);
+    throw new Error(configuration
+      ? 'A agenda desta barbearia precisa ser configurada. Entre em contato com a barbearia.'
+      : 'Nao foi possivel consultar os horarios. Tente novamente.');
+  }
+  if (!Array.isArray(body?.slots) || !body.slots.every((slot: PublicAvailabilitySlot) => (
+    slot && typeof slot.start_at === 'string' && typeof slot.end_at === 'string'
+    && Number.isFinite(Date.parse(slot.start_at)) && Date.parse(slot.end_at) > Date.parse(slot.start_at)
+  ))) throw new Error('Nao foi possivel consultar os horarios. Tente novamente.');
+  return body.slots.map(({ start_at, end_at }: PublicAvailabilitySlot) => ({ start_at, end_at }));
+};
+
 export const listPublicAppointmentSlots = async (barbershopSlug: string, barbershopId?: string): Promise<Appointment[]> => {
   const scopedSlug = barbershopSlug.trim().toLowerCase();
 
@@ -464,7 +488,7 @@ export const createPublicAppointment = async (
 
   const appointments = existingAppointments || [];
 
-  if (hasAppointmentConflict(appointments, appointment)) {
+  if (shouldUseLocalFallback && hasAppointmentConflict(appointments, appointment)) {
     throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
   }
 

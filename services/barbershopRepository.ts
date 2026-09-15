@@ -168,7 +168,7 @@ const getActiveBarbershopBy = async (column: 'id' | 'slug', value: string): Prom
 
   const { data, error } = await supabase
     .from('barbershops')
-    .select(column === 'id' ? INTERNAL_BRANDING_SELECT : BRANDING_WITH_HOURS_SELECT)
+    .select(column === 'id' ? INTERNAL_BRANDING_SELECT : `${BRANDING_WITH_HOURS_SELECT},operational_timezone`)
     .eq(column, value)
     .eq('active', true)
     .maybeSingle<DatabaseBarbershopBrandingRow>();

@@ -29,7 +29,7 @@ import { PublicBookingPage } from './components/PublicBookingPage';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import type { TourStep } from './components/tourUtils';
 import { isProductionWithoutSupabase, isSupabaseConfigured, PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE, shouldUseLocalFallback } from './lib/supabase';
-import { createAppointment as createAppointmentRecord, createBarberAppointment, createPublicAppointment, listInternalAppointments, listPublicAppointmentSlots, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
+import { createAppointment as createAppointmentRecord, createBarberAppointment, createPublicAppointment, listInternalAppointments, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { completeAppointmentWithFinancialRecord, listFinancialRecords, mapFinancialRecordToClient } from './services/financialRecordRepository';
 import { canDeleteClientHistory, getClientHistoryEditLabel, resolveClientEditTarget } from './clientEditing';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
@@ -682,7 +682,7 @@ const App: React.FC = () => {
         }
 
         const [remoteAppointments, remoteBarbers, remoteServices] = await Promise.all([ //
-          isPublicBookingRoute ? listPublicAppointmentSlots(publicBookingSlug!, currentBarbershopId) : listInternalAppointments(currentBarbershopId, authSession?.barberId),
+          isPublicBookingRoute ? Promise.resolve([]) : listInternalAppointments(currentBarbershopId, authSession?.barberId),
           listBarbers(currentBarbershopId),
           isPublicBookingRoute
             ? listPublicServices(publicBookingSlug!, currentBarbershopId)
@@ -1399,7 +1399,7 @@ const App: React.FC = () => {
   };
 
   const handleCreatePublicAppointment = async (appointment: Appointment) => {
-    if (hasAppointmentConflict(appointments, appointment)) {
+    if (shouldUseLocalFallback && hasAppointmentConflict(appointments, appointment)) {
       throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
     }
 
