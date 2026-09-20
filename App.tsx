@@ -56,6 +56,7 @@ import {
   Clock
 } from 'lucide-react';
 import { getOperationalErrorMessage, logOperationalError } from './utils/errorHandling';
+import { operationalDate } from './utils/operationalTime';
 import { AUTH_CALLBACK_PATH, AuthCallbackScreen } from './components/AuthCallbackScreen';
 import { DashboardShell, type DashboardNavigationItem } from './components/DashboardShell';
 import { InlineNotice, LoadingState, Surface } from './components/ui';
@@ -348,7 +349,8 @@ const App: React.FC = () => {
   const [activeManagementSection, setActiveManagementSection] = useState<ManagementSectionHash>(
     initialOwnerNavigation.managementSection
   );
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
+  const [localSelectedDate, setLocalSelectedDate] = useState<string>(getTodayString());
+  const [operationalSelection, setOperationalSelection] = useState<{ tenantId: string | undefined; day: string } | null>(null);
   const [localSelectedMonth, setLocalSelectedMonth] = useState<string>(getCurrentMonthString());
   const [financialSelection, setFinancialSelection] = useState<{ context: string; day?: string; month?: string }>({ context: '' });
   const [selectedBarberFilter, setSelectedBarberFilter] = useState<string>('TODOS');
@@ -369,6 +371,16 @@ const App: React.FC = () => {
   const [isAuthLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [authError, setAuthError] = useState<string | null>(null);
   const [ownerBarbershop, setOwnerBarbershop] = useState<Barbershop | null>(null);
+  const remoteOwnerCalendar = !shouldUseLocalFallback && authSession?.role === 'owner';
+  const selectedDate = remoteOwnerCalendar
+    ? operationalSelection?.tenantId === authSession?.barbershopId && operationalSelection
+      ? operationalSelection.day
+      : ownerBarbershop?.operationalTimezone ? operationalDate(new Date().toISOString(), ownerBarbershop.operationalTimezone) : ''
+    : localSelectedDate;
+  const setSelectedDate = (day: string) => {
+    if (remoteOwnerCalendar) setOperationalSelection({ tenantId: authSession?.barbershopId, day });
+    else setLocalSelectedDate(day);
+  };
   const financialTimezone = resolveFinancialTimezone(shouldUseLocalFallback ? null : ownerBarbershop?.financialTimezone);
   const financialContext = `${authSession?.barbershopId || ''}:${financialTimezone || 'browser-fallback'}`;
   const currentFinancialSelection = financialSelection.context === financialContext ? financialSelection : undefined;
@@ -830,6 +842,14 @@ const App: React.FC = () => {
   const selectedBarberLabel = barberFilterOptions.find(barber => barber.id === selectedBarberFilter)?.name;
 
   const scheduleBarberOptions = useMemo(() => {
+    if (!shouldUseLocalFallback) {
+      const options = new Map<string, string>();
+      (settings.barbers || []).forEach(barber => options.set(barber.id, barber.name));
+      appointments.forEach(appointment => {
+        if (appointment.barberId && !options.has(appointment.barberId)) options.set(appointment.barberId, appointment.barberName);
+      });
+      return Array.from(options, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    }
     const names = new Set<string>();
     // Extract names from BarberOption[]
     (settings.barbers || []).forEach(barber => {
@@ -841,7 +861,7 @@ const App: React.FC = () => {
     clients.forEach(client => {
       if (client.barberName?.trim()) names.add(client.barberName.trim());
     });
-    return Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR')).map(name => ({ id: name, name }));
   }, [settings.barbers, appointments, clients]);
 
   const chartClients = useMemo(() => {
@@ -857,8 +877,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (scheduleBarberOptions.length === 0) return;
-    if (!selectedScheduleBarber || !scheduleBarberOptions.includes(selectedScheduleBarber)) {
-      setSelectedScheduleBarber(scheduleBarberOptions[0]); // Set to the first barber name
+    if (!selectedScheduleBarber || !scheduleBarberOptions.some(barber => barber.id === selectedScheduleBarber)) {
+      setSelectedScheduleBarber(scheduleBarberOptions[0].id);
     }
   }, [selectedScheduleBarber, scheduleBarberOptions]);
 
@@ -891,10 +911,14 @@ const App: React.FC = () => {
 
   const filteredAppointments = useMemo(() => {
     return appointments.filter(appointment => {
-      if (!selectedScheduleBarber || appointment.barberName !== selectedScheduleBarber) return false;
+      if (!selectedScheduleBarber || (shouldUseLocalFallback ? appointment.barberName : appointment.barberId) !== selectedScheduleBarber) return false;
+      if (!shouldUseLocalFallback) {
+        // Without a configured calendar, show history without inventing a browser-local day.
+        return !ownerBarbershop?.operationalTimezone || operationalDate(appointment.startAt, ownerBarbershop.operationalTimezone) === selectedDate;
+      }
       return getAppointmentDateInput(appointment) === selectedDate;
     });
-  }, [appointments, selectedDate, selectedScheduleBarber]);
+  }, [appointments, selectedDate, selectedScheduleBarber, ownerBarbershop?.operationalTimezone]);
 
   // -- Calculations --
   const stats = useMemo(() => {
@@ -1337,6 +1361,7 @@ const App: React.FC = () => {
       return;
     }
     setEditingAppointment(null);
+    setAppointmentReadOnly(false);
     setAppointmentModalOpen(true);
   };
 
@@ -1349,7 +1374,7 @@ const App: React.FC = () => {
 
     const scopedAppointment = scopeOwnerAppointmentToTenant(appointment, barbershopId);
     const editingId = editingAppointment?.id;
-    if (hasAppointmentConflict(appointments, scopedAppointment, editingId)) {
+    if (shouldUseLocalFallback && hasAppointmentConflict(appointments, scopedAppointment, editingId)) {
       addToast('Horario indisponivel para este barbeiro.', 'error');
       return;
     }
@@ -1359,24 +1384,35 @@ const App: React.FC = () => {
         ? await updateAppointmentRecord(editingId, scopedAppointment)
         : await createAppointmentRecord(scopedAppointment, appointments);
 
-      setAppointments(prev => {
-        if (editingId) {
-          return prev.map(item => item.id === editingId ? savedAppointment : item);
+      let agendaReloadFailed = false;
+      if (!editingId && !shouldUseLocalFallback) {
+        // INSERT does not return the database-generated ID. Never use a temporary ID to reschedule.
+        try {
+          setAppointments(await listInternalAppointments());
+        } catch (error) {
+          agendaReloadFailed = true;
+          logOperationalError('dashboard:reload-created-appointment', error);
         }
-        return [savedAppointment, ...prev];
-      });
+      } else {
+        setAppointments(prev => editingId
+          ? prev.map(item => item.id === editingId ? savedAppointment : item)
+          : [savedAppointment, ...prev]);
+      }
 
-      setSelectedDate(getAppointmentDateInput(savedAppointment));
-      setSelectedScheduleBarber(savedAppointment.barberName);
+      if (shouldUseLocalFallback) setSelectedDate(getAppointmentDateInput(savedAppointment));
+      else if (ownerBarbershop?.operationalTimezone) setSelectedDate(operationalDate(savedAppointment.startAt, ownerBarbershop.operationalTimezone));
+      setSelectedScheduleBarber(shouldUseLocalFallback ? savedAppointment.barberName : savedAppointment.barberId || '');
       setAppointmentModalOpen(false);
       setEditingAppointment(null);
       setAppointmentReadOnly(false);
-      addToast(editingId ? 'Agendamento atualizado!' : 'Agendamento criado!', 'success');
+      addToast(agendaReloadFailed ? 'Agendamento criado. Atualize a página para recarregar a agenda.' : editingId ? 'Agendamento atualizado!' : 'Agendamento criado!', 'success');
     } catch (error) {
       logOperationalError('dashboard:save-appointment', error);
       addToast(getOperationalErrorMessage(
         error,
-        'Nao foi possivel salvar o agendamento. Tente novamente.',
+        (error as { message?: string })?.message?.includes('APPOINTMENT_HISTORY_PROTECTED')
+          ? 'Este atendimento possui histórico financeiro e não pode ser alterado.'
+          : 'Nao foi possivel salvar o agendamento. Tente novamente.',
         {
           authExpiredMessage: 'Sua sessao pode ter expirado. Entre novamente antes de salvar.',
           networkMessage: 'Nao foi possivel conectar ao Supabase para salvar o agendamento.'
@@ -1422,7 +1458,7 @@ const App: React.FC = () => {
   };
 
   const handleEditAppointment = (appointment: Appointment) => {
-    setAppointmentReadOnly(false);
+    setAppointmentReadOnly(!shouldUseLocalFallback && (appointment.status === 'completed' || Boolean(appointment.financialRecordId)));
     setEditingAppointment(appointment);
     setAppointmentModalOpen(true);
   };
@@ -1714,6 +1750,7 @@ const App: React.FC = () => {
       setFinancialDate(addCalendarDays(financialDate, days));
       return;
     }
+    if (!selectedDate) return;
     const [year, month, day] = selectedDate.split('-').map(Number);
     const d = new Date(year, month - 1, day);
     d.setDate(d.getDate() + days);
@@ -2060,6 +2097,8 @@ const App: React.FC = () => {
                     {activeTab === 'appointments' ? (
                       <React.Suspense fallback={<SectionFallback />}>
                         <DailySchedule
+                          remoteOwner={!shouldUseLocalFallback}
+                          operationalTimezone={ownerBarbershop?.operationalTimezone}
                           appointments={filteredAppointments}
                           selectedDate={selectedDate}
                           selectedBarber={selectedScheduleBarber}
@@ -2313,10 +2352,13 @@ const App: React.FC = () => {
             onSave={handleSaveAppointment}
             settings={settings}
             selectedDate={selectedDate}
-            selectedBarber={selectedScheduleBarber}
+            selectedBarber={shouldUseLocalFallback ? selectedScheduleBarber : ''}
+            selectedBarberId={shouldUseLocalFallback ? undefined : selectedScheduleBarber}
             initialData={editingAppointment}
             createId={generateId}
             readOnly={isAppointmentReadOnly}
+            remoteOwner={!shouldUseLocalFallback}
+            operationalTimezone={ownerBarbershop?.operationalTimezone}
           />
         )}
       </React.Suspense>
