@@ -1,21 +1,24 @@
 import React from 'react';
 import { CheckCircle, Clock, Edit3, MessageCircle, UserCheck, UserX, XCircle } from 'lucide-react';
-import { Appointment, AppointmentStatus } from '../types';
+import { Appointment, AppointmentStatus, BarberOption } from '../types';
 import { buildWhatsAppLink } from '../scheduling';
 import { formatCurrency } from '../utils';
+import { operationalTime } from '../utils/operationalTime';
 import { Badge, Button, EmptyState, Input, Label, Surface } from './ui';
 
 interface DailyScheduleProps {
   appointments: Appointment[];
   selectedDate: string;
   selectedBarber: string;
-  barberOptions: string[];
+  barberOptions: (string | BarberOption)[];
   onDateChange: (date: string) => void;
   onBarberChange: (barber: string) => void;
   onNew: () => void;
   onEdit: (appointment: Appointment) => void;
   onStatusChange: (appointment: Appointment, status: AppointmentStatus) => void;
   onCancel: (appointment: Appointment) => void;
+  remoteOwner?: boolean;
+  operationalTimezone?: string | null;
 }
 
 export const appointmentStatusLabels: Record<AppointmentStatus, string> = {
@@ -40,8 +43,13 @@ export const DailySchedule: React.FC<DailyScheduleProps> = ({
   onNew,
   onEdit,
   onStatusChange,
-  onCancel
+  onCancel,
+  remoteOwner = false,
+  operationalTimezone
 }) => {
+  const displayTime = (iso: string) => remoteOwner
+    ? operationalTimezone ? operationalTime(iso, operationalTimezone) : '--:--'
+    : formatAppointmentTime(iso);
   const orderedAppointments = [...appointments].sort(
     (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
   );
@@ -63,13 +71,18 @@ export const DailySchedule: React.FC<DailyScheduleProps> = ({
           <div className="ui-field">
             <Label htmlFor="schedule-barber">Barbeiro</Label>
             <select id="schedule-barber" value={selectedBarber} onChange={(event) => onBarberChange(event.target.value)} className="ui-input">
-              {barberOptions.map((barber) => <option key={barber} value={barber}>{barber}</option>)}
+              {barberOptions.map((barber) => typeof barber === 'string'
+                ? <option key={barber} value={barber}>{barber}</option>
+                : <option key={barber.id} value={barber.id}>{barber.name}</option>)}
             </select>
           </div>
           <Button type="button" onClick={onNew} className="ui-schedule-primary-action">Agendar</Button>
         </div>
       </Surface>
 
+      {remoteOwner && !operationalTimezone && <p className="ui-owner-status-info rounded-lg p-3 text-sm" role="status">
+        Fuso operacional não configurado. Exibindo o histórico sem filtro de data; configure o fuso para consultar horários.
+      </p>}
       <div className="ui-schedule-list" aria-live="polite">
         {orderedAppointments.length === 0 ? (
           <Surface>
@@ -77,7 +90,7 @@ export const DailySchedule: React.FC<DailyScheduleProps> = ({
               title="Nenhum agendamento nesta data."
               description={selectedBarber === 'TODOS'
                 ? 'Quando clientes agendarem pelo booking publico ou voce criar um agendamento manual, eles aparecerao aqui.'
-                : `Quando ${selectedBarber} tiver agendamentos nesta data, eles aparecerao aqui.`}
+                : `Quando ${barberOptions.map(barber => typeof barber === 'string' ? { id: barber, name: barber } : barber).find(barber => barber.id === selectedBarber)?.name || 'o barbeiro'} tiver agendamentos nesta data, eles aparecerao aqui.`}
               action={<Button type="button" className="mt-5" onClick={onNew}>Criar agendamento</Button>}
             />
           </Surface>
@@ -89,8 +102,8 @@ export const DailySchedule: React.FC<DailyScheduleProps> = ({
             <article key={appointment.id} className="ui-appointment" aria-labelledby={`appointment-client-${appointment.id}`}>
               <div className="ui-appointment-time">
                 <Clock size={16} aria-hidden="true" />
-                <span>{formatAppointmentTime(appointment.startAt)}</span>
-                <small>ate {formatAppointmentTime(appointment.endAt)}</small>
+                <span>{displayTime(appointment.startAt)}</span>
+                <small>ate {displayTime(appointment.endAt)}</small>
               </div>
 
               <div className="ui-appointment-details">
@@ -112,7 +125,7 @@ export const DailySchedule: React.FC<DailyScheduleProps> = ({
                   </a>
                 )}
                 <Button variant="secondary" type="button" onClick={() => onEdit(appointment)}>
-                  <Edit3 size={15} aria-hidden="true" /> Editar
+                  <Edit3 size={15} aria-hidden="true" /> {remoteOwner && (appointment.status === 'completed' || appointment.financialRecordId) ? 'Ver detalhes' : 'Editar'}
                 </Button>
                 {appointment.status === 'scheduled' && (
                   <Button variant="secondary" type="button" onClick={() => onStatusChange(appointment, 'confirmed')}>

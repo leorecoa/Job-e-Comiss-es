@@ -12,7 +12,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: { rpc: rpcMock, from: fromMock }
 }));
 
-import { createBarberAppointment, listInternalAppointments, updateAppointment } from '../../services/appointmentRepository';
+import { createBarberAppointment, listInternalAppointments, listOwnerAvailability, updateAppointment } from '../../services/appointmentRepository';
 import type { Appointment } from '../../types';
 
 const baseRow = {
@@ -37,6 +37,33 @@ const baseRow = {
 
 describe('controlled internal appointment access', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it.each([undefined, baseRow.id])('reads owner availability with only authorized references (%s)', async (appointmentId) => {
+    const slot = { start_at: '2026-10-01T09:00:12.123456-03:00', end_at: '2026-10-01T10:00:12.123456-03:00' };
+    rpcMock.mockResolvedValue({ data: [{ ...slot, private_field: 'not returned' }], error: null });
+    expect(await listOwnerAvailability({ serviceId: baseRow.service_id, barberId: baseRow.barber_id, localDate: '2026-10-01', appointmentId })).toEqual([slot]);
+    expect(rpcMock).toHaveBeenCalledWith('get_owner_availability', {
+      p_service_id: baseRow.service_id, p_barber_id: baseRow.barber_id, p_local_date: '2026-10-01', p_appointment_id: appointmentId ?? null
+    });
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['PUBLIC_AVAILABILITY_TIMEZONE_REQUIRED', 'fuso operacional'],
+    ['APPOINTMENT_HISTORY_PROTECTED', 'histórico financeiro'],
+    ['OWNER_AVAILABILITY_FORBIDDEN', 'Não foi possível']
+  ])('fails closed without local fallback for %s', async (message, expected) => {
+    rpcMock.mockResolvedValue({ data: null, error: { message } });
+    await expect(listOwnerAvailability({ serviceId: baseRow.service_id, barberId: baseRow.barber_id, localDate: '2026-10-01' })).rejects.toThrow(expected);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('distinguishes an empty result from malformed timestamps', async () => {
+    const input = { serviceId: baseRow.service_id, barberId: baseRow.barber_id, localDate: '2026-10-01' };
+    rpcMock.mockResolvedValueOnce({ data: [], error: null }).mockResolvedValueOnce({ data: [{ start_at: 'invalid', end_at: 'invalid' }], error: null });
+    expect(await listOwnerAvailability(input)).toEqual([]);
+    await expect(listOwnerAvailability(input)).rejects.toThrow('Não foi possível');
+  });
 
   it('loads the full owner contract without sending role or tenant arguments', async () => {
     rpcMock.mockResolvedValue({ data: [{ ...baseRow, viewer_role: 'owner' }], error: null });

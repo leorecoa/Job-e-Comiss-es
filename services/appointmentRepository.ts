@@ -269,6 +269,29 @@ export const listInternalAppointments = async (barbershopId?: string, barberId?:
 
 export type PublicAvailabilitySlot = { start_at: string; end_at: string };
 
+export const listOwnerAvailability = async (input: {
+  serviceId: string; barberId: string; localDate: string; appointmentId?: string;
+}): Promise<PublicAvailabilitySlot[]> => {
+  assertOperationalSupabase();
+  const { data, error } = await supabase.rpc('get_owner_availability', {
+    p_service_id: input.serviceId,
+    p_barber_id: input.barberId,
+    p_local_date: input.localDate,
+    p_appointment_id: input.appointmentId ?? null
+  });
+  if (error) {
+    const message = error.message || '';
+    if (message.includes('TIMEZONE_REQUIRED')) throw new Error('Configure o fuso operacional da barbearia antes de agendar.');
+    if (message.includes('APPOINTMENT_HISTORY_PROTECTED')) throw new Error('Este atendimento possui histórico financeiro e não pode ser reagendado.');
+    throw new Error('Não foi possível consultar os horários. Verifique o serviço, o barbeiro e a configuração da agenda.');
+  }
+  if (!Array.isArray(data) || !data.every(slot => (
+    slot && typeof slot.start_at === 'string' && typeof slot.end_at === 'string'
+    && Number.isFinite(Date.parse(slot.start_at)) && Date.parse(slot.end_at) > Date.parse(slot.start_at)
+  ))) throw new Error('Não foi possível consultar os horários. Tente novamente.');
+  return data.map(({ start_at, end_at }) => ({ start_at, end_at }));
+};
+
 export const listPublicAvailability = async (input: {
   slug: string; serviceId: string; barberId: string; localDate: string;
 }, signal?: AbortSignal): Promise<PublicAvailabilitySlot[]> => {
@@ -386,13 +409,11 @@ export const createAppointment = async ( // Remote owner creation; local fallbac
     throw new Error(validationErrors[0]);
   }
 
-  const appointments = existingAppointments || await listInternalAppointments();
-
-  if (hasAppointmentConflict(appointments, appointment)) {
-    throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
-  }
-
   if (shouldUseLocalFallback) {
+    const appointments = existingAppointments || await listInternalAppointments();
+    if (hasAppointmentConflict(appointments, appointment)) {
+      throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
+    }
     writeLocalAppointments([appointment, ...appointments]);
     return appointment;
   }

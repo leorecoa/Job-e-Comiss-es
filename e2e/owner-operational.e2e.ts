@@ -118,6 +118,8 @@ type MockScenario = {
   completionRpcResponse?: MockRpcResponse;
   completedAt?: string;
   onboardingRpcResponse?: MockRpcResponse;
+  availability?: (body: Record<string, unknown>) => Promise<MockRpcResponse>;
+  failAgendaAfterCreate?: boolean;
 };
 
 const ownerBusinessHours = {
@@ -309,6 +311,8 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
   const barberRequests: string[] = [];
   const serviceRequests: string[] = [];
   const appointmentReadRequests: string[] = [];
+  const availabilityRequests: Record<string, unknown>[] = [];
+  const appointmentInsertRequests: Record<string, unknown>[] = [];
   const rpcRequests: CapturedRequest[] = [];
   const completionRequests: CapturedRequest[] = [];
   const appointmentUpdateRequests: CapturedRequest[] = [];
@@ -475,12 +479,31 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
     }
 
     if (url.pathname === '/rest/v1/appointments') {
+      if (request.method() === 'POST') {
+        const body = parseRequestBody(route) as Record<string, unknown>;
+        appointmentInsertRequests.push(body);
+        appointments.push({ ...body, id: '60000000-0000-4000-8000-000000000099', created_at: String(body.start_at), updated_at: String(body.start_at) } as MockAppointment);
+        await fulfillJson(route, 201, null);
+        return;
+      }
       appointmentReadRequests.push(request.url());
       await fulfillJson(route, 403, { message: 'Direct appointment reads are forbidden.' });
       return;
     }
 
+    if (url.pathname === '/rest/v1/rpc/get_owner_availability') {
+      const body = parseRequestBody(route) as Record<string, unknown>;
+      availabilityRequests.push(body);
+      const response = scenario.availability ? await scenario.availability(body) : { status: 200, body: [] };
+      await fulfillJson(route, response.status, response.body);
+      return;
+    }
+
     if (url.pathname === '/rest/v1/rpc/get_internal_appointments') {
+      if (scenario.failAgendaAfterCreate && appointmentInsertRequests.length) {
+        await fulfillJson(route, 503, { message: 'Unavailable' });
+        return;
+      }
       const rows = appointments
         .filter((appointment) => appointment.barbershop_id === profile.barbershop_id)
         .map((appointment) => ({ ...appointment, viewer_role: 'owner' }));
@@ -600,6 +623,8 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
     barberRequests,
     serviceRequests,
     appointmentReadRequests,
+    availabilityRequests,
+    appointmentInsertRequests,
     rpcRequests,
     completionRequests,
     appointmentUpdateRequests,
@@ -627,6 +652,210 @@ const openOwnerManagement = async (page: Page) => {
 };
 
 test.describe('owner operational dashboard e2e', () => {
+  test('owner availability opens with the selected agenda barber ID, even for homonyms', async ({ page }) => {
+    const barberB = '252b5551-b8e7-4693-ab07-d0bbfde6ec06';
+    const slot = { start_at: '2030-10-01T09:00:00-03:00', end_at: '2030-10-01T09:30:00-03:00' };
+    const network = await installOwnerSupabaseMocks(page, {
+      barbershops: [{ ...ownerBarbershop, operational_timezone: 'America/Recife' }],
+      barbers: [OWNER_BARBER_ID, barberB].map(id => ({ id, name: 'Mesmo nome', barbershop_id: OWNER_BARBERSHOP_ID, active: true })),
+      appointments: [],
+      availability: async () => ({ status: 200, body: [slot] })
+    });
+    await signInAsOwner(page);
+    await page.locator('#schedule-barber').selectOption(barberB);
+    await page.getByLabel('Data da agenda').fill('2030-10-01');
+    await page.getByRole('button', { name: 'Agendar', exact: true }).last().click();
+    await expect(page.locator('#appointment-barber')).toHaveValue(barberB);
+    await page.getByRole('button', { name: '09:00 – 09:30', exact: true }).click();
+    expect(network.availabilityRequests.every(body => body.p_barber_id === barberB)).toBe(true);
+    await page.locator('#appointment-client-name').fill('Barbeiro B');
+    await page.locator('#appointment-client-phone').fill('81999990000');
+    await page.getByRole('button', { name: 'Salvar agendamento' }).click();
+    await expect.poll(() => network.appointmentInsertRequests.length).toBe(1);
+    expect(network.appointmentInsertRequests[0]).toMatchObject({ barber_id: barberB, ...slot });
+  });
+
+  test.describe('initial operational day', () => {
+    test.use({ timezoneId: 'UTC' });
+    for (const manualBeforeLoad of [false, true]) {
+      test(`timezone arrival respects explicit selection: ${manualBeforeLoad}`, async ({ page }) => {
+        await page.clock.setFixedTime(new Date('2030-10-01T01:00:00Z'));
+        await installOwnerSupabaseMocks(page);
+        let release!: () => void;
+        const wait = new Promise<void>(resolve => { release = resolve; });
+        await page.route(`${SUPABASE_URL}/rest/v1/barbershops*`, async route => {
+          if (route.request().method() !== 'GET') {
+            await route.fallback();
+            return;
+          }
+          await wait;
+          await fulfillJson(route, 200, { ...ownerBarbershop, operational_timezone: 'America/Recife' });
+        });
+        await signInAsOwner(page);
+        const date = page.getByLabel('Data da agenda');
+        await expect(date).toHaveValue('');
+        if (manualBeforeLoad) await date.fill('2030-09-25');
+        release();
+        await expect(page.getByText('Fuso operacional não configurado.', { exact: false })).toHaveCount(0);
+        await expect(date).toHaveValue(manualBeforeLoad ? '2030-09-25' : '2030-09-30');
+        await date.fill('2030-09-24');
+        await openOwnerManagement(page);
+        await page.getByLabel('Timezone operacional IANA', { exact: true }).fill('UTC');
+        await page.getByRole('button', { name: 'Confirmar timezone operacional', exact: true }).click();
+        await expect(page.getByText('Timezone operacional atual: UTC')).toBeVisible();
+        await page.getByRole('navigation', { name: 'Secoes do painel', exact: true }).getByRole('button', { name: 'Agenda', exact: true }).click();
+        await expect(date).toHaveValue('2030-09-24');
+      });
+    }
+  });
+
+  test('owner textual edit preserves fractional historical timestamps without pretending they are availability slots', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2030-10-01T15:00:00Z'));
+    const appointment = {
+      ...makeAppointmentRow({ id: '60000000-0000-4000-8000-000000000055', clientName: 'Precisao textual', barberId: OWNER_BARBER_ID, barberName: 'Leo Barber', barbershopId: OWNER_BARBERSHOP_ID, date: '2030-10-01', time: '09:00' }),
+      start_at: '2030-10-01T09:00:12.123456-03:00', end_at: '2030-10-01T09:30:12.123456-03:00'
+    };
+    const network = await installOwnerSupabaseMocks(page, { appointments: [appointment], barbershops: [{ ...ownerBarbershop, operational_timezone: 'America/Recife' }] });
+    await signInAsOwner(page);
+    await page.locator('article').filter({ hasText: 'Precisao textual' }).getByRole('button', { name: 'Editar', exact: true }).click();
+    await page.locator('#appointment-notes').fill('Somente texto');
+    await page.getByRole('button', { name: 'Salvar agendamento' }).click();
+    await expect.poll(() => network.appointmentUpdateRequests.length).toBe(1);
+    expect(network.appointmentUpdateRequests[0].body).toMatchObject({ p_start_at: appointment.start_at, p_end_at: appointment.end_at });
+    expect(network.availabilityRequests).toEqual([]);
+  });
+
+  test('owner availability creates exact slots and reschedules through the authenticated reader', async ({ page }) => {
+    const slot = { start_at: '2030-10-01T09:00:00-03:00', end_at: '2030-10-01T10:00:00-03:00' };
+    let created = false;
+    const network = await installOwnerSupabaseMocks(page, {
+      barbershops: [{ ...ownerBarbershop, operational_timezone: 'America/Recife' }],
+      services: [{ id: OWNER_SERVICE_ID, name: 'Corte Leo', barbershop_id: OWNER_BARBERSHOP_ID, price: 60, duration_minutes: 60, commission_rate: 50, active: true }],
+      availability: async body => ({ status: 200, body: created && !body.p_appointment_id ? [] : [slot] })
+    });
+    await signInAsOwner(page);
+    await page.getByRole('button', { name: 'Agendar', exact: true }).last().click();
+    await page.locator('#appointment-date').fill('2030-10-01');
+    await page.locator('#appointment-client-name').fill('Cliente Availability');
+    await page.locator('#appointment-client-phone').fill('81999990000');
+    await expect(page.locator('#appointment-duration')).toHaveAttribute('readonly', '');
+    await expect(page.locator('#appointment-duration')).toHaveValue('60');
+    await page.getByRole('button', { name: '09:00 – 10:00', exact: true }).click();
+    await page.getByRole('button', { name: 'Salvar agendamento' }).click();
+    await expect.poll(() => network.appointmentInsertRequests.length).toBe(1);
+    created = true;
+    expect(network.appointmentInsertRequests[0]).toMatchObject(slot);
+    expect(network.availabilityRequests.at(-1)).toEqual({ p_service_id: OWNER_SERVICE_ID, p_barber_id: OWNER_BARBER_ID, p_local_date: '2030-10-01', p_appointment_id: null });
+    await expect(page.getByText('Agendamento criado!')).toBeVisible();
+    await page.locator('article').filter({ hasText: 'Cliente Availability' }).getByRole('button', { name: 'Editar', exact: true }).click();
+    const count = network.availabilityRequests.length;
+    await page.locator('#appointment-client-name').fill('Texto preservado');
+    await page.getByRole('button', { name: 'Salvar agendamento' }).click();
+    await expect.poll(() => network.appointmentUpdateRequests.length).toBe(1);
+    expect(network.appointmentUpdateRequests[0].body).toMatchObject({ p_start_at: slot.start_at, p_end_at: slot.end_at });
+    expect(network.availabilityRequests).toHaveLength(count);
+    await page.locator('article').filter({ hasText: 'Texto preservado' }).getByRole('button', { name: 'Editar', exact: true }).click();
+    await page.getByRole('button', { name: 'Reagendar', exact: true }).click();
+    await page.getByRole('button', { name: '09:00 – 10:00', exact: true }).click();
+    expect(network.availabilityRequests.at(-1)?.p_appointment_id).toBe('60000000-0000-4000-8000-000000000099');
+    await expect(page.getByRole('button', { name: '10:00 – 11:00', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Salvar agendamento' }).click();
+    await expect.poll(() => network.appointmentUpdateRequests.length).toBe(2);
+    expect(network.appointmentUpdateRequests[1].body).toMatchObject({ p_start_at: slot.start_at, p_end_at: slot.end_at });
+    expect(network.appointmentReadRequests).toEqual([]);
+    await expect(page.getByRole('heading', { name: 'Editar agendamento' })).toHaveCount(0);
+    const beforeNew = network.availabilityRequests.length;
+    await page.getByRole('button', { name: 'Agendar', exact: true }).last().click();
+    await expect(page.getByText('Nenhum horário disponível nesta data.')).toBeVisible();
+    expect(network.availabilityRequests.length).toBeGreaterThan(beforeNew);
+    await expect(page.getByRole('button', { name: '09:00 – 10:00', exact: true })).toHaveCount(0);
+  });
+
+  test('owner availability does not claim insert failed when agenda reload fails', async ({ page }) => {
+    const network = await installOwnerSupabaseMocks(page, {
+      failAgendaAfterCreate: true,
+      barbershops: [{ ...ownerBarbershop, operational_timezone: 'America/Recife' }],
+      availability: async () => ({ status: 200, body: [{ start_at: '2030-10-01T09:00:00-03:00', end_at: '2030-10-01T09:30:00-03:00' }] })
+    });
+    await signInAsOwner(page);
+    await page.getByRole('button', { name: 'Agendar', exact: true }).last().click();
+    await page.locator('#appointment-client-name').fill('Sem ID temporário');
+    await page.locator('#appointment-client-phone').fill('81999990000');
+    await page.getByRole('button', { name: '09:00 – 09:30', exact: true }).click();
+    await page.getByRole('button', { name: 'Salvar agendamento' }).click();
+    await expect(page.getByText('Agendamento criado. Atualize a página para recarregar a agenda.')).toBeVisible();
+    expect(network.appointmentInsertRequests).toHaveLength(1);
+    await expect(page.locator('article').filter({ hasText: 'Sem ID temporário' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Novo agendamento' })).toHaveCount(0);
+  });
+
+  test('owner availability invalidates dimensions by ID and ignores stale responses for homonyms', async ({ page }) => {
+    const barber2 = '252b5551-b8e7-4693-ab07-d0bbfde6ec06';
+    const service2 = '8b8a04ef-fd1d-40c9-98e1-c052345cf4b9';
+    let release!: () => void;
+    let delayed = false;
+    const wait = new Promise<void>(resolve => { release = resolve; });
+    const network = await installOwnerSupabaseMocks(page, {
+      barbershops: [{ ...ownerBarbershop, operational_timezone: 'America/Recife' }],
+      barbers: [OWNER_BARBER_ID, barber2].map(id => ({ id, name: 'Mesmo nome', barbershop_id: OWNER_BARBERSHOP_ID, active: true })),
+      services: [OWNER_SERVICE_ID, service2].map(id => ({ id, name: 'Mesmo serviço', price: 60, duration_minutes: 30, commission_rate: 50, active: true, barbershop_id: OWNER_BARBERSHOP_ID })),
+      availability: async body => {
+        if (body.p_service_id === service2 && !delayed) { delayed = true; await wait; }
+        return { status: 200, body: [{ start_at: `${body.p_local_date}T${body.p_service_id === service2 ? '11' : '09'}:00:00-03:00`, end_at: `${body.p_local_date}T${body.p_service_id === service2 ? '11' : '09'}:30:00-03:00` }] };
+      }
+    });
+    await signInAsOwner(page);
+    await page.getByRole('button', { name: 'Agendar', exact: true }).last().click();
+    const save = page.getByRole('button', { name: 'Salvar agendamento' });
+    await page.getByRole('button', { name: '09:00 – 09:30', exact: true }).click();
+    await expect(save).toBeEnabled();
+    await page.locator('#appointment-service').selectOption(service2);
+    await expect(save).toBeDisabled();
+    await expect.poll(() => delayed).toBe(true);
+    await page.locator('#appointment-service').selectOption(OWNER_SERVICE_ID);
+    await page.getByRole('button', { name: '09:00 – 09:30', exact: true }).click();
+    const staleResponse = page.waitForResponse(response => response.url().endsWith('/rpc/get_owner_availability') && response.request().postDataJSON()?.p_service_id === service2);
+    release();
+    await staleResponse;
+    await expect(page.getByRole('button', { name: '11:00 – 11:30', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '09:00 – 09:30', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('#appointment-barber').selectOption(barber2);
+    await expect(save).toBeDisabled();
+    await page.getByRole('button', { name: '09:00 – 09:30', exact: true }).click();
+    await page.locator('#appointment-date').fill('2030-10-02');
+    await expect(save).toBeDisabled();
+    await page.getByRole('button', { name: '09:00 – 09:30', exact: true }).click();
+    await page.locator('#appointment-client-name').fill('IDs distintos');
+    await page.locator('#appointment-client-phone').fill('81999990000');
+    await save.click();
+    await expect.poll(() => network.appointmentInsertRequests.length).toBe(1);
+    expect(network.appointmentInsertRequests[0]).toMatchObject({ barber_id: barber2, service_id: OWNER_SERVICE_ID, start_at: '2030-10-02T09:00:00-03:00', end_at: '2030-10-02T09:30:00-03:00' });
+  });
+
+  for (const state of ['empty', 'error', 'timezone'] as const) {
+    test(`owner availability ${state} never invents local slots`, async ({ page }) => {
+      await installOwnerSupabaseMocks(page, {
+        barbershops: [{ ...ownerBarbershop, operational_timezone: state === 'timezone' ? null : 'America/Recife' }],
+        availability: async () => state === 'empty' ? { status: 200, body: [] } : { status: 400, body: { message: 'PUBLIC_AVAILABILITY_INVALID_SERVICE' } }
+      });
+      await signInAsOwner(page);
+      await page.getByRole('button', { name: 'Agendar', exact: true }).last().click();
+      await expect(page.getByText(state === 'empty' ? 'Nenhum horário disponível nesta data.' : state === 'timezone' ? 'Configure o fuso operacional da barbearia antes de agendar.' : 'Não foi possível consultar os horários. Verifique o serviço, o barbeiro e a configuração da agenda.')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Salvar agendamento' })).toBeDisabled();
+      await expect(page.locator('#appointment-time')).toHaveCount(0);
+    });
+  }
+
+  test('owner availability protects completed history in Agenda', async ({ page }) => {
+    const appointment = makeAppointmentRow({ id: 'history', clientName: 'Histórico', barberId: OWNER_BARBER_ID, barberName: 'Leo Barber', barbershopId: OWNER_BARBERSHOP_ID, date: getTodayString(), time: '09:00' });
+    const network = await installOwnerSupabaseMocks(page, { appointments: [{ ...appointment, status: 'completed' }] });
+    await signInAsOwner(page);
+    await page.locator('article').filter({ hasText: 'Histórico' }).getByRole('button', { name: 'Ver detalhes' }).click();
+    await expect(page.getByRole('heading', { name: 'Detalhes do agendamento' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reagendar', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Salvar agendamento' })).toHaveCount(0);
+    expect(network.availabilityRequests).toEqual([]);
+  });
   for (const browserZone of ['UTC', 'America/Recife', 'America/New_York']) {
     test.describe(`financial calendar in ${browserZone}`, () => {
       test.use({ timezoneId: browserZone });
@@ -1262,7 +1491,7 @@ test.describe('owner operational dashboard e2e', () => {
   test('owner scheduling workspace keeps date, filter and appointments usable across viewports', async ({ page }) => {
     await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/, (route) => route.abort());
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await installOwnerSupabaseMocks(page);
+    await installOwnerSupabaseMocks(page, { barbershops: [{ ...ownerBarbershop, operational_timezone: 'America/Recife' }] });
     await signInAsOwner(page);
 
     await expect(page.getByRole('heading', { name: 'Agenda do dia' })).toBeVisible();

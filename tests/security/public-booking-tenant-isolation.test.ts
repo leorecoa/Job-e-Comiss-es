@@ -394,7 +394,7 @@ describe('public booking tenant isolation repositories', () => {
   });
 
   it.each(['scheduled', 'confirmed', 'completed'] as const)(
-    'blocks duplicate appointments for status %s using barbershop_id + barber_id + start_at',
+    'defers remote owner conflicts for status %s to the transactional database writer',
     async (status) => {
       const existing = makeAppointment({
         id: `existing-${status}`,
@@ -403,11 +403,9 @@ describe('public booking tenant isolation repositories', () => {
         endAt: '2026-06-22T15:45:00.000Z'
       });
 
-      await expect(
-        createAppointment(makeAppointment(), [existing])
-      ).rejects.toThrow(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
-
-      expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
+      const { insert } = mockTenantValidatedInsert();
+      await expect(createAppointment(makeAppointment(), [existing])).resolves.toMatchObject({ id: 'appointment-1' });
+      expect(insert).toHaveBeenCalledTimes(1);
     }
   );
 
