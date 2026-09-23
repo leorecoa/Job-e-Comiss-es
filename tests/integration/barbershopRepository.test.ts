@@ -20,6 +20,7 @@ import {
   updateBarbershopFinancialTimezone,
   updateBarbershopOperationalTimezone,
   getBarbershopById,
+  getBarbershopOperationalTimezone,
   getBarbershopBySlug,
   getBarbershopPublicBookingPath,
   normalizeBarbershopSlug
@@ -30,6 +31,26 @@ describe('barbershop onboarding repository', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     supabaseMock.localFallback = false;
+  });
+
+  it.each([null, 'America/Recife'])('loads only the operational timezone (%s) for the authenticated calendar', async value => {
+    const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn().mockResolvedValue({ data: { operational_timezone: value }, error: null }) };
+    query.select.mockReturnValue(query);
+    query.eq.mockReturnValue(query);
+    supabaseMock.from.mockReturnValue(query);
+    expect(await getBarbershopOperationalTimezone('shop-1')).toBe(value);
+    expect(supabaseMock.from).toHaveBeenCalledExactlyOnceWith('barbershops');
+    expect(query.select).toHaveBeenCalledExactlyOnceWith('operational_timezone');
+    expect(query.eq).toHaveBeenCalledExactlyOnceWith('id', 'shop-1');
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
+  });
+
+  it('does not turn a failed timezone read into a fallback', async () => {
+    const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: 'private provider error' } }) };
+    query.select.mockReturnValue(query);
+    query.eq.mockReturnValue(query);
+    supabaseMock.from.mockReturnValue(query);
+    await expect(getBarbershopOperationalTimezone('shop-1')).rejects.toThrow('Não foi possível carregar o fuso operacional');
   });
 
   it('normalizes the onboarding slug into a public-friendly path', () => {

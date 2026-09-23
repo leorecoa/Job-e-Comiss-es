@@ -1423,7 +1423,7 @@ const App: React.FC = () => {
 
   // Function for barber to create appointments
   const handleCreateBarberAppointment = async (appointment: Appointment) => {
-    if (hasAppointmentConflict(appointments, appointment)) {
+    if (shouldUseLocalFallback && hasAppointmentConflict(appointments, appointment)) {
       throw createAppointmentConflictError('Horario indisponivel para este barbeiro.');
     }
 
@@ -1870,6 +1870,7 @@ const App: React.FC = () => {
         <ToastContainer toasts={toasts} removeToast={removeToast} />
         <React.Suspense fallback={<ViewFallback />}>
           <BarberDashboard
+            remote={!shouldUseLocalFallback}
             authSession={authSession}
             appointments={appointments}
             settings={settings}

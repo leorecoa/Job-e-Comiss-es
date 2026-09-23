@@ -1,18 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { rpcMock, fromMock } = vi.hoisted(() => ({
+const { rpcMock, fromMock, mode } = vi.hoisted(() => ({
+  mode: { local: false },
   rpcMock: vi.fn(),
   fromMock: vi.fn()
 }));
 
 vi.mock('../../lib/supabase', () => ({
-  shouldUseLocalFallback: false,
+  get shouldUseLocalFallback() { return mode.local; },
   assertOperationalSupabase: vi.fn(),
   supabase: { rpc: rpcMock, from: fromMock }
 }));
 
-import { createBarberAppointment, listInternalAppointments, listOwnerAvailability, updateAppointment } from '../../services/appointmentRepository';
+import { createBarberAppointment, listBarberAvailability, listInternalAppointments, listOwnerAvailability, updateAppointment } from '../../services/appointmentRepository';
 import type { Appointment } from '../../types';
 
 const baseRow = {
@@ -36,7 +37,51 @@ const baseRow = {
 };
 
 describe('controlled internal appointment access', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); mode.local = false; });
+
+  it('preserves local barber creation, storage and the existing local conflict check', async () => {
+    mode.local = true;
+    const storage = { setItem: vi.fn() };
+    vi.stubGlobal('localStorage', storage);
+    const appointment: Appointment = {
+      id: 'local', barbershopId: 'local-barbershop', serviceId: 'local-service', clientName: 'Cliente', clientPhone: '81987324097', barberId: 'barber', barberName: 'Barbeiro',
+      serviceType: 'Corte', serviceValue: 60, startAt: '2030-10-01T09:00:00-03:00', endAt: '2030-10-01T09:30:00-03:00',
+      status: 'scheduled', createdAt: '2030-10-01T10:00:00Z', updatedAt: '2030-10-01T10:00:00Z'
+    };
+    try {
+      expect(await createBarberAppointment(appointment, [])).toEqual(appointment);
+      expect(storage.setItem).toHaveBeenCalledExactlyOnceWith('barbearia_appointments', JSON.stringify([appointment]));
+      await expect(createBarberAppointment(appointment, [{ ...appointment, id: 'existing', status: 'completed' }])).rejects.toMatchObject({ code: 'APPOINTMENT_ACTIVE_SLOT_CONFLICT' });
+      expect(storage.setItem).toHaveBeenCalledTimes(1);
+      expect(rpcMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+      mode.local = false;
+    }
+  });
+
+  it('reads barber availability using only service and date, preserving literal timestamps', async () => {
+    const slot = { start_at: '2030-10-01T09:00:12.123456-03:00', end_at: '2030-10-01T09:30:12.123456-03:00' };
+    rpcMock.mockResolvedValue({ data: [{ ...slot, private_field: 'removed' }], error: null });
+    expect(await listBarberAvailability({ serviceId: baseRow.service_id, localDate: '2030-10-01' })).toEqual([slot]);
+    expect(rpcMock).toHaveBeenCalledExactlyOnceWith('get_barber_availability', {
+      p_service_id: baseRow.service_id, p_local_date: '2030-10-01'
+    });
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('barber empty, invalid and failed responses never fall back to local availability', async () => {
+    const input = { serviceId: baseRow.service_id, localDate: '2030-10-01' };
+    rpcMock.mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: [{ start_at: 'invalid', end_at: 'invalid' }], error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: 'BARBER_APPOINTMENT_FORBIDDEN' } })
+      .mockResolvedValueOnce({ data: null, error: { message: 'PUBLIC_AVAILABILITY_TIMEZONE_REQUIRED' } });
+    expect(await listBarberAvailability(input)).toEqual([]);
+    await expect(listBarberAvailability(input)).rejects.toThrow('Não foi possível');
+    await expect(listBarberAvailability(input)).rejects.toThrow('Não foi possível');
+    await expect(listBarberAvailability(input)).rejects.toThrow('fuso operacional');
+    expect(fromMock).not.toHaveBeenCalled();
+  });
 
   it.each([undefined, baseRow.id])('reads owner availability with only authorized references (%s)', async (appointmentId) => {
     const slot = { start_at: '2026-10-01T09:00:12.123456-03:00', end_at: '2026-10-01T10:00:12.123456-03:00' };
@@ -142,7 +187,7 @@ describe('controlled internal appointment access', () => {
       serviceType: 'Servico adulterado',
       serviceValue: 999,
       commissionRate: 100,
-      startAt: '2099-08-24T12:00:00.000Z',
+      startAt: '2099-08-24T09:00:12.123456-03:00',
       endAt: '2099-08-24T18:00:00.000Z',
       status: 'scheduled',
       notes: 'Observacao permitida',
@@ -165,7 +210,9 @@ describe('controlled internal appointment access', () => {
       error: null
     });
 
-    const created = await createBarberAppointment(appointment, []);
+    // A completed row in React state must not override the backend occupancy contract.
+    const created = await createBarberAppointment(appointment, [{ ...appointment, id: 'completed', status: 'completed' }]);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
 
     expect(rpcMock).toHaveBeenCalledWith('create_barber_appointment', {
       p_service_id: baseRow.service_id,
