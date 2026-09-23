@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+# Run separately from pgTAP: committed fixtures temporarily change global seed counts.
 $container = 'supabase_db_Job-e-Comiss-es'
 $tenant = 'eeee2727-0000-4000-8000-000000000001'
 $barber = 'eeee2727-0000-4000-8000-000000000002'
@@ -34,6 +35,13 @@ $cases = @(
     @{ Name = 'reschedule/create'; First = "set local role authenticated; select set_config('request.jwt.claim.sub','$owner',true); select * from public.update_owner_appointment('$appointment','Local fixture','11999999999','$barber','Concurrency','$service','Concurrency',50,0,'2030-01-07T09:00Z','2030-01-07T09:30Z','scheduled',null);"; Second = $insert.Replace($appointment, 'eeee2727-0000-4000-8000-000000000005'); Error = 'APPOINTMENT_ACTIVE_SLOT_CONFLICT' },
     @{ Name = 'create/working-hours'; First = $insert; Second = "update public.barber_working_hours set start_time='10:00' where barber_id='$barber';"; Error = 'APPOINTMENT_OUTSIDE_WORKING_HOURS' }
 )
+$ownerCreate = "set local role authenticated; select set_config('request.jwt.claim.sub','$owner',true); select public.create_owner_appointment('$service','$barber','Local fixture','11999999999','2030-01-07T09:00Z');"
+$cases += @(
+    @{ Name = 'owner-rpc/create'; First = $ownerCreate; Second = $ownerCreate; Error = 'APPOINTMENT_ACTIVE_SLOT_CONFLICT' },
+    @{ Name = 'owner-rpc/time-off'; First = $ownerCreate; Second = $cases[1].Second; Error = 'APPOINTMENT_TIME_OFF_CONFLICT' },
+    @{ Name = 'owner-rpc/working-hours'; First = $ownerCreate; Second = $cases[3].Second; Error = 'APPOINTMENT_OUTSIDE_WORKING_HOURS' },
+    @{ Name = 'owner-rpc/reschedule'; First = $cases[2].First; Second = $ownerCreate; Error = 'APPOINTMENT_ACTIVE_SLOT_CONFLICT' }
+)
 $jobs = @()
 # Never clean up a fixture that predates this invocation.
 $existing = Invoke-LocalSql "select (select count(*) from public.barbershops where id='$tenant')+(select count(*) from auth.users where id='$owner');"
@@ -42,7 +50,7 @@ try {
     Invoke-LocalSql "begin; $setup commit;" | Out-Null
     foreach ($case in $cases) {
         Invoke-LocalSql "delete from public.appointments where barbershop_id='$tenant';" | Out-Null
-        if ($case.Name -eq 'reschedule/create') {
+        if ($case.Name -in @('reschedule/create', 'owner-rpc/reschedule')) {
             Invoke-LocalSql ($insert.Replace('T09:00Z','T10:00Z').Replace('T09:30Z','T10:30Z')) | Out-Null
         }
         $firstSql = "begin; set local application_name='availability-027-holder'; $($case.First) select pg_sleep(8); commit;"
