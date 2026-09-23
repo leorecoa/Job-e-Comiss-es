@@ -269,6 +269,25 @@ export const listInternalAppointments = async (barbershopId?: string, barberId?:
 
 export type PublicAvailabilitySlot = { start_at: string; end_at: string };
 
+export const listBarberAvailability = async (input: {
+  serviceId: string; localDate: string;
+}): Promise<PublicAvailabilitySlot[]> => {
+  assertOperationalSupabase();
+  const { data, error } = await supabase.rpc('get_barber_availability', {
+    p_service_id: input.serviceId,
+    p_local_date: input.localDate
+  });
+  if (error) {
+    if (error.message?.includes('TIMEZONE_REQUIRED')) throw new Error('Configure o fuso operacional da barbearia antes de agendar.');
+    throw new Error('Não foi possível consultar os horários. Verifique o serviço e a configuração da agenda.');
+  }
+  if (!Array.isArray(data) || !data.every(slot => (
+    slot && typeof slot.start_at === 'string' && typeof slot.end_at === 'string'
+    && Number.isFinite(Date.parse(slot.start_at)) && Date.parse(slot.end_at) > Date.parse(slot.start_at)
+  ))) throw new Error('Não foi possível consultar os horários. Tente novamente.');
+  return data.map(({ start_at, end_at }) => ({ start_at, end_at }));
+};
+
 export const listOwnerAvailability = async (input: {
   serviceId: string; barberId: string; localDate: string; appointmentId?: string;
 }): Promise<PublicAvailabilitySlot[]> => {
@@ -448,12 +467,11 @@ export const createBarberAppointment = async (
     throw new Error(validationErrors[0]);
   }
 
-  const appointments = existingAppointments || await listInternalAppointments();
-  if (hasAppointmentConflict(appointments, appointment)) {
-    throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
-  }
-
   if (shouldUseLocalFallback) {
+    const appointments = existingAppointments || await listInternalAppointments();
+    if (hasAppointmentConflict(appointments, appointment)) {
+      throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
+    }
     writeLocalAppointments([appointment, ...appointments]);
     return appointment;
   }

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { listOwnerAvailability, type PublicAvailabilitySlot } from '../services/appointmentRepository';
+import { listBarberAvailability, listOwnerAvailability, type PublicAvailabilitySlot } from '../services/appointmentRepository';
 import { operationalDate, operationalTime } from '../utils/operationalTime';
 import { X, Save } from 'lucide-react';
 import { Appointment, AppSettings, BarberOption } from '../types';
@@ -24,6 +24,7 @@ interface AppointmentModalProps {
   readOnly?: boolean;
   durationFromService?: boolean;
   remoteOwner?: boolean;
+  remoteBarber?: boolean;
   operationalTimezone?: string | null;
 }
 
@@ -64,8 +65,12 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   readOnly = false,
   durationFromService = false,
   remoteOwner = false,
+  remoteBarber = false,
   operationalTimezone
 }) => {
+  const remoteAvailability = remoteOwner || remoteBarber;
+  const barberFormInitialized = useRef(false);
+  const barberDateManual = useRef(false);
   const fallbackService = settings.services[0];
 
   const [clientName, setClientName] = useState('');
@@ -99,17 +104,26 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   );
 
   const selectedBarberOption = useMemo(
-    () => barberOptions.find((barber) => remoteOwner ? barber.id === barberId : barber.name === barberName),
-    [barberOptions, barberName, barberId, remoteOwner]
+    () => barberOptions.find((barber) => remoteAvailability ? barber.id === barberId : barber.name === barberName),
+    [barberOptions, barberName, barberId, remoteAvailability]
   );
 
   const selectedService = useMemo(
-    () => settings.services.find((service) => remoteOwner ? service.id === serviceId : service.name === serviceName),
-    [settings.services, serviceName, serviceId, remoteOwner]
+    () => settings.services.find((service) => remoteAvailability ? service.id === serviceId : service.name === serviceName),
+    [settings.services, serviceName, serviceId, remoteAvailability]
   );
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      barberFormInitialized.current = false;
+      barberDateManual.current = false;
+      return;
+    }
+    if (remoteBarber && barberFormInitialized.current) {
+      if (!barberDateManual.current) setDateInput(selectedDate);
+      return;
+    }
+    barberFormInitialized.current = true;
     requestIdentity.current += 1;
     setRescheduling(false);
     setSelectedSlot(null);
@@ -150,26 +164,31 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     barberOptions,
     fallbackService,
     remoteOwner,
+    remoteBarber,
     operationalTimezone
   ]);
 
   useEffect(() => {
     const identity = ++requestIdentity.current;
-    if (!isOpen || !remoteOwner || readOnly || !temporal || !serviceId || !barberId || !dateInput || !operationalTimezone) return;
+    if (!isOpen || !remoteAvailability || readOnly || !temporal || !serviceId || !barberId || !dateInput || !operationalTimezone) return;
     setSelectedSlot(null);
     setAvailability({ key: queryKey, slots: [], loading: true, error: '' });
-    void listOwnerAvailability({ serviceId, barberId, localDate: dateInput, appointmentId: initialData?.id }).then(
+    const request = remoteBarber
+      ? listBarberAvailability({ serviceId, localDate: dateInput })
+      : listOwnerAvailability({ serviceId, barberId, localDate: dateInput, appointmentId: initialData?.id });
+    void request.then(
       slots => { if (identity === requestIdentity.current) setAvailability({ key: queryKey, slots, loading: false, error: '' }); },
       error => { if (identity === requestIdentity.current) setAvailability({ key: queryKey, slots: [], loading: false, error: error instanceof Error ? error.message : 'Não foi possível consultar os horários.' }); }
     );
     return () => { requestIdentity.current += 1; };
-  }, [isOpen, remoteOwner, readOnly, temporal, serviceId, barberId, dateInput, initialData?.id, operationalTimezone, queryKey]);
+  }, [isOpen, remoteAvailability, remoteBarber, readOnly, temporal, serviceId, barberId, dateInput, initialData?.id, operationalTimezone, queryKey]);
 
   const handleServiceChange = (name: string) => {
-    if (remoteOwner) { invalidateAvailability(); setServiceId(name); }
+    if (remoteBarber && name === serviceId) return;
+    if (remoteAvailability) { invalidateAvailability(); setServiceId(name); }
     else setServiceName(name);
 
-    const service = settings.services.find((item) => remoteOwner ? item.id === name : item.name === name);
+    const service = settings.services.find((item) => remoteAvailability ? item.id === name : item.name === name);
 
     if (service) {
       setServiceValue(String(service.price));
@@ -183,10 +202,10 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
       return;
     }
 
-    if (remoteOwner && temporal && (!operationalTimezone || !selectedSlot || !currentSlots.includes(selectedSlot))) return;
+    if (remoteAvailability && temporal && (!operationalTimezone || !selectedSlot || !currentSlots.includes(selectedSlot))) return;
     const now = new Date().toISOString();
-    const startAt = remoteOwner ? (temporal ? selectedSlot!.start_at : initialData!.startAt) : buildLocalDateTimeIso(dateInput, timeInput);
-    const endAt = remoteOwner ? (temporal ? selectedSlot!.end_at : initialData!.endAt) : addMinutesIso(startAt, durationFromService
+    const startAt = remoteAvailability ? (temporal ? selectedSlot!.start_at : initialData!.startAt) : buildLocalDateTimeIso(dateInput, timeInput);
+    const endAt = remoteAvailability ? (temporal ? selectedSlot!.end_at : initialData!.endAt) : addMinutesIso(startAt, durationFromService
       ? selectedService?.durationMinutes ?? 30
       : Math.max(1, Number(durationMinutes) || 30));
 
@@ -195,7 +214,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         ? selectedBarberOption.id
         : undefined;
 
-    const isServiceChanged = !initialData || (remoteOwner ? initialData.serviceId !== serviceId : initialData.serviceType !== serviceName);
+    const isServiceChanged = !initialData || (remoteAvailability ? initialData.serviceId !== serviceId : initialData.serviceType !== serviceName);
     const commissionRate = isServiceChanged
       ? selectedService?.commissionRate
       : (initialData?.commissionRate ?? selectedService?.commissionRate);
@@ -206,8 +225,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
       serviceId: remoteOwner && !temporal ? initialData?.serviceId : selectedService?.id,
       clientName: clientName.trim(),
       clientPhone: clientPhone.trim() || undefined,
-      barberName: remoteOwner ? (!temporal ? initialData!.barberName : selectedBarberOption?.name ?? '') : barberName,
-      serviceType: remoteOwner ? (!isServiceChanged ? initialData!.serviceType : selectedService?.name ?? '') : serviceName,
+      barberName: remoteAvailability ? (!temporal ? initialData!.barberName : selectedBarberOption?.name ?? '') : barberName,
+      serviceType: remoteAvailability ? (!isServiceChanged ? initialData!.serviceType : selectedService?.name ?? '') : serviceName,
       serviceValue: Math.max(0, Number(serviceValue) || 0),
       commissionRate,
       startAt,
@@ -280,15 +299,15 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 id="appointment-date"
                 name="date"
                 type="date"
-                required={!remoteOwner || temporal}
+                required={!remoteAvailability || temporal}
                 disabled={readOnly}
                 value={dateInput}
-                onChange={(e) => { if (remoteOwner) invalidateAvailability(); setDateInput(e.target.value); }}
+                onChange={(e) => { barberDateManual.current = true; if (remoteAvailability) invalidateAvailability(); setDateInput(e.target.value); }}
                 className="ui-input"
               />
             </div>
 
-            {!remoteOwner && <div>
+            {!remoteAvailability && <div>
               <label htmlFor="appointment-time" className="ui-label block mb-1.5">
                 Hora
               </label>
@@ -305,7 +324,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
             </div>}
           </div>
 
-          {remoteOwner && (
+          {remoteAvailability && (
             <div aria-live="polite" className="space-y-2">
               {!temporal && <>
                 <p>Horário atual: {operationalTimezone ? `${operationalTime(initialData!.startAt, operationalTimezone)} – ${operationalTime(initialData!.endAt, operationalTimezone)}` : 'fuso operacional não configurado'}</p>
@@ -332,13 +351,13 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               id="appointment-barber"
               name="barberName"
               required
-              disabled={readOnly}
-              value={remoteOwner ? barberId : barberName}
-              onChange={(e) => { if (remoteOwner) { invalidateAvailability(); setBarberId(e.target.value); } else setBarberName(e.target.value); }}
+              disabled={readOnly || remoteBarber}
+              value={remoteAvailability ? barberId : barberName}
+              onChange={(e) => { if (remoteBarber) return; if (remoteOwner) { invalidateAvailability(); setBarberId(e.target.value); } else setBarberName(e.target.value); }}
               className="ui-input"
             >
               {barberOptions.map((barber) => (
-                <option key={barber.id} value={remoteOwner ? barber.id : barber.name}>
+                <option key={barber.id} value={remoteAvailability ? barber.id : barber.name}>
                   {barber.name}
                 </option>
               ))}
@@ -355,12 +374,12 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 name="serviceName"
                 required
                 disabled={readOnly}
-                value={remoteOwner ? serviceId : serviceName}
+                value={remoteAvailability ? serviceId : serviceName}
                 onChange={(e) => handleServiceChange(e.target.value)}
                 className="ui-input"
               >
                 {settings.services.map((service) => (
-                  <option key={service.id} value={remoteOwner ? service.id : service.name}>
+                  <option key={service.id} value={remoteAvailability ? service.id : service.name}>
                     {service.name}
                   </option>
                 ))}
@@ -378,8 +397,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 min="1"
                 required
                 disabled={readOnly}
-                readOnly={durationFromService || remoteOwner}
-                value={remoteOwner ? (temporal ? selectedService?.durationMinutes ?? durationMinutes : durationMinutes) : durationFromService ? selectedService?.durationMinutes ?? 30 : durationMinutes}
+                readOnly={durationFromService || remoteAvailability}
+                value={remoteAvailability ? (temporal ? selectedService?.durationMinutes ?? durationMinutes : durationMinutes) : durationFromService ? selectedService?.durationMinutes ?? 30 : durationMinutes}
                 onChange={(e) => setDurationMinutes(e.target.value)}
                 className="ui-input"
               />
@@ -426,7 +445,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
           ) : (
             <button
               type="submit"
-              disabled={remoteOwner && temporal && (!selectedSlot || !currentSlots.includes(selectedSlot))}
+              disabled={remoteAvailability && temporal && (!operationalTimezone || !selectedSlot || !currentSlots.includes(selectedSlot))}
               className="ui-button ui-button-primary w-full"
             >
               <Save size={20} />

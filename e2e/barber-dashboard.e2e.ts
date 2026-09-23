@@ -70,6 +70,9 @@ type CapturedRequest = {
 };
 
 type MockScenario = {
+  operationalTimezone?: string | null;
+  timezoneReady?: Promise<void>;
+  availability?: (route: Route, body: Record<string, string>) => Promise<void>;
   profile?: MockProfile;
   barbers?: MockBarber[];
   services?: MockService[];
@@ -221,6 +224,7 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
   const appointmentReadRequests: string[] = [];
   const internalAppointmentResponses: unknown[][] = [];
   const appointmentCreateRequests: CapturedRequest[] = [];
+  const availabilityRequests: Record<string, string>[] = [];
   const signOutRequests: CapturedRequest[] = [];
 
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
@@ -341,6 +345,20 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
       return;
     }
 
+    if (url.pathname === '/rest/v1/barbershops') {
+      await scenario.timezoneReady;
+      await fulfillJson(route, 200, [{ operational_timezone: scenario.operationalTimezone === undefined ? 'America/Recife' : scenario.operationalTimezone }]);
+      return;
+    }
+
+    if (url.pathname === '/rest/v1/rpc/get_barber_availability') {
+      const body = parseRequestBody(route) as Record<string, string>;
+      availabilityRequests.push(body);
+      if (scenario.availability) await scenario.availability(route, body);
+      else await fulfillJson(route, 200, [{ start_at: `${body.p_local_date}T14:00:00-03:00`, end_at: `${body.p_local_date}T14:30:00-03:00` }]);
+      return;
+    }
+
     if (url.pathname === '/rest/v1/appointments') {
       appointmentReadRequests.push(request.url());
       await fulfillJson(route, 403, { message: 'Direct appointment reads are forbidden.' });
@@ -404,6 +422,7 @@ const installBarberSupabaseMocks = async (page: Page, scenario: MockScenario = {
   });
 
   return {
+    availabilityRequests,
     signInRequests,
     signOutRequests,
     appointmentReadRequests,
@@ -429,14 +448,134 @@ const fillBarberAppointmentModal = async (page: Page, clientName: string) => {
   const today = getTodayString();
   await page.getByLabel('Cliente').fill(clientName);
   await page.getByLabel('Telefone WhatsApp').fill('81987324097');
-  await page.getByLabel('Data').fill(today);
-  await page.getByLabel('Hora').fill('14:00');
+  await page.getByLabel('Data', { exact: true }).fill(today);
   await page.getByLabel('Servico').selectOption({ label: 'Corte' });
   await page.getByLabel('Valor').fill('60');
   await page.getByLabel('Observacoes').fill('teste e2e barbeiro');
+  await page.getByRole('button', { name: '14:00 – 14:30', exact: true }).click();
 };
 
 test.describe('barber dashboard e2e', () => {
+  test.use({ timezoneId: 'UTC' });
+  test('homonymous service IDs and date changes invalidate selection and reject stale responses', async ({ page }) => {
+    const secondServiceId = '4cbf9f97-598a-4574-8c72-95c94ec0aba5';
+    const pending: { route: Route; body: Record<string, string> }[] = [];
+    const network = await installBarberSupabaseMocks(page, {
+      services: [SERVICE_ID, secondServiceId].map(id => ({ id, name: 'Corte', barbershop_id: BARBERSHOP_ID, price: 60, duration_minutes: 30, commission_rate: 50, active: true })),
+      availability: async (route, body) => { pending.push({ route, body }); }
+    });
+    await signInAsBarber(page);
+    await openNewAppointmentModal(page);
+    await expect.poll(() => pending.length).toBe(1);
+    await expect(page.getByText('Consultando horários...')).toBeVisible();
+    await expect(page.getByLabel('Barbeiro', { exact: true })).toBeDisabled();
+    await page.getByLabel('Servico').selectOption(secondServiceId);
+    await expect.poll(() => pending.length).toBe(2);
+    const day = pending[1].body.p_local_date;
+    const slot = { start_at: `${day}T14:00:00-03:00`, end_at: `${day}T14:30:00-03:00` };
+    await fulfillJson(pending[1].route, 200, [slot]);
+    await page.getByRole('button', { name: '14:00 – 14:30', exact: true }).click();
+    const staleResponse = page.waitForResponse(response => response.url().endsWith('/get_barber_availability') && response.request().postDataJSON().p_service_id === SERVICE_ID);
+    await fulfillJson(pending[0].route, 200, [{ start_at: `${day}T09:00:00-03:00`, end_at: `${day}T09:30:00-03:00` }]);
+    await staleResponse;
+    await expect(page.getByRole('button', { name: '09:00 – 09:30', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '14:00 – 14:30', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+    await page.getByLabel('Data', { exact: true }).fill('2030-10-01');
+    await expect.poll(() => pending.length).toBe(3);
+    await expect(page.getByRole('button', { name: /Salvar agendamento/i })).toBeDisabled();
+    await page.getByLabel('Data', { exact: true }).fill('2030-10-02');
+    await expect.poll(() => pending.length).toBe(4);
+    const latest = { start_at: '2030-10-02T16:00:00-03:00', end_at: '2030-10-02T16:30:00-03:00' };
+    await fulfillJson(pending[3].route, 200, [latest]);
+    await page.getByRole('button', { name: '16:00 – 16:30', exact: true }).click();
+    const staleError = page.waitForResponse(response => response.url().endsWith('/get_barber_availability') && response.request().postDataJSON().p_local_date === '2030-10-01');
+    await fulfillJson(pending[2].route, 500, { message: 'stale error' });
+    await staleError;
+    await expect(page.getByRole('button', { name: '16:00 – 16:30', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByText('Consultando horários...')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.getByLabel('Cliente').fill('Cliente Homonimo');
+    await page.getByLabel('Telefone WhatsApp').fill('81987324097');
+    await page.getByRole('button', { name: /Salvar agendamento/i }).click();
+    await expect.poll(() => network.appointmentCreateRequests.length).toBe(1);
+    expect(network.appointmentCreateRequests[0].body).toMatchObject({ p_service_id: secondServiceId, p_start_at: latest.start_at });
+    for (const request of network.availabilityRequests) expect(Object.keys(request).sort()).toEqual(['p_local_date', 'p_service_id']);
+    expect(network.appointmentReadRequests).toEqual([]);
+  });
+
+  test('service changes clear an existing slot and empty/error responses never generate local slots', async ({ page }) => {
+    const pending: Route[] = [];
+    await installBarberSupabaseMocks(page, { availability: async route => { pending.push(route); } });
+    await signInAsBarber(page);
+    await openNewAppointmentModal(page);
+    await expect.poll(() => pending.length).toBe(1);
+    await fulfillJson(pending[0], 200, [{ start_at: '2030-10-01T14:00:00-03:00', end_at: '2030-10-01T14:30:00-03:00' }]);
+    await page.getByRole('button', { name: '14:00 – 14:30', exact: true }).click();
+    await page.getByLabel('Servico').selectOption({ label: 'Barba' });
+    await expect.poll(() => pending.length).toBe(2);
+    await expect(page.getByRole('button', { name: /Salvar agendamento/i })).toBeDisabled();
+    await expect(page.getByText('Consultando horários...')).toBeVisible();
+    await fulfillJson(pending[1], 200, []);
+    await expect(page.getByText('Nenhum horário disponível nesta data.')).toBeVisible();
+    await page.getByLabel('Data', { exact: true }).fill('2030-10-02');
+    await expect.poll(() => pending.length).toBe(3);
+    await fulfillJson(pending[2], 500, { message: 'private SQL must not be shown' });
+    await expect(page.getByRole('alert')).toContainText('Não foi possível consultar os horários.');
+    await expect(page.getByText('Nenhum horário disponível nesta data.')).toHaveCount(0);
+    await expect(page.getByLabel('Hora', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Salvar agendamento/i })).toBeDisabled();
+    await expect(page.getByText('private SQL must not be shown')).toHaveCount(0);
+  });
+
+  test('missing operational timezone does not use a browser or financial fallback', async ({ page }) => {
+    const network = await installBarberSupabaseMocks(page, { operationalTimezone: null });
+    await signInAsBarber(page);
+    await expect(page.getByText(/Fuso operacional não configurado/)).toBeVisible();
+    await expect(page.getByLabel('Data da agenda')).toHaveValue('');
+    await openNewAppointmentModal(page);
+    await page.getByLabel('Data', { exact: true }).fill('2030-10-01');
+    await expect(page.getByRole('alert')).toContainText('Configure o fuso operacional');
+    await expect(page.getByRole('button', { name: /Salvar agendamento/i })).toBeDisabled();
+    expect(network.availabilityRequests).toEqual([]);
+  });
+
+  for (const manual of [false, true]) {
+    test(`late timezone uses tenant today and preserves manual dates (${manual})`, async ({ page }) => {
+      await page.clock.setFixedTime(new Date('2030-10-01T01:00:00Z'));
+      let release!: () => void;
+      const timezoneReady = new Promise<void>(resolve => { release = resolve; });
+      const network = await installBarberSupabaseMocks(page, { timezoneReady });
+      await signInAsBarber(page);
+      await expect(page.getByLabel('Data da agenda')).toHaveValue('');
+      if (manual) await page.getByLabel('Data da agenda').fill('2030-10-03');
+      await openNewAppointmentModal(page);
+      if (manual) await page.getByLabel('Data', { exact: true }).fill('2030-10-04');
+      await page.getByLabel('Cliente').fill('Nome preservado');
+      release();
+      await expect.poll(() => network.availabilityRequests.length).toBe(1);
+      await expect(page.getByLabel('Data da agenda')).toHaveValue(manual ? '2030-10-03' : '2030-09-30');
+      await expect(page.getByLabel('Data', { exact: true })).toHaveValue(manual ? '2030-10-04' : '2030-09-30');
+      await expect(page.getByLabel('Cliente')).toHaveValue('Nome preservado');
+      expect(network.availabilityRequests[0]).toEqual({ p_service_id: SERVICE_ID, p_local_date: manual ? '2030-10-04' : '2030-09-30' });
+    });
+  }
+
+  test('a completed appointment in loaded state does not preempt remote availability or creation', async ({ page }) => {
+    const network = await installBarberSupabaseMocks(page, { appointments: [{
+      ...makeAppointmentRow({ id: 'completed', clientName: 'Historico', barberId: BARBER_ID, barberName: BARBER_DISPLAY_NAME, date: getTodayString(), time: '14:00' }),
+      status: 'completed'
+    }] });
+    await signInAsBarber(page);
+    await expect(page.getByText('Historico')).toBeVisible();
+    await openNewAppointmentModal(page);
+    await fillBarberAppointmentModal(page, 'Nova Reserva');
+    await page.getByRole('button', { name: /Salvar agendamento/i }).click();
+    await expect(page.getByText('Agendamento criado!').first()).toBeVisible();
+    expect(network.appointmentCreateRequests).toHaveLength(1);
+    expect(network.internalAppointmentResponses).toHaveLength(1);
+  });
+
   test('authenticated linked barber accesses the dashboard and sees only own appointments', async ({ page }) => {
     const network = await installBarberSupabaseMocks(page);
 
@@ -490,11 +629,13 @@ test.describe('barber dashboard e2e', () => {
     await expect(page.getByText(/Cliente Novo/i)).toBeVisible();
 
     expect(network.appointmentCreateRequests).toHaveLength(1);
+    expect(network.availabilityRequests.at(-1)).toEqual({ p_service_id: SERVICE_ID, p_local_date: getTodayString() });
     const [{ body }] = network.appointmentCreateRequests;
     const payload = body as Record<string, unknown>;
 
     expect(payload).toMatchObject({
       p_service_id: SERVICE_ID,
+      p_start_at: `${getTodayString()}T14:00:00-03:00`,
       p_client_name: 'Cliente Novo',
       p_client_phone: '81987324097',
       p_notes: 'teste e2e barbeiro'
@@ -506,23 +647,33 @@ test.describe('barber dashboard e2e', () => {
     expect(JSON.stringify(payload)).not.toContain('Gestao Maxima');
   });
 
-  test('barber creation failure keeps the form open without success feedback', async ({ page }) => {
-    const network = await installBarberSupabaseMocks(page, {
-      appointmentCreateResponse: { status: 409, body: { message: 'APPOINTMENT_ACTIVE_SLOT_CONFLICT', code: 'P0001' } }
+  for (const [code, message] of [
+    ['APPOINTMENT_ACTIVE_SLOT_CONFLICT', 'Esse horário acabou de ser reservado. Escolha outro horário.'],
+    ['APPOINTMENT_TIME_OFF_CONFLICT', 'Esse horário foi bloqueado. Consulte os horários novamente.'],
+    ['APPOINTMENT_OUTSIDE_WORKING_HOURS', 'Esse horário não pertence mais à jornada disponível. Consulte os horários novamente.'],
+    ['APPOINTMENT_INVALID_TIME', 'Esse horário não é mais válido. Consulte os horários novamente.'],
+    ['BARBER_APPOINTMENT_INVALID_TIME', 'Esse horário não é mais válido. Consulte os horários novamente.'],
+    ['BARBER_APPOINTMENT_INVALID_SERVICE', 'Esse serviço não está mais disponível. Selecione outro serviço.']
+  ]) {
+    test(`barber creation failure ${code} keeps the form open without success feedback`, async ({ page }) => {
+      const network = await installBarberSupabaseMocks(page, {
+        appointmentCreateResponse: { status: 409, body: { message: code, code: 'P0001', details: 'private provider details' } }
+      });
+      const unhandled: string[] = [];
+      page.on('pageerror', error => unhandled.push(error.message));
+      await signInAsBarber(page);
+      await openNewAppointmentModal(page);
+      await fillBarberAppointmentModal(page, 'Cliente Falha');
+      await page.getByRole('button', { name: /Salvar agendamento/i }).click();
+      await expect.poll(() => network.appointmentCreateRequests.length).toBe(1);
+      await expect(page.getByText(message)).toBeVisible();
+      await expect(page.getByText('private provider details')).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: /Novo agendamento/i })).toBeVisible();
+      await expect(page.getByLabel('Cliente')).toHaveValue('Cliente Falha');
+      await expect(page.getByText(/Agendamento criado!/i)).toHaveCount(0);
+      expect(unhandled).toEqual([]);
     });
-    const unhandled: string[] = [];
-    page.on('pageerror', error => unhandled.push(error.message));
-    await signInAsBarber(page);
-    await openNewAppointmentModal(page);
-    await fillBarberAppointmentModal(page, 'Cliente Falha');
-    await page.getByRole('button', { name: /Salvar agendamento/i }).click();
-    await expect.poll(() => network.appointmentCreateRequests.length).toBe(1);
-    await expect(page.getByText('Nao foi possivel salvar o agendamento. Tente novamente.')).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Novo agendamento/i })).toBeVisible();
-    await expect(page.getByLabel('Cliente')).toHaveValue('Cliente Falha');
-    await expect(page.getByText(/Agendamento criado!/i)).toHaveCount(0);
-    expect(unhandled).toEqual([]);
-  });
+  }
 
   test('barber duration follows the selected service without manual override', async ({ page }) => {
     await installBarberSupabaseMocks(page);

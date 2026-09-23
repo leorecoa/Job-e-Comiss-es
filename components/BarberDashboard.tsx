@@ -1,11 +1,13 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { getBarbershopOperationalTimezone } from '../services/barbershopRepository';
+import { operationalDate, operationalTime } from '../utils/operationalTime';
 import { Appointment, AppSettings } from '../types';
 import { AuthSession } from '../services/authRepository';
 import {
   formatTime,
   generateId
 } from '../utils';
-import { getAppointmentDateInput } from '../scheduling';
+import { getAppointmentDateInput, isAppointmentConflictError } from '../scheduling';
 import { getOperationalErrorMessage, logOperationalError } from '../utils/errorHandling';
 import {
   Calendar,
@@ -20,6 +22,7 @@ import { AppointmentModal } from './AppointmentModal';
 import { Button, InlineNotice, Surface } from './ui';
 
 type BarberDashboardProps = {
+  remote?: boolean;
   authSession: AuthSession;
   appointments: Appointment[];
   settings: AppSettings;
@@ -38,6 +41,14 @@ const getTodayString = (): string => {
 
   return `${year}-${month}-${day}`;
 };
+
+const BARBER_AVAILABILITY_ERRORS = new Map([
+  ['APPOINTMENT_TIME_OFF_CONFLICT', 'Esse horário foi bloqueado. Consulte os horários novamente.'],
+  ['APPOINTMENT_OUTSIDE_WORKING_HOURS', 'Esse horário não pertence mais à jornada disponível. Consulte os horários novamente.'],
+  ['APPOINTMENT_INVALID_TIME', 'Esse horário não é mais válido. Consulte os horários novamente.'],
+  ['BARBER_APPOINTMENT_INVALID_TIME', 'Esse horário não é mais válido. Consulte os horários novamente.'],
+  ['BARBER_APPOINTMENT_INVALID_SERVICE', 'Esse serviço não está mais disponível. Selecione outro serviço.']
+]);
 
 export const buildBarberOwnedAppointment = ({
   appointment,
@@ -69,6 +80,7 @@ export const buildBarberOwnedAppointment = ({
 };
 
 export const BarberDashboard: React.FC<BarberDashboardProps> = ({
+  remote = false,
   authSession,
   appointments,
   settings,
@@ -76,7 +88,24 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   addToast,
   onSignOut
 }) => {
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
+  const [localDate, setLocalDate] = useState<string>(getTodayString());
+  const context = `${authSession.userId}:${authSession.barbershopId}:${authSession.barberId}`;
+  const [manualDate, setManualDate] = useState<{ context: string; date: string } | null>(null);
+  const [zone, setZone] = useState<{ context: string; value: string | null; error: string } | null>(null);
+  const operationalTimezone = zone?.context === context ? zone.value : null;
+  const selectedDate = remote
+    ? manualDate?.context === context ? manualDate.date : operationalTimezone ? operationalDate(new Date().toISOString(), operationalTimezone) : ''
+    : localDate;
+  const setSelectedDate = (date: string) => remote ? setManualDate({ context, date }) : setLocalDate(date);
+  useEffect(() => {
+    if (!remote || !authSession.barbershopId || !authSession.barberId) return;
+    let current = true;
+    void getBarbershopOperationalTimezone(authSession.barbershopId).then(
+      value => { if (current) setZone({ context, value, error: '' }); },
+      () => { if (current) setZone({ context, value: null, error: 'Não foi possível carregar o fuso operacional da agenda.' }); }
+    );
+    return () => { current = false; };
+  }, [remote, context, authSession.barbershopId, authSession.barberId]);
   const [isAppointmentModalOpen, setAppointmentModalOpen] = useState(false);
   const [isSigningOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -100,9 +129,9 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
 
   const todayAppointments = useMemo(() => (
     barberAppointments
-      .filter((appointment) => getAppointmentDateInput(appointment) === selectedDate)
+      .filter((appointment) => (remote ? operationalTimezone ? operationalDate(appointment.startAt, operationalTimezone) : null : getAppointmentDateInput(appointment)) === selectedDate)
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
-  ), [barberAppointments, selectedDate]);
+  ), [barberAppointments, selectedDate, remote, operationalTimezone]);
 
   const upcomingAppointments = useMemo(() => {
     const now = new Date();
@@ -111,10 +140,10 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       .filter((appointment) => (
         appointment.status !== 'cancelled'
         && new Date(appointment.startAt) > now
-        && getAppointmentDateInput(appointment) !== selectedDate
+        && (remote ? operationalTimezone ? operationalDate(appointment.startAt, operationalTimezone) : null : getAppointmentDateInput(appointment)) !== selectedDate
       ))
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  }, [barberAppointments, selectedDate]);
+  }, [barberAppointments, selectedDate, remote, operationalTimezone]);
 
   const barberScopedSettings = useMemo(() => ({
     ...settings,
@@ -149,7 +178,9 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       setAppointmentModalOpen(false);
     } catch (error) {
       logOperationalError('barber-dashboard:save-appointment', error);
-      addToast(getOperationalErrorMessage(
+      const backendCode = typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string' ? error.message : '';
+      const availabilityMessage = remote ? BARBER_AVAILABILITY_ERRORS.get(backendCode) : undefined;
+      addToast(remote && isAppointmentConflictError(error) ? error.message : availabilityMessage ?? getOperationalErrorMessage(
         error,
         'Nao foi possivel salvar o agendamento. Tente novamente.',
         {
@@ -161,6 +192,13 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
   };
 
   const changeDate = (days: number) => {
+    if (!selectedDate) return;
+    if (remote) {
+      const calendar = new Date(`${selectedDate}T00:00:00Z`);
+      calendar.setUTCDate(calendar.getUTCDate() + days);
+      setSelectedDate(calendar.toISOString().slice(0, 10));
+      return;
+    }
     const [year, month, day] = selectedDate.split('-').map(Number);
     const d = new Date(year, month - 1, day);
 
@@ -258,6 +296,9 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       </header>
 
       <main className="max-w-6xl mx-auto px-4 pt-6 relative z-20">
+        {remote && !operationalTimezone && <InlineNotice>
+          {zone?.context !== context ? 'Carregando configuração da agenda...' : zone.error || 'Fuso operacional não configurado. Peça ao owner para configurar a agenda.'}
+        </InlineNotice>}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
           <div className="flex gap-2 w-full md:w-auto">
             <button
@@ -281,6 +322,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
 
             <input
               type="date"
+              aria-label="Data da agenda"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               className="ui-owner-date-input text-sm text-center w-full md:w-32"
@@ -318,7 +360,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                       <p className="font-bold">{appointment.clientName}</p>
                       <p className="text-sm">{appointment.serviceType}</p>
                       <p className="text-xs text-gold-400 font-mono">
-                        {formatTime(new Date(appointment.startAt).getTime())}
+                        {remote ? operationalTimezone ? operationalTime(appointment.startAt, operationalTimezone) : 'Fuso operacional indisponível' : formatTime(new Date(appointment.startAt).getTime())}
                       </p>
                     </div>
 
@@ -350,8 +392,7 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
                       <p className="font-bold">{appointment.clientName}</p>
                       <p className="text-sm">{appointment.serviceType}</p>
                       <p className="text-xs text-gold-400 font-mono">
-                        {new Date(appointment.startAt).toLocaleDateString('pt-BR')} as{' '}
-                        {formatTime(new Date(appointment.startAt).getTime())}
+                        {remote ? operationalTimezone ? `${operationalDate(appointment.startAt, operationalTimezone)} às ${operationalTime(appointment.startAt, operationalTimezone)}` : 'Fuso operacional indisponível' : <>{new Date(appointment.startAt).toLocaleDateString('pt-BR')} as{' '}{formatTime(new Date(appointment.startAt).getTime())}</>}
                       </p>
                     </div>
 
@@ -363,6 +404,10 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
       </main>
 
       <AppointmentModal
+        key={context}
+        remoteBarber={remote}
+        operationalTimezone={operationalTimezone}
+        selectedBarberId={barberId ?? undefined}
         isOpen={isAppointmentModalOpen}
         onClose={() => {
           setAppointmentModalOpen(false);

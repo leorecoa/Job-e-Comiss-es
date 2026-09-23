@@ -201,6 +201,14 @@ export const getBarbershopBySlug = async (slug: string): Promise<Barbershop | nu
   return getActiveBarbershopBy('slug', slug);
 };
 
+export const getBarbershopOperationalTimezone = async (id: string): Promise<string | null> => {
+  assertOperationalSupabase();
+  const { data, error } = await supabase.from('barbershops')
+    .select('operational_timezone').eq('id', id).maybeSingle();
+  if (error) throw new Error('Não foi possível carregar o fuso operacional da agenda.');
+  return data?.operational_timezone ?? null;
+};
+
 export const getBarbershopById = async (id: string): Promise<Barbershop | null> => {
   if (shouldUseLocalFallback) {
     return id === 'local-barbershop' ? readLocalBarbershop() : null;
