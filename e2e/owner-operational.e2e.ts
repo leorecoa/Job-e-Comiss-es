@@ -1489,13 +1489,26 @@ test.describe('owner operational dashboard e2e', () => {
   });
 
   test('owner scheduling workspace keeps date, filter and appointments usable across viewports', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2030-10-01T01:00:00Z'));
     await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/, (route) => route.abort());
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await installOwnerSupabaseMocks(page, { barbershops: [{ ...ownerBarbershop, operational_timezone: 'America/Recife' }] });
+    await installOwnerSupabaseMocks(page, {
+      barbershops: [{ ...ownerBarbershop, operational_timezone: 'America/Recife' }],
+      appointments: [makeAppointmentRow({
+        id: 'appointment-owner-tenant',
+        clientName: 'Cliente Leo',
+        barberId: OWNER_BARBER_ID,
+        barberName: 'Leo Barber',
+        barbershopId: OWNER_BARBERSHOP_ID,
+        date: '2030-09-30',
+        time: '09:00'
+      })]
+    });
     await signInAsOwner(page);
 
     await expect(page.getByRole('heading', { name: 'Agenda do dia' })).toBeVisible();
     const initialDate = await page.getByLabel('Data da agenda').inputValue();
+    expect(initialDate).toBe('2030-09-30');
     await expect(page.getByLabel('Barbeiro', { exact: true })).toBeVisible();
     await expect(page.getByText('Cliente Leo')).toBeVisible();
     await expect(page.getByText('Agendado', { exact: true })).toBeVisible();
