@@ -1,6 +1,9 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Appointment } from '../../types';
+import { Appointment, DEFAULT_SETTINGS } from '../../types';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { AppointmentModal } from '../../components/AppointmentModal';
 
 vi.mock('../../lib/supabase', () => ({
   isSupabaseConfigured: false,
@@ -130,11 +133,22 @@ describe('appointment repository local fallback', () => {
     installLocalStorageMock();
   });
 
+  it.each([null, makeAppointment()])('keeps local create/edit price editable (%j)', initialData => {
+    const html = renderToStaticMarkup(createElement(AppointmentModal, {
+      isOpen: true, onClose: vi.fn(), onSave: vi.fn(), settings: DEFAULT_SETTINGS,
+      selectedDate: '2026-06-10', selectedBarber: 'Carlos', createId: () => 'local-id', initialData
+    }));
+    const input = html.match(/<input[^>]*id="appointment-service-value"[^>]*>/)?.[0];
+    expect(input).toBeDefined();
+    expect(input).not.toMatch(/readonly|disabled/i);
+    expect(html).not.toContain('Valor definido pelo catálogo');
+  });
+
   it('creates appointments in localStorage when Supabase is not configured', async () => {
     const created = await createAppointment(makeAppointment(), []);
     const saved = JSON.parse(localStorage.getItem(APPOINTMENT_STORAGE_KEY) || '[]');
 
-    expect(created.status).toBe('scheduled');
+    expect(created).toEqual({ mode: 'local', appointment: makeAppointment() });
     expect(saved).toHaveLength(1);
     expect(saved[0].id).toBe('appointment-1');
   });

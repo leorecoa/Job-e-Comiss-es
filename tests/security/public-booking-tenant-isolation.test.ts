@@ -38,17 +38,6 @@ const createOrderedBarbersQuery = (result: {
   return query;
 };
 
-const createTenantLookupQuery = (result: {
-  data: { id: string; barbershop_id: string | null } | null;
-  error: null;
-}) => {
-  const query = {
-    eq: vi.fn(),
-    maybeSingle: vi.fn().mockResolvedValue(result)
-  };
-  query.eq.mockReturnValue(query);
-  return query;
-};
 
 const createOrderedAppointmentsQuery = (result: {
   data: Array<{
@@ -100,35 +89,6 @@ const makeAppointment = (overrides: Partial<Appointment> = {}): Appointment => (
   ...overrides
 });
 
-const mockTenantValidatedInsert = () => {
-  const insert = vi.fn().mockResolvedValue({ error: null });
-
-  supabaseMock.from.mockImplementation((table: string) => {
-    if (table === 'barbers') {
-      const query = createTenantLookupQuery({
-        data: { id: 'barber-leo', barbershop_id: 'shop-leo' },
-        error: null
-      });
-      return { select: vi.fn().mockReturnValue(query) };
-    }
-
-    if (table === 'services') {
-      const query = createTenantLookupQuery({
-        data: { id: 'service-leo', barbershop_id: 'shop-leo' },
-        error: null
-      });
-      return { select: vi.fn().mockReturnValue(query) };
-    }
-
-    if (table === 'appointments') {
-      return { insert };
-    }
-
-    throw new Error(`Unexpected table ${table}`);
-  });
-
-  return { insert };
-};
 
 describe('public booking tenant isolation repositories', () => {
   beforeEach(() => {
@@ -362,320 +322,87 @@ describe('public booking tenant isolation repositories', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('creates the appointment with the current barbershop_id after validating barber and service tenant ownership', async () => {
-    const insertSelect = vi.fn();
-    const insertSingle = vi.fn();
-    const { insert } = mockTenantValidatedInsert();
+  const persistedId = '60000000-0000-4000-8000-000000000099';
+  const mockOwnerWriter = (response = { data: persistedId, error: null as null | { code: string; message: string } }) => {
+    supabaseMock.from.mockImplementation(() => { throw new Error('Owner create must not access tables'); });
+    supabaseMock.rpc.mockResolvedValue(response);
+    const storage = { setItem: vi.fn() };
+    vi.stubGlobal('localStorage', storage);
+    return storage;
+  };
 
-    const appointment = makeAppointment();
-    const created = await createAppointment(appointment, []);
-
-    expect(insert).toHaveBeenCalledWith({
-      barbershop_id: 'shop-leo',
-      client_name: 'Cliente Leo',
-      client_phone: '85999990000',
-      commission_rate: null,
-      barber_id: 'barber-leo',
-      barber_name: 'Leo',
-      service_id: 'service-leo',
-      service_type: 'Corte Leo',
-      service_value: 70,
-      start_at: '2026-06-22T15:00:00.000Z',
-      end_at: '2026-06-22T15:45:00.000Z',
-      status: 'scheduled',
-      notes: null,
-      financial_record_id: null
-    }, {
-      defaultToNull: true
+  it('uses only the six owner RPC arguments and returns a receipt, not a fabricated row', async () => {
+    const storage = mockOwnerWriter();
+    const appointment = makeAppointment({
+      startAt: '2030-10-01T09:00:00.123456-03:00',
+      endAt: '2030-10-01T10:00:00.123456-03:00',
+      serviceValue: 999, commissionRate: 99, financialRecordId: 'spoofed', status: 'completed'
     });
-    expect(insertSelect).not.toHaveBeenCalled();
-    expect(insertSingle).not.toHaveBeenCalled();
-    expect(created.barbershopId).toBe('shop-leo');
+    expect(await createAppointment(appointment, [])).toEqual({ mode: 'remote', id: persistedId });
+    expect(supabaseMock.rpc).toHaveBeenCalledExactlyOnceWith('create_owner_appointment', {
+      p_service_id: 'service-leo', p_barber_id: 'barber-leo',
+      p_client_name: 'Cliente Leo', p_client_phone: '85999990000',
+      p_start_at: appointment.startAt, p_notes: null
+    });
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(storage.setItem).not.toHaveBeenCalled();
   });
 
-  it.each(['scheduled', 'confirmed', 'completed'] as const)(
-    'defers remote owner conflicts for status %s to the transactional database writer',
-    async (status) => {
-      const existing = makeAppointment({
-        id: `existing-${status}`,
-        status,
-        startAt: '2026-06-22T15:00:00.000Z',
-        endAt: '2026-06-22T15:45:00.000Z'
-      });
-
-      const { insert } = mockTenantValidatedInsert();
-      await expect(createAppointment(makeAppointment(), [existing])).resolves.toMatchObject({ id: 'appointment-1' });
-      expect(insert).toHaveBeenCalledTimes(1);
+  it.each(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show'] as const)(
+    'defers remote conflict decisions for %s to the writer', async status => {
+      mockOwnerWriter();
+      await expect(createAppointment(makeAppointment(), [makeAppointment({ status })]))
+        .resolves.toEqual({ mode: 'remote', id: persistedId });
+      expect(supabaseMock.rpc).toHaveBeenCalledTimes(1);
+      expect(supabaseMock.from).not.toHaveBeenCalled();
     }
   );
 
-  it('allows a new appointment when the previous one is cancelled', async () => {
-    const { insert } = mockTenantValidatedInsert();
-
-    await expect(
-      createAppointment(makeAppointment(), [
-        makeAppointment({
-          id: 'existing-cancelled',
-          status: 'cancelled'
-        })
-      ])
-    ).resolves.toMatchObject({
-      id: 'appointment-1',
-      barbershopId: 'shop-leo'
-    });
-
-    expect(insert).toHaveBeenCalledTimes(1);
+  it('uses selected service and barber IDs for homonyms, regardless of loaded tenant data', async () => {
+    mockOwnerWriter();
+    await createAppointment(makeAppointment({ barberId: 'barber-leo-2', serviceId: 'service-leo-2' }),
+      [makeAppointment(), makeAppointment({ barbershopId: 'other-tenant' })]);
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('create_owner_appointment', expect.objectContaining({
+      p_barber_id: 'barber-leo-2', p_service_id: 'service-leo-2'
+    }));
+    expect(supabaseMock.from).not.toHaveBeenCalled();
   });
 
-  it('allows a new appointment when the previous one is no_show', async () => {
-    const { insert } = mockTenantValidatedInsert();
-
-    await expect(
-      createAppointment(makeAppointment(), [
-        makeAppointment({
-          id: 'existing-no-show',
-          status: 'no_show'
-        })
-      ])
-    ).resolves.toMatchObject({
-      id: 'appointment-1',
-      barbershopId: 'shop-leo'
-    });
-
-    expect(insert).toHaveBeenCalledTimes(1);
+  it.each([null, '', 'not-a-uuid', {}, [persistedId], 42])('rejects malformed receipt %j without another write', async data => {
+    const storage = mockOwnerWriter();
+    supabaseMock.rpc.mockResolvedValue({ data, error: null });
+    await expect(createAppointment(makeAppointment(), [])).rejects.toThrow('Atualize a agenda antes de tentar novamente.');
+    expect(supabaseMock.rpc).toHaveBeenCalledTimes(1);
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(storage.setItem).not.toHaveBeenCalled();
   });
 
-  it('uses barber_id instead of barber_name to detect conflicts', async () => {
-    const { insert } = mockTenantValidatedInsert();
-
-    await expect(
-      createAppointment(makeAppointment({
-        barberId: 'barber-leo-2',
-        barberName: 'Leo'
-      }), [
-        makeAppointment({
-          id: 'existing-same-name',
-          barberId: 'barber-leo',
-          barberName: 'Leo'
-        })
-      ])
-    ).resolves.toMatchObject({
-      barberId: 'barber-leo-2'
-    });
-
-    expect(insert).toHaveBeenCalledTimes(1);
+  it.each([
+    'OWNER_APPOINTMENT_INVALID_BARBER', 'OWNER_APPOINTMENT_INVALID_SERVICE',
+    'OWNER_APPOINTMENT_CREATE_FORBIDDEN', 'APPOINTMENT_TIME_OFF_CONFLICT'
+  ])('propagates server authorization/availability error %s without fallback', async message => {
+    const error = { code: 'P0001', message };
+    const storage = mockOwnerWriter({ data: persistedId, error });
+    await expect(createAppointment(makeAppointment(), [])).rejects.toEqual(error);
+    expect(supabaseMock.rpc).toHaveBeenCalledTimes(1);
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(storage.setItem).not.toHaveBeenCalled();
   });
 
-  it('does not leak conflicts from another tenant with the same barber_id and start_at', async () => {
-    const { insert } = mockTenantValidatedInsert();
-
-    await expect(
-      createAppointment(makeAppointment(), [
-        makeAppointment({
-          id: 'existing-other-tenant',
-          barbershopId: 'shop-gm',
-          barberId: 'barber-leo'
-        })
-      ])
-    ).resolves.toMatchObject({
-      barbershopId: 'shop-leo'
-    });
-
-    expect(insert).toHaveBeenCalledTimes(1);
+  it('maps the transactional conflict to the existing friendly message', async () => {
+    mockOwnerWriter({ data: persistedId, error: { code: 'P0001', message: 'APPOINTMENT_ACTIVE_SLOT_CONFLICT' } });
+    await expect(createAppointment(makeAppointment(), [])).rejects.toThrow(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
+    expect(supabaseMock.from).not.toHaveBeenCalled();
   });
 
-  it('maps a unique index race condition to the public booking conflict message', async () => {
-    const insert = vi.fn().mockResolvedValue({
-      error: {
-        code: '23505',
-        details: 'Key (barbershop_id, barber_id, start_at) conflicts with index appointments_unique_active_barbershop_barber_start.'
-      }
-    });
-
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table === 'barbers') {
-        const query = createTenantLookupQuery({
-          data: { id: 'barber-leo', barbershop_id: 'shop-leo' },
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'services') {
-        const query = createTenantLookupQuery({
-          data: { id: 'service-leo', barbershop_id: 'shop-leo' },
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'appointments') {
-        return { insert };
-      }
-
-      throw new Error(`Unexpected table ${table}`);
-    });
-
-    await expect(createAppointment(makeAppointment(), [])).rejects.toThrow(
-      PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
-    );
-  });
-
-  it('rejects a public appointment with an empty client name before Supabase', async () => {
-    await expect(
-      createAppointment(makeAppointment({
-        clientName: '   '
-      }), [])
-    ).rejects.toThrow('Informe seu nome.');
-
-    expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
-  });
-
-  it('rejects a public appointment with an invalid phone before Supabase', async () => {
-    await expect(
-      createAppointment(makeAppointment({
-        clientPhone: '1234'
-      }), [])
-    ).rejects.toThrow('O WhatsApp deve ter 10 ou 11 digitos.');
-
-    expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
-  });
-
-  it('rejects a public appointment with an invalid date range before Supabase', async () => {
-    await expect(
-      createAppointment(makeAppointment({
-        startAt: '2026-06-22T15:45:00.000Z',
-        endAt: '2026-06-22T15:00:00.000Z'
-      }), [])
-    ).rejects.toThrow('O horario final precisa ser maior que o horario inicial.');
-
-    expect(supabaseMock.from).not.toHaveBeenCalledWith('appointments');
-  });
-
-  it('rejects a public appointment when the barber belongs to another barbershop', async () => {
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table === 'barbers') {
-        const query = createTenantLookupQuery({
-          data: { id: 'barber-gm', barbershop_id: 'shop-gm' },
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'services') {
-        const query = createTenantLookupQuery({
-          data: { id: 'service-leo', barbershop_id: 'shop-leo' },
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'appointments') {
-        return { insert: vi.fn() };
-      }
-
-      throw new Error(`Unexpected table ${table}`);
-    });
-
-    await expect(
-      createAppointment(makeAppointment({ barberId: 'barber-gm', barberName: 'Barber GM' }), [])
-    ).rejects.toThrow('Barbeiro invalido para esta barbearia.');
-  });
-
-  it('rejects a public appointment when the service belongs to another barbershop', async () => {
-    const appointmentsInsert = vi.fn();
-
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table === 'barbers') {
-        const query = createTenantLookupQuery({
-          data: { id: 'barber-leo', barbershop_id: 'shop-leo' },
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'services') {
-        const query = createTenantLookupQuery({
-          data: { id: 'service-gm', barbershop_id: 'shop-gm' },
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'appointments') {
-        return { insert: appointmentsInsert };
-      }
-
-      throw new Error(`Unexpected table ${table}`);
-    });
-
-    await expect(
-      createAppointment(makeAppointment({
-        serviceId: 'service-gm',
-        serviceType: 'Servico GM'
-      }), [])
-    ).rejects.toThrow('Servico invalido para esta barbearia.');
-
-    expect(appointmentsInsert).not.toHaveBeenCalled();
-  });
-
-  it('rejects a public appointment when the barber is inactive', async () => {
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table === 'barbers') {
-        const query = createTenantLookupQuery({
-          data: null,
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'services') {
-        const query = createTenantLookupQuery({
-          data: { id: 'service-leo', barbershop_id: 'shop-leo' },
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'appointments') {
-        return { insert: vi.fn() };
-      }
-
-      throw new Error(`Unexpected table ${table}`);
-    });
-
-    await expect(
-      createAppointment(makeAppointment(), [])
-    ).rejects.toThrow('Barbeiro invalido para esta barbearia.');
-  });
-
-  it('rejects a public appointment when the service is inactive', async () => {
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table === 'barbers') {
-        const query = createTenantLookupQuery({
-          data: { id: 'barber-leo', barbershop_id: 'shop-leo' },
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'services') {
-        const query = createTenantLookupQuery({
-          data: null,
-          error: null
-        });
-        return { select: vi.fn().mockReturnValue(query) };
-      }
-
-      if (table === 'appointments') {
-        return { insert: vi.fn() };
-      }
-
-      throw new Error(`Unexpected table ${table}`);
-    });
-
-    await expect(
-      createAppointment(makeAppointment(), [])
-    ).rejects.toThrow('Servico invalido para esta barbearia.');
+  it.each([
+    [{ clientName: '   ' }, 'Informe seu nome.'],
+    [{ clientPhone: '1234' }, 'O WhatsApp deve ter 10 ou 11 digitos.'],
+    [{ startAt: '2026-06-22T15:45:00.000Z', endAt: '2026-06-22T15:00:00.000Z' }, 'O horario final precisa ser maior que o horario inicial.']
+  ] as const)('preserves input validation before contacting the writer: %j', async (overrides, message) => {
+    mockOwnerWriter();
+    await expect(createAppointment(makeAppointment(overrides), [])).rejects.toThrow(message);
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
+    expect(supabaseMock.from).not.toHaveBeenCalled();
   });
 });

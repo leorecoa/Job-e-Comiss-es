@@ -255,7 +255,7 @@ describe('Public Booking Page Logic', () => {
       { id: 'service-1', name: 'Corte', price: 50, durationMinutes: 30, barbershopId: DEFAULT_BARBERSHOP_ID },
     ]);
     vi.mocked(appointmentRepository.listPublicAppointmentSlots).mockResolvedValue([]);
-    vi.mocked(appointmentRepository.createAppointment).mockResolvedValue({} as Appointment);
+    vi.mocked(appointmentRepository.createAppointment).mockResolvedValue({ mode: 'local', appointment: {} as Appointment });
   });
 
   it('/book keeps the slug undefined instead of silently falling back to another tenant', () => {

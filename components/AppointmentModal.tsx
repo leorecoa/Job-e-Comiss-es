@@ -417,10 +417,12 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               step="0.01"
               required
               disabled={readOnly}
-              value={serviceValue}
+              readOnly={remoteOwner && !initialData}
+              value={remoteOwner && !initialData ? selectedService?.price ?? '' : serviceValue}
               onChange={(e) => setServiceValue(e.target.value)}
               className="ui-input"
             />
+            {remoteOwner && !initialData && <p className="ui-label mt-1">Valor definido pelo catálogo do serviço.</p>}
           </div>
 
           <div>
