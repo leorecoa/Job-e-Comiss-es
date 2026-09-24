@@ -29,7 +29,7 @@ import { PublicBookingPage } from './components/PublicBookingPage';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 import type { TourStep } from './components/tourUtils';
 import { isProductionWithoutSupabase, isSupabaseConfigured, PRODUCTION_SUPABASE_UNAVAILABLE_MESSAGE, shouldUseLocalFallback } from './lib/supabase';
-import { createAppointment as createAppointmentRecord, createBarberAppointment, createPublicAppointment, listInternalAppointments, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
+import { createAppointment as createAppointmentRecord, createBarberAppointment, createPublicAppointment, listInternalAppointments, OWNER_CREATE_UNCONFIRMED_MESSAGE, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { completeAppointmentWithFinancialRecord, listFinancialRecords, mapFinancialRecordToClient } from './services/financialRecordRepository';
 import { canDeleteClientHistory, getClientHistoryEditLabel, resolveClientEditTarget } from './clientEditing';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
@@ -1380,28 +1380,30 @@ const App: React.FC = () => {
     }
 
     try {
-      const savedAppointment = editingId //
+      const creation = editingId ? null : await createAppointmentRecord(scopedAppointment, appointments);
+      const savedAppointment = editingId
         ? await updateAppointmentRecord(editingId, scopedAppointment)
-        : await createAppointmentRecord(scopedAppointment, appointments);
+        : creation?.mode === 'local' ? creation.appointment : undefined;
 
       let agendaReloadFailed = false;
-      if (!editingId && !shouldUseLocalFallback) {
-        // INSERT does not return the database-generated ID. Never use a temporary ID to reschedule.
+      if (creation?.mode === 'remote') {
+        // The receipt is not an appointment snapshot; only the canonical read populates the agenda.
         try {
           setAppointments(await listInternalAppointments());
         } catch (error) {
           agendaReloadFailed = true;
           logOperationalError('dashboard:reload-created-appointment', error);
         }
-      } else {
+      } else if (savedAppointment) {
         setAppointments(prev => editingId
           ? prev.map(item => item.id === editingId ? savedAppointment : item)
           : [savedAppointment, ...prev]);
       }
 
-      if (shouldUseLocalFallback) setSelectedDate(getAppointmentDateInput(savedAppointment));
-      else if (ownerBarbershop?.operationalTimezone) setSelectedDate(operationalDate(savedAppointment.startAt, ownerBarbershop.operationalTimezone));
-      setSelectedScheduleBarber(shouldUseLocalFallback ? savedAppointment.barberName : savedAppointment.barberId || '');
+      const navigation = savedAppointment ?? scopedAppointment;
+      if (shouldUseLocalFallback) setSelectedDate(getAppointmentDateInput(navigation));
+      else if (ownerBarbershop?.operationalTimezone) setSelectedDate(operationalDate(navigation.startAt, ownerBarbershop.operationalTimezone));
+      setSelectedScheduleBarber(shouldUseLocalFallback ? navigation.barberName : navigation.barberId || '');
       setAppointmentModalOpen(false);
       setEditingAppointment(null);
       setAppointmentReadOnly(false);
@@ -1410,7 +1412,9 @@ const App: React.FC = () => {
       logOperationalError('dashboard:save-appointment', error);
       addToast(getOperationalErrorMessage(
         error,
-        (error as { message?: string })?.message?.includes('APPOINTMENT_HISTORY_PROTECTED')
+        (error as { message?: string })?.message === OWNER_CREATE_UNCONFIRMED_MESSAGE
+          ? OWNER_CREATE_UNCONFIRMED_MESSAGE
+          : (error as { message?: string })?.message?.includes('APPOINTMENT_HISTORY_PROTECTED')
           ? 'Este atendimento possui histórico financeiro e não pode ser alterado.'
           : 'Nao foi possivel salvar o agendamento. Tente novamente.',
         {

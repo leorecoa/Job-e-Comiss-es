@@ -73,6 +73,7 @@ type MockAppointment = {
   service_id: string;
   service_type: string;
   service_value: number;
+  commission_rate?: number;
   start_at: string;
   end_at: string;
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
@@ -120,6 +121,8 @@ type MockScenario = {
   onboardingRpcResponse?: MockRpcResponse;
   availability?: (body: Record<string, unknown>) => Promise<MockRpcResponse>;
   failAgendaAfterCreate?: boolean;
+  ownerCreateResponse?: MockRpcResponse;
+  canonicalCreatedName?: string;
 };
 
 const ownerBusinessHours = {
@@ -313,6 +316,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
   const appointmentReadRequests: string[] = [];
   const availabilityRequests: Record<string, unknown>[] = [];
   const appointmentInsertRequests: Record<string, unknown>[] = [];
+  const ownerCreateRequests: Record<string, unknown>[] = [];
   const rpcRequests: CapturedRequest[] = [];
   const completionRequests: CapturedRequest[] = [];
   const appointmentUpdateRequests: CapturedRequest[] = [];
@@ -482,12 +486,37 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
       if (request.method() === 'POST') {
         const body = parseRequestBody(route) as Record<string, unknown>;
         appointmentInsertRequests.push(body);
-        appointments.push({ ...body, id: '60000000-0000-4000-8000-000000000099', created_at: String(body.start_at), updated_at: String(body.start_at) } as MockAppointment);
-        await fulfillJson(route, 201, null);
+        await fulfillJson(route, 403, { message: 'Direct owner INSERT is forbidden in this test.' });
         return;
       }
       appointmentReadRequests.push(request.url());
       await fulfillJson(route, 403, { message: 'Direct appointment reads are forbidden.' });
+      return;
+    }
+
+    if (url.pathname === '/rest/v1/rpc/create_owner_appointment') {
+      const body = parseRequestBody(route) as Record<string, unknown>;
+      ownerCreateRequests.push(body);
+      expect(Object.keys(body).sort()).toEqual(['p_barber_id', 'p_client_name', 'p_client_phone', 'p_notes', 'p_service_id', 'p_start_at']);
+      if (scenario.ownerCreateResponse) {
+        await fulfillJson(route, scenario.ownerCreateResponse.status, scenario.ownerCreateResponse.body);
+        return;
+      }
+      const service = services.find(item => item.id === body.p_service_id && item.barbershop_id === profile.barbershop_id);
+      const barber = barbers.find(item => item.id === body.p_barber_id && item.barbershop_id === profile.barbershop_id);
+      if (!service || !barber) throw new Error('Invalid owner create fixture IDs');
+      const id = '60000000-0000-4000-8000-000000000099';
+      appointments.push({
+        id, barbershop_id: profile.barbershop_id!, barber_id: barber.id, barber_name: barber.name,
+        service_id: service.id, service_type: service.name, service_value: service.price,
+        commission_rate: service.commission_rate, client_name: scenario.canonicalCreatedName ?? String(body.p_client_name),
+        client_phone: String(body.p_client_phone), notes: body.p_notes as string | null,
+        start_at: String(body.p_start_at),
+        end_at: new Date(Date.parse(String(body.p_start_at)) + service.duration_minutes * 60000).toISOString(),
+        status: 'scheduled', financial_record_id: null,
+        created_at: String(body.p_start_at), updated_at: String(body.p_start_at)
+      });
+      await fulfillJson(route, 200, id);
       return;
     }
 
@@ -500,7 +529,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
     }
 
     if (url.pathname === '/rest/v1/rpc/get_internal_appointments') {
-      if (scenario.failAgendaAfterCreate && appointmentInsertRequests.length) {
+      if (scenario.failAgendaAfterCreate && ownerCreateRequests.length) {
         await fulfillJson(route, 503, { message: 'Unavailable' });
         return;
       }
@@ -625,6 +654,7 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
     appointmentReadRequests,
     availabilityRequests,
     appointmentInsertRequests,
+    ownerCreateRequests,
     rpcRequests,
     completionRequests,
     appointmentUpdateRequests,
@@ -671,8 +701,8 @@ test.describe('owner operational dashboard e2e', () => {
     await page.locator('#appointment-client-name').fill('Barbeiro B');
     await page.locator('#appointment-client-phone').fill('81999990000');
     await page.getByRole('button', { name: 'Salvar agendamento' }).click();
-    await expect.poll(() => network.appointmentInsertRequests.length).toBe(1);
-    expect(network.appointmentInsertRequests[0]).toMatchObject({ barber_id: barberB, ...slot });
+    await expect.poll(() => network.ownerCreateRequests.length).toBe(1);
+    expect(network.ownerCreateRequests[0]).toMatchObject({ p_barber_id: barberB, p_start_at: slot.start_at });
   });
 
   test.describe('initial operational day', () => {
@@ -729,6 +759,7 @@ test.describe('owner operational dashboard e2e', () => {
     const slot = { start_at: '2030-10-01T09:00:00-03:00', end_at: '2030-10-01T10:00:00-03:00' };
     let created = false;
     const network = await installOwnerSupabaseMocks(page, {
+      canonicalCreatedName: 'Cliente canônico',
       barbershops: [{ ...ownerBarbershop, operational_timezone: 'America/Recife' }],
       services: [{ id: OWNER_SERVICE_ID, name: 'Corte Leo', barbershop_id: OWNER_BARBERSHOP_ID, price: 60, duration_minutes: 60, commission_rate: 50, active: true }],
       availability: async body => ({ status: 200, body: created && !body.p_appointment_id ? [] : [slot] })
@@ -740,19 +771,25 @@ test.describe('owner operational dashboard e2e', () => {
     await page.locator('#appointment-client-phone').fill('81999990000');
     await expect(page.locator('#appointment-duration')).toHaveAttribute('readonly', '');
     await expect(page.locator('#appointment-duration')).toHaveValue('60');
+    await expect(page.locator('#appointment-service-value')).toHaveAttribute('readonly', '');
+    await expect(page.locator('#appointment-service-value')).toHaveValue('60');
+    await expect(page.getByText('Valor definido pelo catálogo do serviço.')).toBeVisible();
     await page.getByRole('button', { name: '09:00 – 10:00', exact: true }).click();
     await page.getByRole('button', { name: 'Salvar agendamento' }).click();
-    await expect.poll(() => network.appointmentInsertRequests.length).toBe(1);
+    await expect.poll(() => network.ownerCreateRequests.length).toBe(1);
     created = true;
-    expect(network.appointmentInsertRequests[0]).toMatchObject(slot);
+    expect(network.ownerCreateRequests[0]).toMatchObject({ p_start_at: slot.start_at });
     expect(network.availabilityRequests.at(-1)).toEqual({ p_service_id: OWNER_SERVICE_ID, p_barber_id: OWNER_BARBER_ID, p_local_date: '2030-10-01', p_appointment_id: null });
     await expect(page.getByText('Agendamento criado!')).toBeVisible();
-    await page.locator('article').filter({ hasText: 'Cliente Availability' }).getByRole('button', { name: 'Editar', exact: true }).click();
+    await expect(page.locator('article').filter({ hasText: 'Cliente Availability' })).toHaveCount(0);
+    expect(network.appointmentInsertRequests).toHaveLength(0);
+    await page.locator('article').filter({ hasText: 'Cliente canônico' }).getByRole('button', { name: 'Editar', exact: true }).click();
+    await expect(page.locator('#appointment-service-value')).toBeEditable();
     const count = network.availabilityRequests.length;
     await page.locator('#appointment-client-name').fill('Texto preservado');
     await page.getByRole('button', { name: 'Salvar agendamento' }).click();
     await expect.poll(() => network.appointmentUpdateRequests.length).toBe(1);
-    expect(network.appointmentUpdateRequests[0].body).toMatchObject({ p_start_at: slot.start_at, p_end_at: slot.end_at });
+    expect(network.appointmentUpdateRequests[0].body).toMatchObject({ p_start_at: slot.start_at, p_end_at: new Date(slot.end_at).toISOString() });
     expect(network.availabilityRequests).toHaveLength(count);
     await page.locator('article').filter({ hasText: 'Texto preservado' }).getByRole('button', { name: 'Editar', exact: true }).click();
     await page.getByRole('button', { name: 'Reagendar', exact: true }).click();
@@ -784,10 +821,36 @@ test.describe('owner operational dashboard e2e', () => {
     await page.getByRole('button', { name: '09:00 – 09:30', exact: true }).click();
     await page.getByRole('button', { name: 'Salvar agendamento' }).click();
     await expect(page.getByText('Agendamento criado. Atualize a página para recarregar a agenda.')).toBeVisible();
-    expect(network.appointmentInsertRequests).toHaveLength(1);
+    expect(network.ownerCreateRequests).toHaveLength(1);
+    expect(network.appointmentInsertRequests).toHaveLength(0);
     await expect(page.locator('article').filter({ hasText: 'Sem ID temporário' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Novo agendamento' })).toHaveCount(0);
   });
+
+  for (const malformed of [false, true]) {
+    test(`owner writer failure keeps the form without fallback (malformed receipt=${malformed})`, async ({ page }) => {
+      const network = await installOwnerSupabaseMocks(page, {
+        appointments: [],
+        barbershops: [{ ...ownerBarbershop, operational_timezone: 'America/Recife' }],
+        availability: async () => ({ status: 200, body: [{ start_at: '2030-10-01T09:00:00-03:00', end_at: '2030-10-01T09:30:00-03:00' }] }),
+        ownerCreateResponse: malformed ? { status: 200, body: null } : { status: 400, body: { code: 'P0001', message: 'APPOINTMENT_TIME_OFF_CONFLICT' } }
+      });
+      await signInAsOwner(page);
+      await page.getByRole('button', { name: 'Agendar', exact: true }).last().click();
+      await page.locator('#appointment-client-name').fill('Não persistido');
+      await page.locator('#appointment-client-phone').fill('81999990000');
+      await page.getByRole('button', { name: '09:00 – 09:30', exact: true }).click();
+      await page.getByRole('button', { name: 'Salvar agendamento' }).click();
+      await expect(page.getByText(malformed
+        ? 'Não foi possível confirmar o identificador do agendamento. Atualize a agenda antes de tentar novamente.'
+        : 'Nao foi possivel salvar o agendamento. Tente novamente.')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Novo agendamento' })).toBeVisible();
+      await expect(page.locator('#appointment-client-name')).toHaveValue('Não persistido');
+      await expect(page.locator('article').filter({ hasText: 'Não persistido' })).toHaveCount(0);
+      expect(network.ownerCreateRequests).toHaveLength(1);
+      expect(network.appointmentInsertRequests).toHaveLength(0);
+    });
+  }
 
   test('owner availability invalidates dimensions by ID and ignores stale responses for homonyms', async ({ page }) => {
     const barber2 = '252b5551-b8e7-4693-ab07-d0bbfde6ec06';
@@ -825,11 +888,14 @@ test.describe('owner operational dashboard e2e', () => {
     await page.locator('#appointment-date').fill('2030-10-02');
     await expect(save).toBeDisabled();
     await page.getByRole('button', { name: '09:00 – 09:30', exact: true }).click();
+    await page.locator('#appointment-service').selectOption(service2);
+    await page.getByRole('button', { name: '11:00 – 11:30', exact: true }).click();
     await page.locator('#appointment-client-name').fill('IDs distintos');
     await page.locator('#appointment-client-phone').fill('81999990000');
     await save.click();
-    await expect.poll(() => network.appointmentInsertRequests.length).toBe(1);
-    expect(network.appointmentInsertRequests[0]).toMatchObject({ barber_id: barber2, service_id: OWNER_SERVICE_ID, start_at: '2030-10-02T09:00:00-03:00', end_at: '2030-10-02T09:30:00-03:00' });
+    await expect.poll(() => network.ownerCreateRequests.length).toBe(1);
+    expect(network.ownerCreateRequests[0]).toMatchObject({ p_barber_id: barber2, p_service_id: service2, p_start_at: '2030-10-02T11:00:00-03:00' });
+    expect(network.appointmentInsertRequests).toHaveLength(0);
   });
 
   for (const state of ['empty', 'error', 'timezone'] as const) {

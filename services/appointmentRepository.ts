@@ -58,11 +58,6 @@ export type DatabaseInternalAppointmentRow = Omit<DatabaseAppointmentRow, 'clien
   service_value: number | string | null;
 };
 
-type DatabaseTenantEntityRow = {
-  id: string;
-  barbershop_id: string | null;
-};
-
 type DatabaseWriteError = {
   code?: string;
   message?: string;
@@ -375,53 +370,16 @@ export const listAppointmentsByDate = async (date: string): Promise<Appointment[
   return appointments.filter(appointment => getAppointmentDateInput(appointment) === date);
 };
 
-const assertAppointmentTenantIntegrity = async (appointment: Appointment): Promise<void> => {
-  const barbershopId = nullableUuid(appointment.barbershopId);
+export type AppointmentCreationResult =
+  | { mode: 'local'; appointment: Appointment }
+  | { mode: 'remote'; id: string };
 
-  if (shouldUseLocalFallback || !barbershopId) return;
-  assertOperationalSupabase();
-
-  const checks: Array<Promise<void>> = [];
-
-  if (appointment.barberId) {
-    checks.push((async () => {
-      const { data, error } = await supabase
-        .from('barbers')
-        .select('id,barbershop_id')
-        .eq('id', appointment.barberId)
-        .eq('active', true)
-        .maybeSingle<DatabaseTenantEntityRow>();
-
-      if (error) throw error;
-      if (!data || data.barbershop_id !== barbershopId) {
-        throw new Error('Barbeiro invalido para esta barbearia.');
-      }
-    })());
-  }
-
-  if (appointment.serviceId) {
-    checks.push((async () => {
-      const { data, error } = await supabase
-        .from('services')
-        .select('id,barbershop_id')
-        .eq('id', appointment.serviceId)
-        .eq('active', true)
-        .maybeSingle<DatabaseTenantEntityRow>();
-
-      if (error) throw error;
-      if (!data || data.barbershop_id !== barbershopId) {
-        throw new Error('Servico invalido para esta barbearia.');
-      }
-    })());
-  }
-
-  await Promise.all(checks);
-};
+export const OWNER_CREATE_UNCONFIRMED_MESSAGE = 'Não foi possível confirmar o identificador do agendamento. Atualize a agenda antes de tentar novamente.';
 
 export const createAppointment = async ( // Remote owner creation; local fallback remains shared.
   appointment: Appointment,
   existingAppointments?: Appointment[]
-): Promise<Appointment> => {
+): Promise<AppointmentCreationResult> => {
   const validationErrors = validatePublicAppointmentRecord(appointment);
 
   if (validationErrors.length > 0) {
@@ -434,19 +392,21 @@ export const createAppointment = async ( // Remote owner creation; local fallbac
       throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
     }
     writeLocalAppointments([appointment, ...appointments]);
-    return appointment;
+    return { mode: 'local', appointment };
   }
   assertOperationalSupabase();
 
-  await assertAppointmentTenantIntegrity(appointment);
-
-  // Public booking must insert without requesting RETURNING rows, so anon does not need SELECT on appointments.
-  const { error } = await supabase
-    .from('appointments')
-    .insert(mapAppointmentToDb(appointment), { defaultToNull: true });
+  const { data, error } = await supabase.rpc('create_owner_appointment', {
+    p_service_id: appointment.serviceId,
+    p_barber_id: appointment.barberId,
+    p_client_name: appointment.clientName,
+    p_client_phone: appointment.clientPhone || '',
+    p_start_at: appointment.startAt,
+    p_notes: appointment.notes || null
+  });
 
   if (error) {
-    if (isActiveAppointmentConflictError(error)) {
+    if (error.message === 'APPOINTMENT_ACTIVE_SLOT_CONFLICT' || isActiveAppointmentConflictError(error)) {
       throw createAppointmentConflictError(PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE);
     }
 
@@ -454,7 +414,10 @@ export const createAppointment = async ( // Remote owner creation; local fallbac
     throw error;
   }
 
-  return appointment;
+  if (typeof data !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data)) {
+    throw new Error(OWNER_CREATE_UNCONFIRMED_MESSAGE);
+  }
+  return { mode: 'remote', id: data };
 };
 
 export const createBarberAppointment = async (
