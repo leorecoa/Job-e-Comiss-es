@@ -17,7 +17,8 @@ from generate_series(1,2) n;
 insert into public.barbers(id,name,barbershop_id) values
 (pg_temp.fixture_id(3),'Same name',pg_temp.fixture_id(1)),
 (pg_temp.fixture_id(4),'Same name',pg_temp.fixture_id(2)),
-(pg_temp.fixture_id(7),'Same name',pg_temp.fixture_id(1));
+(pg_temp.fixture_id(7),'Same name',pg_temp.fixture_id(1)),
+(pg_temp.fixture_id(8),'Inactive profile professional',pg_temp.fixture_id(1));
 insert into public.services(id,name,barbershop_id,price,duration_minutes,commission_rate) values
 (pg_temp.fixture_id(5),'Service',pg_temp.fixture_id(1),50,30,40),
 (pg_temp.fixture_id(6),'Service',pg_temp.fixture_id(2),50,30,40);
@@ -27,7 +28,7 @@ from generate_series(101,106) n;
 insert into public.profiles(id,role,active,barbershop_id,barber_id) values
 (pg_temp.fixture_id(101),'barber',true,pg_temp.fixture_id(1),pg_temp.fixture_id(3)),
 (pg_temp.fixture_id(102),'owner',true,pg_temp.fixture_id(1),null),
-(pg_temp.fixture_id(104),'barber',false,pg_temp.fixture_id(1),pg_temp.fixture_id(3)),
+(pg_temp.fixture_id(104),'barber',false,pg_temp.fixture_id(1),pg_temp.fixture_id(8)),
 (pg_temp.fixture_id(105),'barber',true,null,null),
 (pg_temp.fixture_id(106),'barber',true,pg_temp.fixture_id(2),pg_temp.fixture_id(4))
 on conflict(id) do update set role=excluded.role,active=excluded.active,
