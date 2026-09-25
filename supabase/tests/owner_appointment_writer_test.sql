@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(61);
+select plan(63);
 
 insert into public.barbershops(id,name,slug,operational_timezone,slot_step_minutes,business_hours)
 select id,name,slug,'UTC',30,jsonb_object_agg(d,jsonb_build_object('active',true,'open','09:00','close','18:00'))
@@ -36,8 +36,9 @@ array['p_service_id','p_barber_id','p_client_name','p_client_phone','p_start_at'
 'only six inputs: no tenant, snapshots, price, commission, duration, end, status, financial link or audit fields');
 select is((select prorettype::regtype::text from pg_proc where oid='public.create_owner_appointment(uuid,uuid,text,text,timestamptz,text)'::regprocedure),'uuid','return only UUID');
 select is((select pronargdefaults::integer from pg_proc where oid='public.create_owner_appointment(uuid,uuid,text,text,timestamptz,text)'::regprocedure),1,'notes default NULL');
-select ok(has_table_privilege('authenticated','public.appointments','INSERT'),'bridge INSERT grant unchanged');
-select ok(exists(select 1 from pg_policies where schemaname='public' and tablename='appointments' and policyname='appointments_owner_insert_own_barbershop'),'bridge policy retained');
+select ok(not has_table_privilege('authenticated','public.appointments','INSERT'),'authenticated direct INSERT denied');
+select ok(not has_any_column_privilege('authenticated','public.appointments','INSERT'),'no column-level INSERT bypass');
+select ok(not exists(select 1 from pg_policies where schemaname='public' and tablename='appointments' and policyname='appointments_owner_insert_own_barbershop'),'bridge policy removed');
 
 set local role anon;
 select throws_ok($$select public.create_owner_appointment('eeee0030-0000-4000-8000-000000000003','eeee0030-0000-4000-8000-000000000002','Test client','12345678','2030-01-07T09:00Z',null)$$,'42501',null,'anon execution denied');
@@ -76,9 +77,10 @@ select ok((select financial_record_id is null and notes is null and created_at i
 set local role authenticated;
 select throws_ok($$select public.create_owner_appointment('eeee0030-0000-4000-8000-000000000003','eeee0030-0000-4000-8000-000000000002','Test client','12345678','2030-01-07T09:00Z',null)$$,'P0001','APPOINTMENT_ACTIVE_SLOT_CONFLICT','occupied slot rejected');
 select lives_ok($$select public.create_owner_appointment('eeee0030-0000-4000-8000-000000000003','eeee0030-0000-4000-8000-000000000002','Test client','+55 (81) 99999-9999','2030-01-07T10:00Z','Owner note')$$,'adjacency with formatted phone and notes');
-select lives_ok($$insert into public.appointments(barbershop_id,barber_id,barber_name,service_id,service_type,service_value,client_name,client_phone,start_at,end_at)
-values('eeee0030-0000-4000-8000-000000000001','eeee0030-0000-4000-8000-000000000002','Bridge','eeee0030-0000-4000-8000-000000000003','Bridge',1,'Bridge client','12345678','2030-01-07T11:00Z','2030-01-07T12:00Z')$$,'direct owner INSERT still works');
+select throws_ok($$insert into public.appointments(barbershop_id,barber_id,barber_name,service_id,service_type,service_value,client_name,client_phone,start_at,end_at)
+values('eeee0030-0000-4000-8000-000000000001','eeee0030-0000-4000-8000-000000000002','Bridge','eeee0030-0000-4000-8000-000000000003','Bridge',1,'Bridge client','12345678','2030-01-07T11:00Z','2030-01-07T12:00Z')$$,'42501',null,'direct owner INSERT denied');
 reset role;
+select is((select count(*) from public.appointments where barbershop_id='eeee0030-0000-4000-8000-000000000001' and start_at='2030-01-07T11:00Z'),0::bigint,'denied owner INSERT creates no row');
 select is((select notes from public.appointments where barbershop_id='eeee0030-0000-4000-8000-000000000001' and start_at='2030-01-07T10:00Z'),'Owner note','notes persisted');
 select is((select client_phone from public.appointments where barbershop_id='eeee0030-0000-4000-8000-000000000001' and start_at='2030-01-07T10:00Z'),'+55 (81) 99999-9999','formatted phone preserved');
 insert into public.barber_time_off(barbershop_id,barber_id,starts_at,ends_at) values('eeee0030-0000-4000-8000-000000000001','eeee0030-0000-4000-8000-000000000002','2030-01-07T13:00Z','2030-01-07T14:00Z');
@@ -97,7 +99,7 @@ select throws_ok($$select public.create_owner_appointment('eeee0030-0000-4000-80
 select throws_ok($$select public.create_owner_appointment('eeee0030-0000-4000-8000-000000000003','eeee0030-0000-4000-8000-000000000002','Test client',repeat('1',21),'2030-01-07T14:00Z',null)$$,'P0001','OWNER_APPOINTMENT_INVALID_INPUT','long phone rejected');
 select throws_ok($$select public.create_owner_appointment('eeee0030-0000-4000-8000-000000000003','eeee0030-0000-4000-8000-000000000002','Test client','12345678','2030-01-07T14:00Z',repeat('n',501))$$,'P0001','OWNER_APPOINTMENT_INVALID_INPUT','long notes rejected');
 reset role;
-select is((select count(*) from public.appointments where barbershop_id='eeee0030-0000-4000-8000-000000000001'),3::bigint,'failed attempts leave no rows');
+select is((select count(*) from public.appointments where barbershop_id='eeee0030-0000-4000-8000-000000000001'),2::bigint,'only the two successful RPC calls create rows');
 delete from public.appointments where barbershop_id='eeee0030-0000-4000-8000-000000000001';
 update public.services set active=false where id='eeee0030-0000-4000-8000-000000000003';
 set local role authenticated;
