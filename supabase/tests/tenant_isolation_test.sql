@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(269);
+select plan(274);
 
 select is((select count(*) from public.barbershops), 2::bigint, 'seed creates exactly two tenants');
 select is((select count(distinct slug) from public.barbershops), 2::bigint, 'tenant slugs are distinct');
@@ -13,6 +13,10 @@ select is((select count(*) from pg_class c join pg_namespace n on n.oid = c.reln
 select ok(not exists(select 1 from pg_policies where schemaname = 'public' and tablename = 'appointments' and policyname = 'appointments_public_insert_scheduled'), 'legacy public insert policy is absent');
 select ok(not has_table_privilege('anon', 'public.appointments', 'select'), 'anon has no direct appointments select');
 select ok(not has_table_privilege('anon', 'public.appointments', 'insert'), 'anon has no direct appointments insert');
+select ok(not has_table_privilege('authenticated', 'public.appointments', 'insert'), 'authenticated has no direct appointments insert');
+select ok(not has_any_column_privilege('anon', 'public.appointments', 'insert') and not has_any_column_privilege('authenticated', 'public.appointments', 'insert'), 'no column-level insert bypass for browser roles');
+select ok(not has_table_privilege('anon', 'public.appointments', 'update') and not has_table_privilege('anon', 'public.appointments', 'delete'), 'anon has no direct appointments update or delete');
+select ok(not exists(select 1 from pg_policies where schemaname='public' and tablename='appointments' and cmd in ('INSERT','ALL')), 'no residual direct insert policy');
 select ok(not has_table_privilege('authenticated', 'public.appointments', 'select'), 'authenticated has no direct appointments select');
 select ok(not has_table_privilege('authenticated', 'public.appointments', 'update'), 'authenticated has no direct appointments update');
 select ok(not has_table_privilege('authenticated', 'public.appointments', 'delete'), 'authenticated has no direct appointments delete');
@@ -255,6 +259,7 @@ select throws_ok($test$delete from public.appointments where id = '60000000-0000
 select is((select count(*) from public.get_internal_appointments() where id = '60000000-0000-4000-8000-000000000001'), 1::bigint, 'barber appointment remains after delete attempt');
 
 reset role;
+select is((select count(*) from public.appointments where client_name = 'Barber Direct'), 0::bigint, 'denied barber direct insert creates no row');
 select is((select count(*) from public.appointments where client_name = 'Barber RPC'), 1::bigint, 'barber RPC creates exactly one appointment');
 select is((select barbershop_id from public.appointments where client_name = 'Barber RPC'), 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid, 'barber RPC derives tenant from the authenticated profile');
 select is((select barber_id from public.appointments where client_name = 'Barber RPC'), '11111111-1111-4111-8111-111111111111'::uuid, 'barber RPC derives barber id from the authenticated profile');

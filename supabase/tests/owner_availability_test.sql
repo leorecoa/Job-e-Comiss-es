@@ -258,7 +258,7 @@ select results_eq($$select * from pg_temp.owner_slots() limit 1$$,
 select is((select count(*) from pg_temp.owner_slots(null,pg_temp.fixture_id(5),pg_temp.fixture_id(3),'2000-01-03')),0::bigint,'past date empty');
 reset role;
 select ok(not has_table_privilege('authenticated','public.appointments','UPDATE')
- and has_table_privilege('authenticated','public.appointments','INSERT'),'027 owner write bridge unchanged');
+ and not has_table_privilege('authenticated','public.appointments','INSERT'),'031 denies direct INSERT while UPDATE remains denied');
 select ok((select provolatile='v' from pg_proc where oid='private.validate_appointment_availability(uuid,uuid,uuid,timestamptz,uuid)'::regprocedure),'027 validator remains volatile');
 select ok((select prosecdef and proconfig=array['search_path=pg_catalog']
  from pg_proc where oid='public.get_public_availability_by_slug(text,uuid,uuid,date)'::regprocedure),'public wrapper security attributes preserved');

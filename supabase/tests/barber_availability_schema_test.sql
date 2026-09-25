@@ -118,7 +118,8 @@ set local "request.jwt.claims" = '{"sub":"eeee0024-0000-4000-8000-000000000001",
 select is((select count(*) from public.barber_time_off),0::bigint,'barber_time_off inactive owner sees nothing');
 reset role;
 update public.profiles set active=true where id='eeee0024-0000-4000-8000-000000000001';
-select is((select md5(coalesce((select string_agg(row_to_json(p)::text, ',' order by policyname) from pg_policies p where schemaname='public' and tablename='appointments'), '') || coalesce((select relacl::text from pg_class where oid='public.appointments'::regclass), ''))),'b3e7f8d4919ff63a95bf4515101e57a3','appointments policies and grants unchanged from local migration 023 baseline');
+-- 031 removes only authenticated INSERT and its owner policy from the 023 baseline.
+select is((select md5(coalesce((select string_agg(row_to_json(p)::text, ',' order by policyname) from pg_policies p where schemaname='public' and tablename='appointments'), '') || coalesce((select relacl::text from pg_class where oid='public.appointments'::regclass), ''))),'3e5d7b27add78d65aa8aa7c61ebab0dd','appointments policies and grants match migration 031 baseline');
 
 select * from finish();
 rollback;
