@@ -681,6 +681,194 @@ const openOwnerManagement = async (page: Page) => {
     .click();
 };
 
+test.describe('owner team invitations', () => {
+  const invitationId = 'eeee0033-0000-4000-8000-000000000201';
+  const secondBarber = 'eeee0033-0000-4000-8000-000000000011';
+  const tokenA = 'a'.repeat(64);
+  const tokenB = 'b'.repeat(64);
+  const invitationRow = (token = tokenA) => ({ invitation_id: invitationId, token, expires_at: '2030-10-01T10:00:00Z' });
+  const setup = async (page: Page) => {
+    await page.route('https://**/*', (route) => route.abort());
+    const network = await installOwnerSupabaseMocks(page, { barbers: [
+      { id: OWNER_BARBER_ID, name: 'Leo Barber', barbershop_id: OWNER_BARBERSHOP_ID, active: true },
+      { id: secondBarber, name: 'Leo Barber', barbershop_id: OWNER_BARBERSHOP_ID, active: true }
+    ] });
+    const calls: Array<{ rpc: string; body: unknown }> = [];
+    let issueCount = 0;
+    let revokeFails = false;
+    await page.route(`${SUPABASE_URL}/rest/v1/rpc/*team_invitation`, async (route) => {
+      if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: CORS_HEADERS }); return; }
+      const rpc = new URL(route.request().url()).pathname.split('/').pop()!;
+      calls.push({ rpc, body: parseRequestBody(route) });
+      if (rpc === 'issue_team_invitation') {
+        issueCount += 1;
+        await fulfillJson(route, 200, [invitationRow(issueCount === 1 ? tokenA : tokenB)]);
+      } else if (revokeFails) {
+        await fulfillJson(route, 400, { code: 'P0001', message: 'TEAM_INVITATION_UNAVAILABLE', details: 'private detail' });
+      } else { await fulfillJson(route, 200, null); }
+    });
+    return { network, calls, failRevoke: (value: boolean) => { revokeFails = value; } };
+  };
+  const open = async (page: Page) => {
+    await page.getByRole('button', { name: 'Convidar acesso', exact: true }).click();
+    await page.getByLabel('Profissional do convite', { exact: true }).selectOption(OWNER_BARBER_ID);
+    await page.getByLabel('E-mail do convite', { exact: true }).fill('barber@example.test');
+  };
+
+  test('issues, copies, shares, reissues and revokes without replacing the bridge', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const mocks = await setup(page);
+    const consoleMessages: string[] = [];
+    const unexpectedRequests: string[] = [];
+    page.on('console', (message) => consoleMessages.push(message.text()));
+    page.on('request', (request) => {
+      const body = request.postData() || '';
+      if (request.url().includes(tokenA) || request.url().includes(tokenB) || body.includes(tokenA) || body.includes(tokenB)
+        || request.url().includes('/rest/v1/team_invitations')) unexpectedRequests.push(request.url());
+    });
+    await signInAsOwner(page, '/#management-team');
+    await page.evaluate(() => {
+      Object.assign(window, { invitationCopy: '', invitationShare: null });
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { Object.assign(window, { invitationCopy: value }); } } });
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async (value: ShareData) => { Object.assign(window, { invitationShare: value }); } });
+    });
+    await open(page);
+    await page.getByRole('button', { name: 'Gerar convite', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Convite gerado', exact: true })).toBeVisible();
+    const linkA = new URL(`/convite#token=${tokenA}`, page.url()).href;
+    await expect(page.getByLabel('Link do convite', { exact: true })).toHaveValue(linkA);
+    expect(mocks.calls[0]).toEqual({ rpc: 'issue_team_invitation', body: { p_barber_id: OWNER_BARBER_ID, p_recipient_email: 'barber@example.test' } });
+    await page.getByRole('button', { name: 'Copiar', exact: true }).click();
+    await expect(page.getByText('Link copiado.', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { invitationCopy: string }).invitationCopy)).toBe(linkA);
+    await page.getByRole('button', { name: 'Compartilhar', exact: true }).click();
+    expect(await page.evaluate(() => (window as unknown as { invitationShare: ShareData }).invitationShare)).toEqual({ title: 'Convite de acesso', text: 'Use este link para acessar seu convite.', url: linkA });
+    await expect(page.getByText('Gerar um novo convite invalida o convite anterior deste profissional.', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Gerar novo convite', exact: true }).click();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toHaveValue(new URL(`/convite#token=${tokenB}`, page.url()).href);
+    expect(await page.locator('#management-team').innerHTML()).not.toContain(tokenA);
+    mocks.failRevoke(true);
+    await page.getByRole('button', { name: 'Revogar', exact: true }).click();
+    await expect(page.getByText('Não foi possível concluir esta ação com o convite.', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toBeVisible();
+    mocks.failRevoke(false);
+    await page.getByRole('button', { name: 'Revogar', exact: true }).click();
+    await expect(page.getByText('Convite revogado.', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
+    expect(mocks.calls.at(-1)).toEqual({ rpc: 'revoke_team_invitation', body: { p_invitation_id: invitationId } });
+    await page.getByRole('button', { name: 'Fechar convite', exact: true }).click();
+    // Legacy linking remains a different, functional action.
+    await page.getByLabel('E-mail usado no login', { exact: true }).fill('barber@example.com');
+    await page.getByLabel('Profissional correspondente', { exact: true }).selectOption(OWNER_BARBER_ID);
+    await page.getByRole('button', { name: 'Vincular usuário', exact: true }).click();
+    await expect(page.getByText(/Conta vinculada ao profissional Leo Barber/)).toBeVisible();
+    expect(mocks.network.rpcRequests).toHaveLength(1);
+    expect(page.url()).toMatch(/\/#management-team$/);
+    const storage = await page.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+    expect(storage).not.toContain(tokenA); expect(storage).not.toContain(tokenB);
+    expect(consoleMessages.join('\n')).not.toContain(tokenA); expect(consoleMessages.join('\n')).not.toContain(tokenB);
+    expect(unexpectedRequests).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test('manual copy and cancelled share preserve the generated result', async ({ page }) => {
+    await setup(page);
+    await signInAsOwner(page, '/#management-team');
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+      Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+    });
+    await open(page);
+    await page.getByRole('button', { name: 'Gerar convite', exact: true }).click();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Compartilhar', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Copiar', exact: true }).click();
+    await expect(page.getByText('Selecione o link abaixo e copie manualmente.', { exact: true })).toBeVisible();
+    await page.getByLabel('Link do convite', { exact: true }).focus();
+    expect(await page.getByLabel('Link do convite', { exact: true }).evaluate((input: HTMLInputElement) => input.selectionEnd! - input.selectionStart!)).toBeGreaterThan(64);
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('clipboard denied'); } } });
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async () => { throw new DOMException('cancelled', 'AbortError'); } });
+    });
+    await page.getByRole('button', { name: 'Gerar novo convite', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Compartilhar', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Compartilhar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Convite gerado', exact: true })).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Copiar', exact: true }).click();
+    await expect(page.getByText('Selecione o link abaixo e copie manualmente.', { exact: true })).toBeVisible();
+  });
+
+  test('closing a pending issue prevents duplicate submit and stale resurrection', async ({ page }) => {
+    const mocks = await setup(page);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let started = 0;
+    let completed = false;
+    await page.route(`${SUPABASE_URL}/rest/v1/rpc/issue_team_invitation`, async (route) => {
+      if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: CORS_HEADERS }); return; }
+      started += 1;
+      await gate;
+      await fulfillJson(route, 200, [invitationRow()]);
+      completed = true;
+    });
+    await signInAsOwner(page, '/#management-team');
+    await open(page);
+    await page.getByRole('button', { name: 'Gerar convite', exact: true }).evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
+    await expect.poll(() => started).toBe(1);
+    await expect(page.getByRole('button', { name: 'Aguarde...', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Fechar convite', exact: true }).click();
+    await open(page);
+    release();
+    await expect.poll(() => completed).toBe(true);
+    await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Gerar convite', exact: true })).toBeEnabled();
+    expect(started).toBe(1); expect(mocks.calls).toHaveLength(0);
+  });
+
+  test('professional change, management navigation and refresh discard tokens', async ({ page }) => {
+    const mocks = await setup(page);
+    await signInAsOwner(page, '/#management-team');
+    await open(page);
+    await page.getByRole('button', { name: 'Gerar convite', exact: true }).click();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toBeVisible();
+    await page.getByLabel('Profissional do convite', { exact: true }).selectOption(secondBarber);
+    await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Gerar convite', exact: true }).click();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toBeVisible();
+    expect(mocks.calls.at(-1)?.body).toEqual({ p_barber_id: secondBarber, p_recipient_email: 'barber@example.test' });
+    await page.locator('a[href="#management-catalog"]').first().click();
+    await page.locator('a[href="#management-team"]').first().click();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
+    await open(page);
+    await expect(page.getByRole('heading', { name: 'Convite gerado', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Gerar convite', exact: true }).click();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Fechar convite', exact: true }).click();
+    await open(page);
+    await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Convidar acesso', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
+  });
+
+  test('issue failure is sanitized and never becomes success or a local invitation', async ({ page }) => {
+    await setup(page);
+    await page.route(`${SUPABASE_URL}/rest/v1/rpc/issue_team_invitation`, async (route) => {
+      if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: CORS_HEADERS }); return; }
+      await fulfillJson(route, 400, { code: 'P0001', message: 'TEAM_INVITATION_UNAVAILABLE', details: tokenA, hint: 'private SQL' });
+    });
+    await signInAsOwner(page, '/#management-team');
+    await open(page);
+    await page.getByRole('button', { name: 'Gerar convite', exact: true }).click();
+    await expect(page.getByText('Não foi possível concluir esta ação com o convite.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Gerar convite', exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
+    expect(await page.locator('#management-team').innerHTML()).not.toContain(tokenA);
+  });
+});
+
 test.describe('owner operational dashboard e2e', () => {
   test('owner availability opens with the selected agenda barber ID, even for homonyms', async ({ page }) => {
     const barberB = '252b5551-b8e7-4693-ab07-d0bbfde6ec06';
