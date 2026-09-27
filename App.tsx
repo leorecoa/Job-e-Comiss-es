@@ -1976,6 +1976,8 @@ const App: React.FC = () => {
                   role={authSession?.role || 'owner'}
                   barbers={ownerCatalogBarbers}
                   onLinkProfile={handleLinkOwnerBarberProfile}
+                  invitationContext={`${authSession?.userId || ''}:${authSession?.barbershopId || ''}`}
+                  invitationActive={activeOwnerSection === 'management' && activeManagementSection === '#management-team'}
                 />
               )}
               catalog={(
