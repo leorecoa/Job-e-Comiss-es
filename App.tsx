@@ -244,7 +244,7 @@ export const getInternalAuthView = (
   return canAccessInternalPanel(authSession, true) ? 'owner-dashboard' : 'auth';
 };
 
-const App: React.FC = () => {
+const App: React.FC<{ initialAuthSession?: AuthSession }> = ({ initialAuthSession }) => {
   const pathname = window.location.pathname;
   const publicBookingSlug = getPublicBookingSlugFromPath(pathname);
   const isPublicBookingRoute = pathname === '/book' || pathname === '/agendar' || pathname.startsWith('/book/');
@@ -468,7 +468,7 @@ const App: React.FC = () => {
 
       setAuthLoading(true);
       try {
-        const session = await getCurrentAuthSession();
+        const session = initialAuthSession ?? await getCurrentAuthSession();
         if (!active) return;
         setAuthSession(session);
         if (session) {

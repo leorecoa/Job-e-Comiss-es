@@ -9,15 +9,20 @@ interface AuthScreenProps {
   onSignUp: (email: string, password: string, displayName: string, role: AppRole) => Promise<void>;
   loading?: boolean;
   error?: string | null;
+  signupRole?: 'barber';
+  embedded?: boolean;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({
   onSignIn,
   onSignUp,
   loading = false,
-  error
+  error,
+  signupRole,
+  embedded = false
 }) => {
   const reduceMotion = useReducedMotion();
+  const Layout = embedded ? React.Fragment : AuthLayout;
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,11 +36,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       return;
     }
 
-    await onSignUp(email.trim(), password, displayName.trim(), role);
+    await onSignUp(email.trim(), password, displayName.trim(), signupRole ?? role);
   };
 
   return (
-    <AuthLayout>
+    <Layout>
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -76,7 +81,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <Input id="auth-password" type="password" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} required minLength={6} aria-invalid={Boolean(error)} aria-describedby={error ? 'auth-form-error' : undefined} value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
 
-            {mode === 'signup' && (
+            {mode === 'signup' && !signupRole && (
               <div className="ui-field">
                 <Label htmlFor="auth-role">Perfil</Label>
                 <select id="auth-role" value={role} onChange={(e) => setRole(e.target.value as AppRole)} className="ui-input">
@@ -97,6 +102,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </form>
         </Surface>
       </motion.div>
-    </AuthLayout>
+    </Layout>
   );
 };

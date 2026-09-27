@@ -1,22 +1,14 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './styles.css';
-import App from './App';
-import { AppErrorBoundary } from './components/AppErrorBoundary';
-import { initializeObservability } from './utils/observability';
+import { captureInvitation } from './utils/invitationBootstrap';
 
-initializeObservability();
-
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
-}
-
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <AppErrorBoundary>
-      <App />
-    </AppErrorBoundary>
-  </React.StrictMode>
-);
+let invitation = captureInvitation(window);
+// Dynamic import ensures Auth/Sentry cannot initialize before URL cleanup.
+void import('./bootstrap').then(({ mountApplication }) => {
+  mountApplication(invitation);
+  invitation = null;
+}).catch(() => {
+  if (invitation) invitation.token = null;
+  invitation = null;
+  document.getElementById('splash-screen')?.remove();
+  const root = document.getElementById('root');
+  if (root) root.textContent = 'Não foi possível carregar a aplicação. Recarregue a página.';
+});
