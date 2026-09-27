@@ -7,7 +7,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: { rpc: mocks.rpc, from: mocks.from }
 }));
 vi.mock('../../utils/observability', () => ({ reportUnexpectedError: mocks.report }));
-import { getTeamInvitationErrorMessage, issueTeamInvitation, revokeTeamInvitation } from '../../services/teamInvitationRepository';
+import { acceptTeamInvitation, getTeamInvitationErrorMessage, issueTeamInvitation, revokeTeamInvitation } from '../../services/teamInvitationRepository';
 
 const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 const row = { invitation_id: id, token: 'a'.repeat(64), expires_at: '2030-10-01T10:00:00+00:00' };
@@ -88,5 +88,36 @@ describe('team invitation repository', () => {
     await expect(issueTeamInvitation(id, 'invalid')).rejects.toThrow('Confira');
     await expect(revokeTeamInvitation('bad')).rejects.toThrow('Confira');
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it('accepts void using only the unchanged token, without persistence or reporting', async () => {
+    const storage = { setItem: vi.fn(), getItem: vi.fn() };
+    vi.stubGlobal('localStorage', storage); vi.stubGlobal('sessionStorage', storage);
+    const log = vi.spyOn(console, 'log'); const errorLog = vi.spyOn(console, 'error');
+    mocks.rpc.mockResolvedValue({ data: null, error: null });
+    await expect(acceptTeamInvitation(row.token)).resolves.toBeUndefined();
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('accept_team_invitation', { p_token: row.token });
+    expect(mocks.from).not.toHaveBeenCalled(); expect(mocks.report).not.toHaveBeenCalled();
+    expect(storage.setItem).not.toHaveBeenCalled(); expect(storage.getItem).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled(); expect(errorLog).not.toHaveBeenCalled();
+  });
+  it.each(['A'.repeat(64), 'a'.repeat(63), 'a'.repeat(65), ` ${row.token}`, `${row.token}\n`, ''])('rejects noncanonical acceptance token %#', async (token) => {
+    await expect(acceptTeamInvitation(token)).rejects.toThrow();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it.each(['AUTH_REQUIRED', 'TEAM_INVITATION_UNAVAILABLE', 'TEAM_INVITATION_FORBIDDEN', 'unexpected'])('sanitizes acceptance %s with no retry', async (message) => {
+    mocks.rpc.mockResolvedValue({ error: { message, details: row.token, hint: row.token } });
+    const error = await acceptTeamInvitation(row.token).catch((failure) => failure);
+    expect(error.publicCode).toBe(['AUTH_REQUIRED', 'TEAM_INVITATION_UNAVAILABLE'].includes(message) ? message : undefined);
+    expect(error).not.toHaveProperty('details'); expect(error).not.toHaveProperty('hint');
+    expect(error.message).not.toContain(row.token); expect(JSON.stringify(error)).not.toContain(row.token);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1); expect(mocks.from).not.toHaveBeenCalled();
+  });
+  it('sanitizes acceptance network failure and fails closed locally', async () => {
+    mocks.rpc.mockRejectedValue(new Error(row.token));
+    await expect(acceptTeamInvitation(row.token)).rejects.toThrow('Não foi possível concluir esta ação com o convite.');
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    mocks.local = true;
+    await expect(acceptTeamInvitation(row.token)).rejects.toThrow('Convites disponíveis apenas no ambiente online.');
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
   });
 });

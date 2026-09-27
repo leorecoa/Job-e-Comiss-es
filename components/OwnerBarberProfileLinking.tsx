@@ -321,7 +321,7 @@ const TeamInvitationForm = ({ barbers, onClose }: { barbers: BarberOption[]; onC
 
   return (
     <section aria-label="Convite de acesso" className="mt-4 space-y-4" onKeyDown={(event) => { if (event.key === 'Escape') onClose(); }}>
-      <p className="ui-owner-help">Gere o link e compartilhe com o profissional. O aceite pelo link será disponibilizado em uma próxima etapa.</p>
+      <p className="ui-owner-help">Gere o link e compartilhe com o profissional. Ele deve entrar com a conta destinatária e aceitar o convite.</p>
       <p className="ui-owner-help">Ao fechar, o link não poderá ser recuperado aqui. Se perdê-lo, gere outro convite.</p>
       <form className="grid gap-4" aria-busy={busy} onSubmit={(event) => { event.preventDefault(); void mutate('issue'); }}>
         <div className="ui-field">

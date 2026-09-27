@@ -74,3 +74,15 @@ export const revokeTeamInvitation = async (invitationId: string): Promise<void> 
     throw safeError(error);
   }
 };
+
+export const acceptTeamInvitation = async (token: string): Promise<void> => {
+  const remote = client();
+  if (typeof token !== 'string' || token.length !== 64 || !/^[0-9a-f]{64}$/.test(token)) throw safeError({ message: 'TEAM_INVITATION_UNAVAILABLE' });
+  try {
+    const { error } = await remote.rpc('accept_team_invitation', { p_token: token });
+    if (error) throw error;
+  } catch (error) {
+    const code = (error as { message?: unknown } | null)?.message;
+    throw safeError(code === 'AUTH_REQUIRED' || code === 'TEAM_INVITATION_UNAVAILABLE' ? error : null);
+  }
+};
