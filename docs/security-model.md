@@ -19,11 +19,7 @@ The application must not assume a global default tenant for operational actions.
 For a new Supabase environment, treat these files as the reviewed reference set:
 
 ```txt
-1. docs/supabase-schema.sql
-2. docs/supabase-tenant-rls-plan.sql
-3. docs/public-appointment-availability-rpc.sql
-4. docs/appointments-active-slot-unique-index.sql
-5. docs/barber-profile-linking-rpc.sql
+supabase/migrations (sequencia completa 001-034; revisao e aplicacao remota manuais)
 ```
 
 `docs/supabase-schema.sql` is the base schema reference. It must not be used as a shortcut to create broad MVP policies. Tenant-aware RLS belongs in `docs/supabase-tenant-rls-plan.sql`.
@@ -183,7 +179,7 @@ Real authorization depends on the combination of:
 
 Frontend role checks improve UX and reduce invalid actions, but they do not replace backend enforcement.
 
-Owner-to-barber profile linking by email should be mediated by a reviewed backend surface instead of direct frontend table access. See `docs/barber-profile-linking-rpc.md`.
+Commercial barber linking requires explicit invitation acceptance through the controlled RPC, never direct frontend profile writes. See `docs/team-invitations.md`.
 
 ## Current limits
 

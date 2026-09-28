@@ -10,7 +10,7 @@
 As RPCs `SECURITY DEFINER` abaixo usam `search_path` controlado e possuem EXECUTE revogado de `PUBLIC`. Os testes de banco validam seus grants e limites:
 
 - Booking publico: `create_public_appointment` e `get_public_appointment_slots` aceitam `anon` e `authenticated`, resolvem o tenant pelo argumento validado e expõem somente o contrato publico necessario.
-- Operacoes internas: `complete_appointment_with_financial_record`, `create_owner_barbershop`, `get_internal_appointments`, `link_barber_profile_by_email` e `update_owner_appointment` exigem `auth.uid()`, profile ativo e validacoes de role/tenant aplicaveis.
+- Operacoes internas: `complete_appointment_with_financial_record`, `create_owner_barbershop`, `get_internal_appointments`, `issue_team_invitation`, `accept_team_invitation`, `revoke_team_invitation` e `update_owner_appointment` exigem `auth.uid()`, profile ativo e validacoes de role/tenant aplicaveis.
 
 Essas funcoes precisam de `SECURITY DEFINER` para executar operacoes atomicas ou leituras projetadas sem reabrir acesso direto amplo as tabelas.
 

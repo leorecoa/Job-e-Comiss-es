@@ -13,11 +13,7 @@
 --   appointments contain client data.
 --
 -- Recommended manual order for a new Supabase project:
--- 1. docs/supabase-schema.sql
--- 2. docs/supabase-tenant-rls-plan.sql
--- 3. docs/public-appointment-availability-rpc.sql
--- 4. docs/appointments-active-slot-unique-index.sql
--- 5. docs/barber-profile-linking-rpc.sql
+-- Review the complete versioned migration sequence in supabase/migrations (001-034).
 
 -- Create internal schema for RLS helpers.
 create schema if not exists private;

@@ -33,7 +33,6 @@ import { createAppointment as createAppointmentRecord, createBarberAppointment, 
 import { completeAppointmentWithFinancialRecord, listFinancialRecords, mapFinancialRecordToClient } from './services/financialRecordRepository';
 import { canDeleteClientHistory, getClientHistoryEditLabel, resolveClientEditTarget } from './clientEditing';
 import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
-import { linkBarberProfileByEmail } from './services/profileLinkingRepository';
 import { createService, listPublicServices, listServices, removeService, updateService } from './services/serviceRepository';
 import { AppRole, AuthSession, canAccessInternalPanel, getCurrentAuthSession, signInWithPassword, signOut as signOutAuth, signUpWithPassword } from './services/authRepository';
 import { 
@@ -1250,23 +1249,6 @@ const App: React.FC<{ initialAuthSession?: AuthSession }> = ({ initialAuthSessio
     }
   };
 
-  const handleLinkOwnerBarberProfile = async ({
-    targetEmail,
-    targetBarberId
-  }: {
-    targetEmail: string;
-    targetBarberId: string;
-  }) => {
-    const barbershopId = getOwnerCatalogBarbershopId();
-
-    return linkBarberProfileByEmail({
-      targetEmail,
-      targetBarberId,
-      ownerBarbers: ownerCatalogBarbers,
-      ownerBarbershopId: barbershopId
-    });
-  };
-
   const handleSaveOwnerBarbershopBranding = async (input: BarbershopBrandingInput) => {
     if (authSession?.role === 'barber') return;
 
@@ -1975,7 +1957,6 @@ const App: React.FC<{ initialAuthSession?: AuthSession }> = ({ initialAuthSessio
                 <OwnerBarberProfileLinking
                   role={authSession?.role || 'owner'}
                   barbers={ownerCatalogBarbers}
-                  onLinkProfile={handleLinkOwnerBarberProfile}
                   invitationContext={`${authSession?.userId || ''}:${authSession?.barbershopId || ''}`}
                   invitationActive={activeOwnerSection === 'management' && activeManagementSection === '#management-team'}
                 />

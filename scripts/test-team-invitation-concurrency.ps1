@@ -64,7 +64,7 @@ update public.profiles set barbershop_id='$tenant' where id='$owner';
 commit;
 "@ | Out-Null
   $created = $true
-  $scenarios = @('same-invitation','same-barber','accept-revoke','accept-reissue','same-user','accept-bridge','expiry-wait','revoke-accept','reissue-accept')
+  $scenarios = @('same-invitation','same-barber','accept-revoke','accept-reissue','same-user','expiry-wait','revoke-accept','reissue-accept')
   foreach ($scenario in $scenarios) {
     Sql @"
 begin;
@@ -93,10 +93,6 @@ commit;
         Sql "insert into public.team_invitations(id,barbershop_id,barber_id,recipient_email,token_hash,created_by) values ('$otherInvite','$tenant','$otherBarber','recipient-concurrency-033@example.test',extensions.digest('$otherToken','sha256'),'$owner');" | Out-Null
         $second = Actor $recipient "select public.accept_team_invitation('$otherToken');"
         $pending = 1
-      }
-      'accept-bridge' {
-        $second = Actor $owner "select profile_id from public.link_barber_profile_by_email('other-concurrency-033@example.test','$barber');"
-        $expectedError = 'profiles_barber_id_unique'
       }
       'expiry-wait' {
         # The invitation remains valid when the second connection starts waiting.

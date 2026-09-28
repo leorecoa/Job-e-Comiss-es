@@ -49,7 +49,7 @@ Repositories principais:
 - `services/serviceRepository.ts`
 - `services/barbershopRepository.ts`
 - `services/authRepository.ts`
-- `services/profileLinkingRepository.ts`
+- `services/teamInvitationRepository.ts`
 
 ## Rotas
 
@@ -85,16 +85,12 @@ Regras atuais:
 - public booking usa RPC `public.get_public_appointment_slots(uuid)` para disponibilidade;
 - public booking nao deve ler linhas completas de `public.appointments`;
 - public appointment insert nao deve solicitar retorno de linhas sensiveis;
-- vinculo owner -> barber por e-mail usa RPC `public.link_barber_profile_by_email`.
+- Vinculo comercial de barber exige convite e aceite explicito por `accept_team_invitation`; veja `docs/team-invitations.md`.
 
 SQL manual de referencia:
 
 ```txt
-1. docs/supabase-schema.sql
-2. docs/supabase-tenant-rls-plan.sql
-3. docs/public-appointment-availability-rpc.sql
-4. docs/appointments-active-slot-unique-index.sql
-5. docs/barber-profile-linking-rpc.sql
+supabase/migrations (sequencia completa 001-034; revisao e aplicacao remota manuais)
 ```
 
 `docs/supabase-schema.sql` e a referencia de schema base. Ele nao deve recriar policies MVP permissivas. As policies atuais ficam em `docs/supabase-tenant-rls-plan.sql`.

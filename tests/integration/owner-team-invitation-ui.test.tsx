@@ -9,14 +9,14 @@ vi.mock('../../lib/supabase', () => ({
 }));
 import { OwnerBarberProfileLinking } from '../../components/OwnerBarberProfileLinking';
 const render = (role: 'owner' | 'barber' = 'owner', active = true) => renderToStaticMarkup(
-  <OwnerBarberProfileLinking role={role} barbers={[]} onLinkProfile={vi.fn()} invitationContext="owner:tenant" invitationActive={active} />
+  <OwnerBarberProfileLinking role={role} barbers={[]} invitationContext="owner:tenant" invitationActive={active} />
 );
 describe('owner invitation entry', () => {
   beforeEach(() => { runtime.online = true; });
-  it('adds a separate owner action without removing the bridge', () => {
+  it('offers invitations without the manual linking bridge', () => {
     const html = render();
     expect(html).toContain('Convidar acesso');
-    expect(html).toContain('Vincular usuário');
+    expect(html).not.toContain('Vincular usuário');
     expect(html).not.toContain('Convite gerado');
     expect(html).not.toContain('/convite#token=');
   });
@@ -29,7 +29,7 @@ describe('owner invitation entry', () => {
   });
   it('does not mount invitation state when management context is hidden', () => {
     expect(render('owner', false)).not.toContain('Convidar acesso');
-    expect(render('owner', false)).toContain('Vincular usuário');
+    expect(render('owner', false)).toContain('Profissionais da equipe');
   });
   it('does not expose either operation to barber UI', () => { expect(render('barber')).toBe(''); });
 });
