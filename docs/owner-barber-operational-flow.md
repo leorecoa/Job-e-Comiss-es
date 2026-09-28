@@ -105,60 +105,15 @@ Expected final statuses:
 - `Booking pronto para receber agendamentos.`
 - `Booking incompleto.`
 
-## Linking a barber to a user
+## Inviting a barber to the team
 
-The owner can link an existing barber catalog row to an existing authenticated user by email.
+1. The owner selects a professional and recipient email in Management > Team.
+2. `issue_team_invitation` returns a link for the owner to share.
+3. The recipient signs in or creates a barber account, confirms the email and explicitly accepts.
+4. `accept_team_invitation` validates identity and atomically links the canonical profile.
+5. Reissue/revoke invalidate invitations without unilateral profile linking.
 
-This flow uses the reviewed Supabase RPC:
-
-```txt
-public.link_barber_profile_by_email(
-  p_target_email text,
-  p_target_barber_id uuid
-)
-```
-
-See:
-
-- [barber-profile-linking-rpc.md](./barber-profile-linking-rpc.md)
-- [barber-profile-linking-rpc.sql](./barber-profile-linking-rpc.sql)
-
-### Current flow
-
-1. The barber creates an account first.
-2. The owner opens the internal panel.
-3. The owner selects a barber from the current tenant catalog.
-4. The owner enters the barber user's email.
-5. The app calls the RPC.
-6. The RPC validates:
-   - authenticated owner
-   - active owner profile
-   - owner `barbershop_id`
-   - selected `barber_id` inside the same tenant
-   - target user existence in `auth.users`
-7. The RPC creates or updates `public.profiles` for the target user as:
-
-```txt
-role = barber
-active = true
-barbershop_id = owner tenant
-barber_id = selected barber
-```
-
-### Expected messages
-
-- user not found
-  - `Usuario nao encontrado. Peca para o barbeiro criar uma conta primeiro.`
-- barber does not belong to the current barbershop
-  - `Este barbeiro nao pertence a sua barbearia.`
-- target user already belongs to another tenant
-  - `Este usuario ja esta vinculado a outra barbearia.`
-- target user is already an owner
-  - `Este usuario ja e owner e nao pode ser vinculado como barbeiro.`
-- owner tried to reuse the same account as barber
-  - `Use uma conta separada para o barbeiro.`
-- link success
-  - `Barbeiro vinculado com sucesso.`
+See [team-invitations.md](./team-invitations.md).
 
 ## Barber flow
 
@@ -239,7 +194,7 @@ Current operating rules:
 - public booking does not have `SELECT` on `appointments`
 - production does not use local fallback as an operational substitute when Supabase is unavailable
 - role text alone does not authorize internal access
-- owner should not need manual SQL for barber linking after the RPC and owner UI are available
+- commercial barber linking requires invitation acceptance; administrative SQL is not this flow
 
 Additional enforcement already in the current model:
 
@@ -258,7 +213,7 @@ Recommended operational walkthrough:
 5. Owner creates at least one barber.
 6. Owner creates at least one service.
 7. Owner reviews the setup checklist.
-8. Owner links a barber account by email.
+8. Owner sends an invitation; the barber explicitly accepts it.
 9. Barber signs in with the linked account.
 10. Customer opens `/book/:slug`.
 11. Customer creates an appointment through public booking.

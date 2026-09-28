@@ -28,7 +28,7 @@ Ele nao representa liberacao para escala comercial total. O objetivo e confirmar
 - [ ] Tabelas principais existem: `barbershops`, `profiles`, `barbers`, `services`, `appointments`.
 - [ ] RLS tenant-aware esta aplicada.
 - [ ] Policies tenant-aware foram conferidas no ambiente alvo.
-- [ ] A RPC `public.link_barber_profile_by_email` esta aplicada.
+- [ ] RPCs de convites aplicadas e bridge legado retirado pela migration 034.
 - [ ] O indice parcial contra slot duplicado ativo esta aplicado:
 
 ```txt
@@ -63,7 +63,7 @@ appointments_unique_active_barbershop_barber_start
 - [ ] Existe pelo menos um barbeiro ativo na barbearia piloto.
 - [ ] Cada barbeiro ativo pertence ao tenant correto.
 - [ ] O usuario do barbeiro ja criou conta quando necessario.
-- [ ] O owner consegue vincular barbeiro por e-mail.
+- [ ] O owner emite convite e o profissional confirma o aceite.
 - [ ] O profile vinculado fica com `role = barber`.
 - [ ] O profile vinculado recebe `barbershop_id` correto.
 - [ ] O profile vinculado recebe `barber_id` correto.
@@ -121,7 +121,7 @@ Checklist:
 - [ ] Owner entra com a conta correta.
 - [ ] Owner confirma tenant, slug e dados da barbearia.
 - [ ] Owner confirma barbeiros, servicos e horarios.
-- [ ] Owner vincula o e-mail do barbeiro.
+- [ ] Owner envia convite; barbeiro autenticado aceita.
 - [ ] Barbeiro entra com a propria conta.
 - [ ] Barbeiro ve apenas a propria agenda.
 - [ ] Barbeiro cria um agendamento manual proprio.
@@ -152,5 +152,5 @@ Checklist:
 - `docs/security-model.md`
 - `docs/dependency-audit.md`
 - `docs/owner-barber-operational-flow.md`
-- `docs/barber-profile-linking-rpc.md`
+- `docs/team-invitations.md`
 - `docs/RELEASE_PROCESS.md`

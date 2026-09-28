@@ -66,8 +66,8 @@ O Job e Comissoes centraliza essa operacao em uma unica aplicacao, com tenant is
 - onboarding de owner e checklist operacional;
 - empty states operacionais para tenants sem dados;
 - branding publico da barbearia;
-- vinculacao de barbeiro a usuario por e-mail via RPC;
-- UX de vinculo de barbeiro com mensagens por erro conhecido;
+- convite de acesso ao barbeiro com aceite explicito;
+- UX de convites com mensagens amigaveis;
 - painel do barbeiro com agenda propria;
 - criacao manual de agendamento pelo barbeiro usando a sessao autenticada;
 - controle de faturamento bruto, comissao calculada, saldo estimado, vales e relatorios;
@@ -102,8 +102,8 @@ Estado funcional atual:
 - business hours e `slot_step_minutes` por barbearia;
 - branding publico por tenant;
 - empty states para barbearias sem barbeiros, servicos, agenda ou dados financeiros;
-- vinculacao owner -> barber por e-mail via RPC `link_barber_profile_by_email`;
-- UX de vinculo com mensagens especificas para usuario inexistente, barbeiro fora do tenant, conta de outro tenant e conta owner;
+- Vinculo comercial de barber exige convite e aceite explicito por `accept_team_invitation`; veja `docs/team-invitations.md`.
+- UX de convites sem exposicao de detalhes internos;
 - painel do barbeiro restrito a propria agenda;
 - criacao manual de agendamento pelo barbeiro usando `authSession.barbershopId` e `authSession.barberId`;
 - bloqueio de slug invalido no booking publico;
@@ -269,7 +269,7 @@ Pontos principais do modelo atual:
 - disponibilidade publica usa `public.get_public_appointment_slots(uuid)`;
 - payload publico e validado antes de chegar ao Supabase;
 - conflitos ativos de slot sao bloqueados no app e por indice unico parcial no banco;
-- RPC dedicada para vinculo owner -> barber por e-mail;
+- RPCs dedicadas para emissao, revogacao e aceite de convites;
 - regressao automatizada para mutations sensiveis entre tenants;
 - logs tecnicos sao sanitizados para evitar tokens, sessoes, headers e credenciais;
 - fallback/localStorage nao deve ser tratado como auth de producao.
@@ -283,7 +283,7 @@ Limites importantes:
 Mais detalhes:
 
 - [docs/security-model.md](./docs/security-model.md)
-- [docs/barber-profile-linking-rpc.md](./docs/barber-profile-linking-rpc.md)
+- [docs/team-invitations.md](./docs/team-invitations.md)
 - [docs/production-error-visibility.md](./docs/production-error-visibility.md)
 - [docs/deployment.md](./docs/deployment.md)
 
@@ -320,7 +320,7 @@ O painel interno hoje ja diferencia claramente owner e barber.
 - define `slot_step_minutes`;
 - cria, edita, remove ou desativa barbeiros e servicos;
 - usa checklist operacional para readiness do booking;
-- vincula barbeiro a usuario por e-mail via RPC.
+- convida o barbeiro, que aceita explicitamente para vincular sua conta.
 - recebe mensagens especificas para falhas de catalogo, configuracao, upload, agendamento e vinculo de barbeiro.
 
 ### Barber
@@ -382,14 +382,10 @@ Sem Supabase configurado, o app pode usar fallback local apenas em dev/demo. Em 
 Para configurar um ambiente Supabase novo, revise e aplique manualmente a sequencia documentada em [docs/deployment.md](./docs/deployment.md):
 
 ```txt
-1. docs/supabase-schema.sql
-2. docs/supabase-tenant-rls-plan.sql
-3. docs/public-appointment-availability-rpc.sql
-4. docs/appointments-active-slot-unique-index.sql
-5. docs/barber-profile-linking-rpc.sql
+supabase/migrations (sequencia completa 001-034; revisao e aplicacao remota manuais)
 ```
 
-Nao aplique apenas o schema base em producao; RLS tenant-aware, RPC publica de disponibilidade, indice de conflito e RPC de vinculo fazem parte do estado operacional atual.
+Nao aplique apenas o schema base em producao; RLS tenant-aware, RPC publica de disponibilidade, indice de conflito e RPCs de convites fazem parte do estado operacional atual.
 
 ---
 
@@ -423,7 +419,7 @@ Documentacao relacionada:
 - [docs/security-model.md](./docs/security-model.md)
 - [docs/dependency-audit.md](./docs/dependency-audit.md)
 - [docs/owner-barber-operational-flow.md](./docs/owner-barber-operational-flow.md)
-- [docs/barber-profile-linking-rpc.md](./docs/barber-profile-linking-rpc.md)
+- [docs/team-invitations.md](./docs/team-invitations.md)
 - [docs/performance-notes.md](./docs/performance-notes.md)
 - [docs/production-error-visibility.md](./docs/production-error-visibility.md)
 

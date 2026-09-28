@@ -18,11 +18,7 @@
 --
 -- These helpers are documented in docs/supabase-schema.sql and must exist before
 -- applying this policy plan. For a new environment, apply manually in this order:
--- 1. docs/supabase-schema.sql
--- 2. docs/supabase-tenant-rls-plan.sql
--- 3. docs/public-appointment-availability-rpc.sql
--- 4. docs/appointments-active-slot-unique-index.sql
--- 5. docs/barber-profile-linking-rpc.sql
+-- Review the complete versioned migration sequence in supabase/migrations (001-034).
 
 begin;
 

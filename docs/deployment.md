@@ -41,18 +41,14 @@ O cadastro envia `emailRedirectTo` para `/auth/callback` na origem atual. O clie
 
 Para testar Preview, adicione somente a URL exata do deploy Preview sob o dominio controlado da Vercel. Nao use wildcard amplo. A configuracao do Dashboard e um gate manual e nao e executada por esta alteracao.
 
-O estado atual do app depende de schema, RLS tenant-aware, RPC publica de disponibilidade, indice contra slot duplicado e RPC de vinculo de barbeiro.
+O estado atual do app depende de schema, RLS tenant-aware, RPC publica de disponibilidade, indice contra slot duplicado e RPCs de convites de equipe.
 
 Nao aplique apenas um SQL isolado em ambiente novo. Aplique e valide manualmente a sequencia completa.
 
 Ordem recomendada para um projeto Supabase novo:
 
 ```txt
-1. docs/supabase-schema.sql
-2. docs/supabase-tenant-rls-plan.sql
-3. docs/public-appointment-availability-rpc.sql
-4. docs/appointments-active-slot-unique-index.sql
-5. docs/barber-profile-linking-rpc.sql
+supabase/migrations (sequencia completa 001-034; revisao e aplicacao remota manuais)
 ```
 
 Arquivos de estado aplicado/historico, como `docs/supabase-tenant-rls-applied.md`, `docs/supabase-barbershop-id-not-null-applied.md` e `docs/supabase-appointment-barbershop-trigger-removal-applied.md`, servem para auditoria do ambiente atual. Eles nao substituem revisao antes de aplicar SQL em outro projeto.
@@ -68,7 +64,7 @@ Arquivos de estado aplicado/historico, como `docs/supabase-tenant-rls-applied.md
 - Owner opera apenas a propria `barbershop_id`.
 - Barber opera apenas a propria `barbershop_id` e o proprio `barber_id`.
 - A RPC `public.get_public_appointment_slots(uuid)` deve ser aplicada para listar apenas slots ocupados da barbearia solicitada, sem expor dados pessoais.
-- A RPC `public.link_barber_profile_by_email(text, uuid)` deve ser aplicada para vincular usuario existente a barbeiro sem expor `auth.users` ao frontend.
+- Vinculo comercial de barber exige convite e aceite explicito por `accept_team_invitation`; veja `docs/team-invitations.md`.
 - O indice `appointments_unique_active_barbershop_barber_start` deve ser aplicado para bloquear corrida de agendamento duplicado ativo.
 
 ## Validacao Antes do Deploy

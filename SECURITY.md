@@ -31,7 +31,7 @@ O modelo atual usa `barbershop_id` como chave de isolamento multi-tenant:
 - public booking nao deve fazer `SELECT` publico na tabela completa `appointments`;
 - disponibilidade publica deve usar `public.get_public_appointment_slots(uuid)`;
 - inserts publicos em `appointments` nao devem solicitar retorno de linhas sensiveis;
-- a RPC `public.link_barber_profile_by_email` deve ser usada para vincular usuario existente a barbeiro sem expor `auth.users`.
+- Vinculo comercial de barber exige convite e aceite explicito por `accept_team_invitation`; veja `docs/team-invitations.md`.
 
 ## Supabase
 
@@ -44,7 +44,7 @@ Arquivos de referencia:
 - `docs/supabase-tenant-rls-plan.sql`
 - `docs/public-appointment-availability-rpc.sql`
 - `docs/appointments-active-slot-unique-index.sql`
-- `docs/barber-profile-linking-rpc.sql`
+- `docs/team-invitations.md`
 - `docs/deployment.md`
 
 Nao desative RLS para corrigir bug de frontend.

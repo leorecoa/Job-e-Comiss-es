@@ -110,13 +110,10 @@ select is((select count(*) from public.profiles where id in (pg_temp.invite_id(1
 select throws_ok($$update public.profiles set barber_id=pg_temp.invite_id(3) where id=pg_temp.invite_id(101)$$,'23514',null,'owner cannot have barber link');
 select throws_ok($$update public.profiles set barbershop_id=pg_temp.invite_id(1),barber_id=pg_temp.invite_id(4) where id=pg_temp.invite_id(102)$$,'23503',null,'profile cross-tenant link still denied');
 
--- Temporary compatibility bridge: cutover must revoke it once invites work.
-set local role authenticated;
-select set_config('request.jwt.claim.sub',pg_temp.invite_id(101)::text,true);
-select lives_ok($$select * from public.link_barber_profile_by_email('invitation-102@example.test',pg_temp.invite_id(3))$$,'legacy owner link still works temporarily');
-select lives_ok($$select * from public.link_barber_profile_by_email('invitation-102@example.test',pg_temp.invite_id(3))$$,'legacy same-user relink stays idempotent');
-select throws_ok($$select * from public.link_barber_profile_by_email('invitation-103@example.test',pg_temp.invite_id(3))$$,'23505',null,'legacy bridge cannot assign a second profile');
-reset role;
+-- Privileged fixture setup only; commercial linking requires invitation acceptance.
+select ok(to_regprocedure('public.link_barber_profile_by_email(text,uuid)') is null,'legacy linking RPC retired');
+select lives_ok($$update public.profiles set barbershop_id=pg_temp.invite_id(1),barber_id=pg_temp.invite_id(3) where id=pg_temp.invite_id(102)$$,'fixture assigns target professional');
+select throws_ok($$update public.profiles set barbershop_id=pg_temp.invite_id(1),barber_id=pg_temp.invite_id(3) where id=pg_temp.invite_id(103)$$,'23505',null,'second profile cannot occupy assigned professional');
 select is((select count(*) from public.profiles where barber_id=pg_temp.invite_id(3)),1::bigint,'exactly one profile represents target');
 select ok((select barber_id is null and barbershop_id is null from public.profiles where id=pg_temp.invite_id(103)),'failed relink leaves pending profile unchanged');
 update public.profiles set active=false where id=pg_temp.invite_id(103);
@@ -128,8 +125,6 @@ select is((select md5(string_agg(row_to_json(x)::text,',' order by x.name)) from
  select c.relname as name,c.relacl::text,c.relrowsecurity,c.relforcerowsecurity,
  (select json_agg(p order by p.policyname) from pg_policies p where p.schemaname='public' and p.tablename=c.relname)::text as policies
  from pg_class c where c.oid in ('public.appointments'::regclass,'public.financial_records'::regclass)
- union all select 'legacy_link',p.proacl::text,p.prosecdef,false,pg_get_functiondef(p.oid)
- from pg_proc p where p.oid='public.link_barber_profile_by_email(text,uuid)'::regprocedure
-) x),'8ba6dd0a25566ed0d2cdc009f6381ecb','appointments/financial ACLs and policies and legacy RPC definition/ACL unchanged from 031');
+) x),'0cf46039119d3c29e9a4e967d35855a0','appointments/financial ACLs and policies unchanged from 031');
 select * from finish();
 rollback;

@@ -95,7 +95,7 @@ select ok(not has_table_privilege('authenticated', 'public.profiles', 'trigger')
 select ok(has_table_privilege('service_role', 'public.profiles', 'select') and has_table_privilege('service_role', 'public.profiles', 'insert') and has_table_privilege('service_role', 'public.profiles', 'update') and has_table_privilege('service_role', 'public.profiles', 'delete') and has_table_privilege('service_role', 'public.profiles', 'truncate') and has_table_privilege('service_role', 'public.profiles', 'references') and has_table_privilege('service_role', 'public.profiles', 'trigger'), 'service_role retains all profiles privileges');
 select ok((select relrowsecurity from pg_class where oid = 'public.profiles'::regclass), 'profiles RLS remains enabled');
 select is((select count(*) from pg_policies where schemaname = 'public' and tablename = 'profiles'), 2::bigint, 'only profile select policies remain');
-select ok(has_function_privilege('authenticated', 'public.link_barber_profile_by_email(text,uuid)', 'execute'), 'authenticated can execute profile linking RPC');
+select ok(to_regprocedure('public.link_barber_profile_by_email(text,uuid)') is null, 'legacy profile linking RPC is absent');
 
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'private' and routine_name = 'current_user_barber_id' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC has no direct execute on barber helper');
 select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema = 'private' and routine_name = 'current_user_barbershop_id' and grantee = 'PUBLIC' and privilege_type = 'EXECUTE'), 'PUBLIC has no direct execute on tenant helper');
@@ -116,7 +116,7 @@ select is((select count(*) from pg_proc p join pg_namespace n on n.oid = p.prona
 select is((select proconfig from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname = 'current_user_barber_id'), array['search_path=public, private'], 'barber helper search path is unchanged');
 select is((select proconfig from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname = 'current_user_barbershop_id'), array['search_path=public, private'], 'tenant helper search path is unchanged');
 select is((select proconfig from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname = 'current_user_role'), array['search_path=public'], 'role helper search path is unchanged');
-select ok(not pg_catalog.has_function_privilege('anon', 'public.link_barber_profile_by_email(text,uuid)', 'execute'), 'anon cannot execute authenticated profile RPC');
+select ok(not exists(select 1 from information_schema.routine_privileges where routine_schema='public' and routine_name='link_barber_profile_by_email'), 'legacy RPC has no remaining EXECUTE grants');
 
 select is((select count(*) from storage.buckets where id = 'barbershop-branding'), 1::bigint, 'branding bucket exists');
 select is((select public from storage.buckets where id = 'barbershop-branding'), true, 'branding bucket remains public');

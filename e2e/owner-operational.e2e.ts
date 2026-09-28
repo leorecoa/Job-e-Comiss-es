@@ -115,7 +115,6 @@ type MockScenario = {
   services?: MockService[];
   appointments?: MockAppointment[];
   financialRecords?: MockFinancialRecord[];
-  rpcResponse?: MockRpcResponse;
   completionRpcResponse?: MockRpcResponse;
   completedAt?: string;
   onboardingRpcResponse?: MockRpcResponse;
@@ -297,18 +296,6 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
   ];
   const financialRecords = scenario.financialRecords ?? [];
 
-  const rpcResponse: MockRpcResponse = scenario.rpcResponse ?? {
-    status: 200,
-    body: [{
-      profile_id: '177e1e46-8f6c-4fe0-a31f-b0ce1c40f170',
-      display_name: 'Leo Barber',
-      role: 'barber',
-      active: true,
-      barbershop_id: OWNER_BARBERSHOP_ID,
-      barber_id: OWNER_BARBER_ID
-    }]
-  };
-
   const signInRequests: CapturedRequest[] = [];
   const barbershopRequests: string[] = [];
   const barberRequests: string[] = [];
@@ -317,7 +304,6 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
   const availabilityRequests: Record<string, unknown>[] = [];
   const appointmentInsertRequests: Record<string, unknown>[] = [];
   const ownerCreateRequests: Record<string, unknown>[] = [];
-  const rpcRequests: CapturedRequest[] = [];
   const completionRequests: CapturedRequest[] = [];
   const appointmentUpdateRequests: CapturedRequest[] = [];
   const onboardingRequests: CapturedRequest[] = [];
@@ -598,17 +584,6 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
       return;
     }
 
-    if (url.pathname === '/rest/v1/rpc/link_barber_profile_by_email') {
-      rpcRequests.push({
-        method: request.method(),
-        url: request.url(),
-        body: parseRequestBody(route)
-      });
-
-      await fulfillJson(route, rpcResponse.status, rpcResponse.body);
-      return;
-    }
-
     if (url.pathname === '/rest/v1/rpc/create_owner_barbershop') {
       const body = parseRequestBody(route) as Record<string, unknown>;
       onboardingRequests.push({ method: request.method(), url: request.url(), body });
@@ -655,7 +630,6 @@ const installOwnerSupabaseMocks = async (page: Page, scenario: MockScenario = {}
     availabilityRequests,
     appointmentInsertRequests,
     ownerCreateRequests,
-    rpcRequests,
     completionRequests,
     appointmentUpdateRequests,
     onboardingRequests,
@@ -715,7 +689,7 @@ test.describe('owner team invitations', () => {
     await page.getByLabel('E-mail do convite', { exact: true }).fill('barber@example.test');
   };
 
-  test('issues, copies, shares, reissues and revokes without replacing the bridge', async ({ page }) => {
+  test('issues, copies, shares, reissues and revokes without manual linking', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const mocks = await setup(page);
@@ -758,12 +732,8 @@ test.describe('owner team invitations', () => {
     await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
     expect(mocks.calls.at(-1)).toEqual({ rpc: 'revoke_team_invitation', body: { p_invitation_id: invitationId } });
     await page.getByRole('button', { name: 'Fechar convite', exact: true }).click();
-    // Legacy linking remains a different, functional action.
-    await page.getByLabel('E-mail usado no login', { exact: true }).fill('barber@example.com');
-    await page.getByLabel('Profissional correspondente', { exact: true }).selectOption(OWNER_BARBER_ID);
-    await page.getByRole('button', { name: 'Vincular usuário', exact: true }).click();
-    await expect(page.getByText(/Conta vinculada ao profissional Leo Barber/)).toBeVisible();
-    expect(mocks.network.rpcRequests).toHaveLength(1);
+    await expect(page.getByRole('button', { name: 'Vincular usuário', exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('E-mail usado no login', { exact: true })).toHaveCount(0);
     expect(page.url()).toMatch(/\/#management-team$/);
     const storage = await page.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
     expect(storage).not.toContain(tokenA); expect(storage).not.toContain(tokenB);
@@ -1578,7 +1548,7 @@ test.describe('owner operational dashboard e2e', () => {
     await expect(page.locator('.ui-branding-preview[class~="bg-gray-950/80"]')).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: 'Grupos da gestão' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Configurações da barbearia/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Vincular barbeiro à equipe/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Acesso da equipe/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Catálogo operacional/i })).toBeVisible();
     await page.getByLabel('Nome da barbearia').fill('Nome em edicao nao salvo');
 
@@ -1802,94 +1772,4 @@ test.describe('owner operational dashboard e2e', () => {
     await expect(page.getByLabel('Data da agenda')).toBeVisible();
   });
 
-  test('owner links a barber profile by email through the tenant-scoped RPC', async ({ page }) => {
-    const network = await installOwnerSupabaseMocks(page);
-
-    await signInAsOwner(page);
-    await openOwnerManagement(page);
-
-    const team = page.locator('#management-team');
-    await expect(team.getByRole('heading', { name: /Vincular barbeiro à equipe/i })).toBeVisible();
-    await expect(page.getByText(/O barbeiro cria uma conta usando o e-mail dele/i)).toBeVisible();
-    await expect(page.getByText(OWNER_BARBER_ID)).toHaveCount(0);
-    await expect(team.getByLabel('E-mail usado no login')).toHaveCount(1);
-    await expect(team.getByLabel('Profissional correspondente')).toHaveCount(1);
-    await team.getByRole('button', { name: /Vincular usuário/i }).click();
-    await expect(team.getByRole('alert')).toContainText('Informe o e-mail usado pelo barbeiro no login.');
-    await team.getByLabel('E-mail usado no login').fill('  BARBER@EXAMPLE.COM  ');
-    await team.getByRole('button', { name: /Vincular usuário/i }).click();
-    await expect(team.getByRole('alert')).toContainText('Escolha o profissional correspondente.');
-    await team.getByLabel('Profissional correspondente').selectOption(OWNER_BARBER_ID);
-    const linkButton = team.getByRole('button', { name: /Vincular usuário/i });
-    await expect(linkButton).toBeEnabled();
-    await linkButton.evaluate((button: HTMLButtonElement) => {
-      button.click();
-      button.click();
-    });
-
-    await expect.poll(() => network.rpcRequests.length).toBe(1);
-    await expect(page.getByText(/Conta vinculada ao profissional Leo Barber/i)).toBeVisible();
-    await expect(page.getByText(/E-mail usado: barber@example\.com/i)).toBeVisible();
-    await expect(page.getByText(/sair e entrar novamente/i)).toBeVisible();
-    await expect(team.getByLabel('E-mail usado no login')).toHaveValue('');
-    await expect(team.getByLabel('Profissional correspondente')).toHaveValue('');
-    await expect(team.getByLabel('Profissional correspondente').locator(`option[value="${OWNER_BARBER_ID}"]`)).toHaveCount(0);
-    await expect(team.getByText('Vinculado', { exact: true })).toBeVisible();
-
-    const [{ method, body }] = network.rpcRequests;
-    expect(method).toBe('POST');
-    expect(body).toMatchObject({
-      p_target_email: 'barber@example.com',
-      p_target_barber_id: OWNER_BARBER_ID
-    });
-  });
-
-  for (const { code, message } of [
-    {
-      code: 'TARGET_USER_NOT_FOUND',
-      message: 'Nenhuma conta foi encontrada com este e-mail. Peca para o barbeiro criar a conta primeiro e tente novamente.'
-    },
-    {
-      code: 'BARBER_NOT_IN_TENANT',
-      message: 'O profissional selecionado nao pertence a esta barbearia.'
-    },
-    {
-      code: 'TARGET_PROFILE_BELONGS_TO_ANOTHER_TENANT',
-      message: 'Esta conta ja esta vinculada a outra barbearia.'
-    },
-    {
-      code: 'TARGET_PROFILE_IS_OWNER',
-      message: 'Esta conta e de owner e nao pode ser vinculada como barbeiro.'
-    },
-    {
-      code: 'TARGET_USER_CANNOT_BE_OWNER',
-      message: 'Use uma conta separada para o barbeiro. Uma conta de owner nao deve ser usada como perfil de atendimento.'
-    }
-  ]) {
-    test(`owner sees friendly linking error for ${code}`, async ({ page }) => {
-      const network = await installOwnerSupabaseMocks(page, {
-        rpcResponse: {
-          status: 400,
-          body: {
-            code,
-            message: code
-          }
-        }
-      });
-
-      await signInAsOwner(page);
-      await openOwnerManagement(page);
-
-      await page.getByLabel('E-mail usado no login').fill('barber@example.com');
-      await page.getByLabel('Profissional correspondente').selectOption(OWNER_BARBER_ID);
-      const linkButton = page.getByRole('button', { name: /Vincular usuário/i });
-      await expect(linkButton).toBeEnabled();
-      await linkButton.evaluate((button: HTMLButtonElement) => button.click());
-
-      await expect.poll(() => network.rpcRequests.length).toBe(1);
-      await expect(page.getByText(message)).toBeVisible();
-      await expect(page.getByLabel('E-mail usado no login')).toHaveValue('barber@example.com');
-      await expect(page.getByLabel('Profissional correspondente')).toHaveValue(OWNER_BARBER_ID);
-    });
-  }
 });
