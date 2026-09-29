@@ -1959,6 +1959,7 @@ const App: React.FC<{ initialAuthSession?: AuthSession }> = ({ initialAuthSessio
                   barbers={ownerCatalogBarbers}
                   invitationContext={`${authSession?.userId || ''}:${authSession?.barbershopId || ''}`}
                   invitationActive={activeOwnerSection === 'management' && activeManagementSection === '#management-team'}
+                  onActivateInvitation={() => handleManagementNavigation('#management-team')}
                 />
               )}
               catalog={(

@@ -684,7 +684,7 @@ test.describe('owner team invitations', () => {
     return { network, calls, failRevoke: (value: boolean) => { revokeFails = value; } };
   };
   const open = async (page: Page) => {
-    await page.getByRole('button', { name: 'Convidar acesso', exact: true }).click();
+    await page.getByRole('button', { name: 'Gerar convite', exact: true }).click();
     await page.getByLabel('Profissional do convite', { exact: true }).selectOption(OWNER_BARBER_ID);
     await page.getByLabel('E-mail do convite', { exact: true }).fill('barber@example.test');
   };
@@ -701,13 +701,19 @@ test.describe('owner team invitations', () => {
       if (request.url().includes(tokenA) || request.url().includes(tokenB) || body.includes(tokenA) || body.includes(tokenB)
         || request.url().includes('/rest/v1/team_invitations')) unexpectedRequests.push(request.url());
     });
-    await signInAsOwner(page, '/#management-team');
+    await signInAsOwner(page, '/#management-public-presence');
+    const entry = page.locator('#management-team').getByRole('button', { name: 'Gerar convite', exact: true });
+    await entry.scrollIntoViewIfNeeded();
+    await expect(entry).toBeVisible();
+    await expect(page).toHaveURL(/#management-public-presence$/);
+    await expect(page.getByLabel('E-mail do convite', { exact: true })).toHaveCount(0);
     await page.evaluate(() => {
       Object.assign(window, { invitationCopy: '', invitationShare: null });
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { Object.assign(window, { invitationCopy: value }); } } });
       Object.defineProperty(navigator, 'share', { configurable: true, value: async (value: ShareData) => { Object.assign(window, { invitationShare: value }); } });
     });
     await open(page);
+    await expect(page).toHaveURL(/#management-team$/);
     await page.getByRole('button', { name: 'Gerar convite', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Convite gerado', exact: true })).toBeVisible();
     const linkA = new URL(`/convite#token=${tokenA}`, page.url()).href;
@@ -770,7 +776,8 @@ test.describe('owner team invitations', () => {
     await expect(page.getByText('Selecione o link abaixo e copie manualmente.', { exact: true })).toBeVisible();
   });
 
-  test('closing a pending issue prevents duplicate submit and stale resurrection', async ({ page }) => {
+  for (const exit of ['close', 'navigate'] as const) {
+  test(`${exit} during a pending issue prevents duplicate submit and stale resurrection`, async ({ page }) => {
     const mocks = await setup(page);
     let release!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
@@ -788,14 +795,18 @@ test.describe('owner team invitations', () => {
     await page.getByRole('button', { name: 'Gerar convite', exact: true }).evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
     await expect.poll(() => started).toBe(1);
     await expect(page.getByRole('button', { name: 'Aguarde...', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: 'Fechar convite', exact: true }).click();
+    if (exit === 'close') await page.getByRole('button', { name: 'Fechar convite', exact: true }).click();
+    else await page.locator('a[href="#management-catalog"]').first().click();
+    await expect(page.getByLabel('E-mail do convite', { exact: true })).toHaveCount(0);
     await open(page);
+    await expect(page).toHaveURL(/#management-team$/);
     release();
     await expect.poll(() => completed).toBe(true);
     await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Gerar convite', exact: true })).toBeEnabled();
     expect(started).toBe(1); expect(mocks.calls).toHaveLength(0);
   });
+  }
 
   test('professional change, management navigation and refresh discard tokens', async ({ page }) => {
     const mocks = await setup(page);
@@ -809,6 +820,9 @@ test.describe('owner team invitations', () => {
     await expect(page.getByLabel('Link do convite', { exact: true })).toBeVisible();
     expect(mocks.calls.at(-1)?.body).toEqual({ p_barber_id: secondBarber, p_recipient_email: 'barber@example.test' });
     await page.locator('a[href="#management-catalog"]').first().click();
+    await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('E-mail do convite', { exact: true })).toHaveCount(0);
+    await expect(page.locator('#management-team').getByRole('button', { name: 'Gerar convite', exact: true })).toBeVisible();
     await page.locator('a[href="#management-team"]').first().click();
     await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
     await open(page);
@@ -819,7 +833,7 @@ test.describe('owner team invitations', () => {
     await open(page);
     await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
     await page.reload();
-    await expect(page.getByRole('button', { name: 'Convidar acesso', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Gerar convite', exact: true })).toBeVisible();
     await expect(page.getByLabel('Link do convite', { exact: true })).toHaveCount(0);
   });
 
