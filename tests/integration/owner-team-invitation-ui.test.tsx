@@ -15,7 +15,7 @@ describe('owner invitation entry', () => {
   beforeEach(() => { runtime.online = true; });
   it('offers invitations without the manual linking bridge', () => {
     const html = render();
-    expect(html).toContain('Convidar acesso');
+    expect(html).toContain('Gerar convite');
     expect(html).not.toContain('Vincular usuário');
     expect(html).not.toContain('Convite gerado');
     expect(html).not.toContain('/convite#token=');
@@ -23,13 +23,18 @@ describe('owner invitation entry', () => {
   it('disables the local feature instead of inventing a token', () => {
     runtime.online = false;
     const html = render();
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Convidar acesso/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Gerar convite/);
     expect(html).toContain('Convites disponíveis apenas no ambiente online.');
     expect(html).not.toContain('/convite#token=');
   });
-  it('does not mount invitation state when management context is hidden', () => {
-    expect(render('owner', false)).not.toContain('Convidar acesso');
-    expect(render('owner', false)).toContain('Profissionais da equipe');
+  it('keeps the entry visible outside the active subsection without mounting the form or token', () => {
+    const html = render('owner', false);
+    expect(html).toContain('Gerar convite');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('disabled=""');
+    expect(html).not.toContain('id="invite-email"');
+    expect(html).not.toContain('/convite#token=');
+    expect(html).toContain('Profissionais da equipe');
   });
   it('does not expose either operation to barber UI', () => { expect(render('barber')).toBe(''); });
 });

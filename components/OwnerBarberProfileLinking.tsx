@@ -12,6 +12,7 @@ type OwnerBarberProfileLinkingProps = {
   barbers: BarberOption[];
   invitationContext?: string;
   invitationActive?: boolean;
+  onActivateInvitation?: () => void;
 };
 
 type FeedbackState = {
@@ -25,7 +26,8 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
   role,
   barbers,
   invitationContext,
-  invitationActive = false
+  invitationActive = false,
+  onActivateInvitation
 }) => {
   const sortedBarbers = useMemo(
     () => [...barbers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
@@ -44,7 +46,7 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
         <p className="ui-owner-help mt-1 text-sm">Convide o profissional para acessar a equipe mediante aceite do convite.</p>
       </div>
 
-      {invitationActive && <TeamInvitationEntry key={invitationContext} barbers={sortedBarbers} />}
+      <TeamInvitationEntry key={invitationContext} barbers={sortedBarbers} active={invitationActive} onActivate={onActivateInvitation} />
 
       <div className="ui-owner-info mb-5 rounded-2xl p-4 text-sm">
         <p className="font-bold">Como funciona</p>
@@ -86,15 +88,19 @@ export const OwnerBarberProfileLinking: React.FC<OwnerBarberProfileLinkingProps>
   );
 };
 
-const TeamInvitationEntry = ({ barbers }: { barbers: BarberOption[] }) => {
+const TeamInvitationEntry = ({ barbers, active, onActivate }: { barbers: BarberOption[]; active: boolean; onActivate?: () => void }) => {
   const [open, setOpen] = useState(false);
   const opener = useRef<HTMLButtonElement>(null);
   const online = isSupabaseConfigured && !shouldUseLocalFallback;
+  useEffect(() => { if (!active) setOpen(false); }, [active]);
   return (
     <div className="ui-owner-card-solid mb-5 rounded-2xl p-4">
-      <Button ref={opener} type="button" variant="secondary" className="min-h-11" disabled={!online || open} onClick={() => setOpen(true)}>Convidar acesso</Button>
+      <Button ref={opener} type="button" variant="secondary" className="min-h-11" disabled={!online || open} aria-expanded={active && open} onClick={() => {
+        onActivate?.();
+        setOpen(true);
+      }}>{open ? 'Convite aberto' : 'Gerar convite'}</Button>
       {!online && <p className="ui-owner-help mt-2">{INVITATIONS_ONLINE_ONLY}</p>}
-      {online && open && <TeamInvitationForm barbers={barbers} onClose={() => {
+      {online && active && open && <TeamInvitationForm barbers={barbers} onClose={() => {
         setOpen(false);
         window.requestAnimationFrame(() => opener.current?.focus());
       }} />}
