@@ -240,10 +240,10 @@ export const BarberDashboard: React.FC<BarberDashboardProps> = ({
             Sua conta existe, mas ainda não está vinculada a um profissional ativo desta barbearia.
           </p>
           <p className="mt-3 text-sm leading-relaxed">
-            Envie ao owner o e-mail usado neste login. Ele deve selecionar o profissional correspondente no painel e vincular a sua conta.
+            Para concluir o vínculo, reabra o link original do convite enviado pelo responsável pela barbearia. Entre com o e-mail destinatário, se solicitado, e clique em Aceitar convite.
           </p>
           <p className="ui-owner-info mt-3 rounded-2xl p-3 text-xs leading-relaxed">
-            Se o owner acabou de concluir o vínculo, saia e entre novamente para atualizar a sessão.
+            Confirmar o e-mail ou fazer login não conclui o vínculo. Se não recebeu o link ou ele expirou, solicite um novo convite ao responsável. Se já aceitou e continua nesta tela, peça que ele verifique seu acesso.
           </p>
           {signOutError && <InlineNotice tone="error" className="mt-4 text-left">{signOutError}</InlineNotice>}
           <Button

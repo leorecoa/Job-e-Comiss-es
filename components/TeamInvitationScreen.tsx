@@ -158,7 +158,11 @@ export function TeamInvitationScreen({ invitation, onComplete }: {
       <h1 className="font-display text-2xl">Convite para a equipe</h1>
       {!online ? <InlineNotice>{INVITATIONS_ONLINE_ONLY}</InlineNotice>
         : invalidated ? <InlineNotice>Este fluxo foi encerrado. Reabra o link original do convite.</InlineNotice>
-        : pendingConfirmation ? <InlineNotice>Cadastro criado. Confirme seu e-mail e depois reabra o link original do convite para continuar.</InlineNotice>
+        : pendingConfirmation ? <InlineNotice>
+          <p>Cadastro criado. Confirme seu e-mail e depois reabra o link original do convite enviado pelo responsável pela barbearia.</p>
+          <p>A confirmação do e-mail não vincula sua conta à equipe. No convite original, entre com o e-mail destinatário, se solicitado, e clique em Aceitar convite.</p>
+          <p>Se aparecer Vínculo pendente após confirmar ou entrar, reabra esse mesmo link. Sem o link original, solicite um novo convite ao responsável.</p>
+        </InlineNotice>
         : missing ? <InlineNotice>Link ausente ou inválido. Reabra o convite original recebido.</InlineNotice>
         : loading ? <p role="status">Validando sessão...</p>
         : accepted ? <>
