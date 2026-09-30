@@ -8,14 +8,15 @@ const headers = { 'access-control-allow-origin': '*', 'access-control-allow-head
 
 async function mockInvitation(page: Page) {
   const state = { role: 'barber', linked: false, accepts: [] as unknown[], signups: [] as any[], failAccept: false,
-    failRefresh: false, release: null as Promise<void> | null, profileReads: 0, requests: [] as string[] };
+    failRefresh: false, confirmed: true, release: null as Promise<void> | null, profileReads: 0, requests: [] as string[] };
   await page.route('https://**/*', (route) => route.abort());
   await page.route('https://e2e.supabase.test/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     state.requests.push(request.url());
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
-    const user = { id: userId, email: 'recipient@example.test', user_metadata: { role: state.role, display_name: 'Recipient Fixture' } };
+    const user = { id: userId, email: 'recipient@example.test', email_confirmed_at: state.confirmed ? '2026-09-29T10:00:00Z' : null, user_metadata: { role: state.role, display_name: 'Recipient Fixture' } };
+    if (url.pathname === '/auth/v1/token' && !state.confirmed) return route.fulfill({ status: 400, headers, body: JSON.stringify({ code: 'email_not_confirmed', message: 'Email not confirmed' }) });
     let data: unknown = [];
     if (url.pathname === '/auth/v1/token') data = { access_token: 'mock-access-token', refresh_token: 'mock-refresh-token', expires_in: 3600,
       expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: 'bearer', user };
@@ -73,6 +74,7 @@ test('invitation login explicit acceptance refreshes canonical profile; mobile t
 
 test('invitation signup forces barber and pending confirmation requires original link', async ({ page }) => {
   const state = await mockInvitation(page);
+  state.confirmed = false;
   await page.goto(`/convite?role=owner#token=${token}`);
   await page.getByRole('button', { name: 'Criar acesso', exact: true }).click();
   await expect(page.getByLabel('Perfil', { exact: true })).toHaveCount(0);
@@ -81,6 +83,8 @@ test('invitation signup forces barber and pending confirmation requires original
   await page.getByLabel('Senha', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: 'Criar acesso', exact: true }).last().click();
   await expect(page.getByText(/Confirme seu e-mail e depois reabra/)).toBeVisible();
+  await expect(page.getByText(/A confirmação do e-mail não vincula sua conta/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Aceitar convite' })).toHaveCount(0);
   expect(state.signups).toHaveLength(1);
   expect(state.signups[0].data.role).toBe('barber');
   expect(new URL(state.requests.find((url) => url.includes('/auth/v1/signup'))!).searchParams.get('redirect_to')).toBe('http://127.0.0.1:4173/auth/callback');
@@ -88,6 +92,30 @@ test('invitation signup forces barber and pending confirmation requires original
   expect(await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))).not.toContain(token);
   await page.reload();
   await expect(page.getByText('Link ausente ou inválido.', { exact: false })).toBeVisible();
+  // Auth confirmation is simulated; no real email, OTP or external Auth is used.
+  state.confirmed = true;
+  await page.goto('/');
+  await login(page);
+  await expect(page.getByRole('heading', { name: 'Vínculo pendente' })).toBeVisible();
+  await page.goto('/auth/callback');
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: 'Vínculo pendente' })).toBeVisible();
+  await expect(page.getByText('Para concluir o vínculo, reabra o link original do convite enviado pelo responsável pela barbearia. Entre com o e-mail destinatário, se solicitado, e clique em Aceitar convite.', { exact: true })).toBeVisible();
+  await expect(page.getByText(/selecionar o profissional correspondente no painel e vincular/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Agendar', exact: true })).toHaveCount(0);
+  expect(state.linked).toBe(false);
+  expect(state.accepts).toEqual([]);
+  await page.goto(`/convite#token=${token}`);
+  await expect(page).toHaveURL(/\/convite$/);
+  await expect(page.getByRole('button', { name: 'Aceitar convite' })).toBeVisible();
+  expect(state.accepts).toEqual([]);
+  const readsBeforeAcceptance = state.profileReads;
+  await page.getByRole('button', { name: 'Aceitar convite' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('button', { name: 'Agendar', exact: true })).toBeVisible();
+  expect(state.accepts).toEqual([{ p_token: token }]);
+  expect(state.profileReads).toBeGreaterThan(readsBeforeAcceptance);
+  expect(await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))).not.toContain(token);
 });
 
 test('invalid token is cleaned and never submitted', async ({ page }) => {
