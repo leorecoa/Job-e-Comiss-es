@@ -65,7 +65,8 @@ describe('owner workspace contrast regression', () => {
     const booking = readSource('../../components/PublicBookingPage.tsx');
     const branding = readSource('../../components/BarbershopBrandingSettings.tsx');
 
-    expect(booking).toContain('ui-public-hero');
+    expect(booking).not.toContain('ui-public-hero');
+    expect(booking).toContain('className="ui-surface overflow-hidden rounded-3xl mb-5" aria-label="Sobre a barbearia"');
     expect(booking).not.toContain('glass-card');
     expect(branding).toContain('ui-branding-preview');
   });

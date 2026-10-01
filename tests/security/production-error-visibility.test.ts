@@ -64,7 +64,7 @@ describe('production error visibility', () => {
     expect(getPublicBookingSubmissionErrorMessage({
       message: 'new row violates row-level security policy for table appointments',
       code: '42501'
-    })).toBe('Nao foi possivel confirmar este horario. Tente novamente.');
+    })).toBe('Não foi possível confirmar este horário. Tente novamente.');
   });
 
   it.each([PUBLIC_BOOKING_RATE_LIMIT_MESSAGE, PUBLIC_BOOKING_ACTIVE_LIMIT_MESSAGE])(
