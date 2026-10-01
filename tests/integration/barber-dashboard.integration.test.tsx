@@ -365,7 +365,7 @@ describe('Public Booking Page Logic', () => {
 
     expect(branding.shopName).toBe('leo do leo');
     expect(landingContent.headline).toBe('leo do leo');
-    expect(landingContent.subheadline).toBe('Agende seu horario');
+    expect(landingContent.subheadline).toBe('Agende seu horário');
   });
 
   it('/book/leo-do-leo does not fall back to Gestao Maxima in the public branding', () => {
@@ -878,7 +878,7 @@ describe('Public Booking Page Logic', () => {
       },
       clientName: 'pedro',
       clientPhone: '81987324097'
-    })).toThrow('Barbearia nao encontrada ou indisponivel.');
+    })).toThrow('Barbearia não encontrada ou indisponível.');
   });
 
   it('blocks public booking payload creation when barber_id is missing', () => {
@@ -935,7 +935,7 @@ describe('Public Booking Page Logic', () => {
       },
       clientName: 'pedro',
       clientPhone: '81987324097'
-    })).toThrow('Selecione um servico.');
+    })).toThrow('Selecione um serviço.');
   });
 
   it('public booking landing content renders a headline with barbershop name', () => {
@@ -948,9 +948,9 @@ describe('Public Booking Page Logic', () => {
     const content = getPublicBookingLandingContent(branding);
 
     expect(content.headline).toBe('Barbearia Premium');
-    expect(content.subheadline).toBe('Agende seu horario');
+    expect(content.subheadline).toBe('Agende seu horário');
     expect(content.ctaLabel).toBe('Agendar agora');
-    expect(content.trustItems).toContain('Horario reservado');
+    expect(content.trustItems).toContain('Horário reservado');
   });
 
   it('public booking landing content uses barbershop description when it exists', () => {
@@ -973,7 +973,7 @@ describe('Public Booking Page Logic', () => {
       active: true
     }, DEFAULT_SETTINGS, DEFAULT_BARBERSHOP_SLUG);
 
-    expect(getPublicBookingLandingContent(branding).description).toBe('Corte, barba e acabamento com horario marcado.');
+    expect(getPublicBookingLandingContent(branding).description).toBe('Corte, barba e acabamento com horário marcado.');
   });
 
   it('public booking contact links render only when branding fields exist', () => {
@@ -1013,7 +1013,7 @@ describe('Public Booking Page Logic', () => {
       hasClient: false
     });
 
-    expect(steps.map((step) => step.label)).toEqual(['Barbeiro', 'Servico', 'Horario', 'Dados', 'Confirmar']);
+    expect(steps.map((step) => step.label)).toEqual(['Barbeiro', 'Serviço', 'Horário', 'Dados', 'Confirmar']);
     expect(steps.find((step) => step.key === 'slot')?.active).toBe(true);
     expect(steps.find((step) => step.key === 'barber')?.complete).toBe(true);
   });
@@ -1045,8 +1045,8 @@ describe('Public Booking Page Logic', () => {
 
     expect(summary.ready).toBe(false);
     expect(summary.barberName).toBe('Selecione um barbeiro');
-    expect(summary.serviceName).toBe('Selecione um servico');
-    expect(summary.slotLabel).toBe('Selecione um horario');
+    expect(summary.serviceName).toBe('Selecione um serviço');
+    expect(summary.slotLabel).toBe('Selecione um horário');
   });
 
   it('public booking shows the friendly conflict message for duplicate slots', () => {

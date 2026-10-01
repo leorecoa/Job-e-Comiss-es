@@ -356,10 +356,53 @@ const fillValidPublicBookingForm = async (page: Page) => {
 
   await page.locator('label').filter({ hasText: 'Seu nome' }).locator('xpath=following-sibling::input').fill('pedro');
   await page.locator('label').filter({ hasText: 'WhatsApp' }).locator('xpath=following-sibling::input').fill('81987324097');
-  await page.locator('label').filter({ hasText: 'Observacoes' }).locator('xpath=following-sibling::textarea').fill('teste e2e');
+  await page.locator('label').filter({ hasText: 'Observações' }).locator('xpath=following-sibling::textarea').fill('teste e2e');
 };
 
 test.describe('public booking /book/:slug', () => {
+  test('keeps the banner clear and the mobile summary progressive', async ({ page }, testInfo) => {
+    await installSupabaseMocks(page, { barbershops: [{ ...leoBarbershop, cover_image_url: '/brand-mark.svg', logo_url: '/brand-mark.svg' }] });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/book/leo-do-leo');
+    const info = page.getByRole('region', { name: 'Sobre a barbearia' });
+    const cover = info.getByRole('img', { name: 'Capa da leo do leo' });
+    await expect(cover).toHaveAttribute('src', '/brand-mark.svg');
+    await expect(page.getByRole('heading', { name: 'leo do leo', exact: true })).toHaveCount(1);
+    await expect(info.getByRole('img', { name: 'Logo da leo do leo' })).toHaveCount(1);
+    await expect(info.getByText('Rua do Leo, 123')).toBeVisible();
+    await expect(info.getByText('1 serviço', { exact: true })).toBeVisible();
+    await expect(info.getByText('1 profissional', { exact: true })).toBeVisible();
+    const summary = page.getByRole('complementary', { name: 'Resumo da reserva' });
+    await expect(summary.getByText('Duração', { exact: true })).toBeVisible();
+    await expect(summary.getByText('Horário', { exact: true })).toHaveCount(0);
+    await expect(summary.getByText('--', { exact: true })).toHaveCount(0);
+    for (const [width, height] of [[1440, 900], [1280, 720], [768, 1024], [390, 844], [360, 800]]) {
+      await page.setViewportSize({ width, height });
+      const imageBox = (await cover.boundingBox())!;
+      const titleBox = (await info.getByRole('heading').boundingBox())!;
+      expect(titleBox.y).toBeGreaterThanOrEqual(imageBox.y + imageBox.height);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      if (width < 1024) {
+        const form = (await page.locator('#booking-flow form').boundingBox())!;
+        expect((await summary.boundingBox())!.y).toBeGreaterThan(form.y + form.height - 1);
+      }
+      await page.screenshot({ path: testInfo.outputPath(`booking-${width}.png`), fullPage: true });
+    }
+    await page.getByRole('link', { name: 'Agendar agora', exact: true }).click();
+    await fillValidPublicBookingForm(page);
+    await expect(summary.getByText('Horário', { exact: true })).toBeVisible();
+  });
+
+  test('omits absent branding and contact details without an empty banner', async ({ page }) => {
+    await installSupabaseMocks(page, { barbershops: [{ ...leoBarbershop, phone: null, whatsapp: null, address: null, instagram_url: null }] });
+    await page.goto('/book/leo-do-leo');
+    const info = page.getByRole('region', { name: 'Sobre a barbearia' });
+    await expect(info.getByRole('heading', { name: 'leo do leo' })).toBeVisible();
+    await expect(info.getByRole('img')).toHaveCount(0);
+    await expect(info.getByRole('link')).toHaveCount(1);
+    await expect(info.getByRole('link', { name: 'Agendar agora' })).toBeVisible();
+  });
+
   test('distinguishes loading and empty without requiring global hours for custom availability', async ({ page }) => {
     await installSupabaseMocks(page, { barbershops: [{ ...leoBarbershop, business_hours: null, slot_step_minutes: null }] });
     let finish: (() => Promise<void>) | undefined;
@@ -379,8 +422,8 @@ test.describe('public booking /book/:slug', () => {
       await installSupabaseMocks(page);
       await page.route('**/api/public-booking/availability?**', (route) => fulfillJson(route, 503, { code, details: 'private upstream detail' }));
       await page.goto('/book/leo-do-leo');
-      await expect(page.getByRole('alert')).toContainText(code.includes('TIMEZONE') ? 'precisa ser configurada' : 'Nao foi possivel consultar');
-      await expect(page.getByRole('button', { name: /Escolher horario:/ })).toHaveCount(0);
+      await expect(page.getByRole('alert')).toContainText(code.includes('TIMEZONE') ? 'precisa ser configurada' : 'Não foi possível consultar');
+      await expect(page.getByRole('button', { name: /Escolher horário:/ })).toHaveCount(0);
       await expect(page.getByText(/private upstream detail/)).toHaveCount(0);
       await expect(page.getByText('Nenhum horário disponível para esta data.', { exact: false })).toHaveCount(0);
     });
@@ -405,21 +448,21 @@ test.describe('public booking /book/:slug', () => {
       } else await fulfillJson(route, 200, response);
     });
     await page.goto('/book/leo-do-leo');
-    await expect(page.getByRole('button', { name: 'Escolher horario: 11:00', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Escolher horario: 11:00', exact: true }).click();
-    await page.getByRole('button', { name: /Escolher servico: Especial/ }).click();
+    await expect(page.getByRole('button', { name: 'Escolher horário: 11:00', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Escolher horário: 11:00', exact: true }).click();
+    await page.getByRole('button', { name: /Escolher serviço: Especial/ }).click();
     await expect.poll(() => requests.at(-1)?.searchParams.get('service_id')).toBe(OTHER_SERVICE_ID);
-    await expect(page.getByRole('button', { name: /Horario selecionado:/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Horário selecionado:/ })).toHaveCount(0);
     await page.getByRole('button', { name: /Escolher barbeiro: Segundo/ }).click();
     await expect.poll(() => requests.at(-1)?.searchParams.get('barber_id')).toBe(OTHER_BARBER_ID);
     await page.locator('input[type="date"]').fill('2030-01-08');
     await expect.poll(() => Boolean(releaseOld)).toBe(true);
     await expect(page.getByRole('status')).toHaveText('Consultando horários...');
     await page.locator('input[type="date"]').fill('2030-01-09');
-    await expect(page.getByRole('button', { name: 'Escolher horario: 11:00', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Escolher horário: 11:00', exact: true })).toBeVisible();
     await releaseOld!();
-    await expect(page.getByRole('button', { name: 'Escolher horario: 15:00', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Horario selecionado:/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Escolher horário: 15:00', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Horário selecionado:/ })).toHaveCount(0);
   });
 
   test('loads the correct barbershop and tenant-scoped public catalog without fallback', async ({ page }) => {
@@ -433,7 +476,7 @@ test.describe('public booking /book/:slug', () => {
     await expect(page.getByRole('button', { name: /test/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /corte/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Barbeiro selecionado: test/i })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('button', { name: /Servico selecionado: corte/i })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /Serviço selecionado: corte/i })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByText(/R\$\s*60,00/i).first()).toBeVisible();
     await expect(page.getByText(/30 min/i).first()).toBeVisible();
     await expect(page.getByText(/Leo Inativo/i)).toHaveCount(0);
@@ -463,9 +506,9 @@ test.describe('public booking /book/:slug', () => {
     await expect(page.getByText(/pedro/i)).toBeVisible();
     await expect(page.getByText(/Revise os dados antes de confirmar/i)).toBeVisible();
 
-    await page.getByRole('button', { name: /Reservar horario/i }).click();
+    await page.getByRole('button', { name: /Reservar horário/i }).click();
 
-    await expect(page.getByRole('heading', { name: /Horario reservado com sucesso/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Horário reservado com sucesso/i })).toBeVisible();
     await expect(page.getByText(/Resumo confirmado/i)).toBeVisible();
     await expect(page.getByText(/leo do leo/i)).toBeVisible();
     await expect(page.getByText(/corte/i)).toBeVisible();
@@ -500,8 +543,8 @@ test.describe('public booking /book/:slug', () => {
     const network = await installSupabaseMocks(page);
     await page.goto('/book/leo-do-leo');
     await fillValidPublicBookingForm(page);
-    await page.getByRole('button', { name: /Reservar horario/i }).click();
-    await expect(page.getByRole('heading', { name: /Horario reservado com sucesso/i })).toBeVisible();
+    await page.getByRole('button', { name: /Reservar horário/i }).click();
+    await expect(page.getByRole('heading', { name: /Horário reservado com sucesso/i })).toBeVisible();
 
     const previousQuery = new URL(network.slotRequests.at(-1)!.url).search;
     expect(network.appointmentRequests[0].body).toMatchObject({
@@ -520,11 +563,11 @@ test.describe('public booking /book/:slug', () => {
     await page.getByRole('button', { name: 'Nova reserva', exact: true }).click();
     await expect.poll(() => refreshedQueries).toEqual([previousQuery]);
     await expect(page.getByRole('status')).toContainText('Consultando');
-    await expect(page.getByRole('button', { name: /horario: 09:00/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /horário: 09:00/ })).toHaveCount(0);
     await finish!();
-    await expect(page.getByRole('button', { name: 'Escolher horario: 11:00', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /horario: 09:00/ })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Horario selecionado:/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Escolher horário: 11:00', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /horário: 09:00/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Horário selecionado:/ })).toHaveCount(0);
     await expect(page.getByRole('status')).toHaveCount(0);
     expect(network.appointmentReadRequests).toHaveLength(0);
   });
@@ -535,14 +578,14 @@ test.describe('public booking /book/:slug', () => {
     await page.goto('/book/leo-do-leo');
     await fillValidPublicBookingForm(page);
 
-    const submitButton = page.getByRole('button', { name: /Reservar horario/i });
+    const submitButton = page.getByRole('button', { name: /Reservar horário/i });
     await submitButton.evaluate((button: HTMLButtonElement) => {
       button.click();
       button.click();
     });
 
     await expect(page.getByRole('button', { name: /Confirmando/i })).toBeDisabled();
-    await expect(page.getByRole('heading', { name: /Horario reservado com sucesso/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Horário reservado com sucesso/i })).toBeVisible();
     expect(network.appointmentRequests).toHaveLength(1);
   });
 
@@ -557,10 +600,10 @@ test.describe('public booking /book/:slug', () => {
 
       await page.goto('/book/leo-do-leo');
       await fillValidPublicBookingForm(page);
-      await page.getByRole('button', { name: /Reservar horario/i }).click();
+      await page.getByRole('button', { name: /Reservar horário/i }).click();
 
       await expect(page.getByText(message).first()).toBeVisible();
-      await expect(page.getByRole('button', { name: /Reservar horario/i })).toBeEnabled();
+      await expect(page.getByRole('button', { name: /Reservar horário/i })).toBeEnabled();
       expect(network.appointmentRequests).toHaveLength(1);
     });
   }
@@ -576,7 +619,7 @@ test.describe('public booking /book/:slug', () => {
     await page.locator('label').filter({ hasText: 'Seu nome' }).locator('xpath=following-sibling::input').fill('pedro');
     await page.locator('label').filter({ hasText: 'WhatsApp' }).locator('xpath=following-sibling::input').fill('81987324097');
 
-    const submitButton = page.getByRole('button', { name: /Reservar horario/i });
+    const submitButton = page.getByRole('button', { name: /Reservar horário/i });
     await expect(submitButton).toBeDisabled();
 
     expect(network.appointmentRequests).toHaveLength(0);
@@ -596,7 +639,7 @@ test.describe('public booking /book/:slug', () => {
 
     await page.goto('/book/leo-do-leo');
     await fillValidPublicBookingForm(page);
-    await page.getByRole('button', { name: /Reservar horario/i }).click();
+    await page.getByRole('button', { name: /Reservar horário/i }).click();
 
     await expect(page.getByText(/Esse hor.rio acabou de ser reservado\..*Escolha outro hor.rio\./i).first()).toBeVisible();
     expect(network.appointmentRequests).toHaveLength(1);
@@ -610,7 +653,7 @@ test.describe('public booking /book/:slug', () => {
 
     await page.goto('/book/barbearia-inexistente');
 
-    await expect(page.getByText(/Link indisponivel/i)).toBeVisible();
+    await expect(page.getByText(/Link indisponível/i)).toBeVisible();
     await expect(page.getByText(/Barbearia.*encontrada.*indispon/i)).toBeVisible();
     await expect(page.getByText(/Gest[aã]o M[aá]xima/i)).toHaveCount(0);
   });

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarCheck, CheckCircle, Clock, MapPin, MessageCircle, Phone, Scissors } from 'lucide-react';
+import { CheckCircle, MapPin, MessageCircle, Phone, Scissors } from 'lucide-react';
 import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfile } from '../types';
 import { getBarbershopBySlug } from '../services/barbershopRepository';
 import { listPublicAvailability } from '../services/appointmentRepository';
@@ -75,7 +75,7 @@ type SectionTitleProps = {
 
 const SectionTitle: React.FC<SectionTitleProps> = ({ step, title, description }) => (
   <div className="flex items-start gap-3">
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-gold-400/20 bg-gold-500/10 text-[11px] font-black text-gold-300">
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-muted text-[11px] font-black text-foreground">
       {step}
     </span>
     <span>
@@ -173,21 +173,21 @@ export const getPublicBookingBranding = (
   };
 };
 
-const DEFAULT_PUBLIC_BOOKING_DESCRIPTION = 'Corte, barba e acabamento com horario marcado.';
+const DEFAULT_PUBLIC_BOOKING_DESCRIPTION = 'Corte, barba e acabamento com horário marcado.';
 
 export const getPublicBookingLandingContent = (branding: ReturnType<typeof getPublicBookingBranding>) => {
   const description = branding.description
     || (branding.shopName === 'Escolha uma barbearia'
-      ? 'Use o link publico da sua barbearia para abrir a agenda correta.'
+      ? 'Use o link público da sua barbearia para abrir a agenda correta.'
       : DEFAULT_PUBLIC_BOOKING_DESCRIPTION);
 
   return {
     eyebrow: 'Reserva oficial',
     headline: branding.shopName,
-    subheadline: 'Agende seu horario',
+    subheadline: 'Agende seu horário',
     description,
     ctaLabel: 'Agendar agora',
-    trustItems: ['Horario reservado', 'Atendimento por barbeiro']
+    trustItems: ['Horário reservado', 'Atendimento por barbeiro']
   };
 };
 
@@ -241,8 +241,8 @@ export const getPublicBookingSteps = ({
 }): PublicBookingStep[] => {
   const steps: Array<Omit<PublicBookingStep, 'active'>> = [
     { key: 'barber', label: 'Barbeiro', complete: hasBarber },
-    { key: 'service', label: 'Servico', complete: hasService },
-    { key: 'slot', label: 'Horario', complete: hasSlot },
+    { key: 'service', label: 'Serviço', complete: hasService },
+    { key: 'slot', label: 'Horário', complete: hasSlot },
     { key: 'client', label: 'Dados', complete: hasClient },
     { key: 'confirm', label: 'Confirmar', complete: hasReadyToConfirm }
   ];
@@ -272,10 +272,10 @@ const formatPublicBookingDateTimeLabel = (isoDate: string, timeZone?: string | n
   const date = new Date(isoDate);
 
   if (Number.isNaN(date.getTime())) {
-    return 'Horario agendado';
+    return 'Horário agendado';
   }
 
-  return `${date.toLocaleDateString('pt-BR', { timeZone: timeZone || undefined })} as ${date.toLocaleTimeString('pt-BR', {
+  return `${date.toLocaleDateString('pt-BR', { timeZone: timeZone || undefined })} às ${date.toLocaleTimeString('pt-BR', {
     timeZone: timeZone || undefined,
     hour: '2-digit',
     minute: '2-digit'
@@ -288,10 +288,10 @@ export const getPublicBookingSummary = (
   slot: TimeSlot | null
 ) => ({
   barberName: barber?.name || 'Selecione um barbeiro',
-  serviceName: service?.name || 'Selecione um servico',
+  serviceName: service?.name || 'Selecione um serviço',
   serviceValue: service ? formatCurrency(service.price) : '--',
   duration: service ? `${service.durationMinutes} min` : '--',
-  slotLabel: slot?.label || 'Selecione um horario',
+  slotLabel: slot?.label || 'Selecione um horário',
   ready: Boolean(barber?.id && service?.id && slot)
 });
 
@@ -410,7 +410,7 @@ export const getPublicBookingSubmissionErrorMessage = (error: unknown): string =
     ? PUBLIC_BOOKING_APPOINTMENT_CONFLICT_MESSAGE
     : error instanceof Error && [PUBLIC_BOOKING_RATE_LIMIT_MESSAGE, PUBLIC_BOOKING_ACTIVE_LIMIT_MESSAGE].includes(error.message)
       ? error.message
-      : 'Nao foi possivel confirmar este horario. Tente novamente.'
+      : 'Não foi possível confirmar este horário. Tente novamente.'
 );
 
 export const buildPublicBookingInput = ({
@@ -431,7 +431,7 @@ export const buildPublicBookingInput = ({
   notes?: string;
 }): PublicBookingInput => {
   if (!barbershop?.id) {
-    throw new Error('Barbearia nao encontrada ou indisponivel.');
+    throw new Error('Barbearia não encontrada ou indisponível.');
   }
 
   if (!selectedBarber?.id) {
@@ -439,19 +439,19 @@ export const buildPublicBookingInput = ({
   }
 
   if (!selectedService?.id) {
-    throw new Error('Selecione um servico.');
+    throw new Error('Selecione um serviço.');
   }
 
   if (!selectedSlot) {
-    throw new Error('Selecione um horario.');
+    throw new Error('Selecione um horário.');
   }
 
   if (selectedBarber.barbershopId && selectedBarber.barbershopId !== barbershop.id) {
-    throw new Error('O barbeiro selecionado nao pertence a esta barbearia.');
+    throw new Error('O barbeiro selecionado não pertence a esta barbearia.');
   }
 
   if (selectedService.barbershopId && selectedService.barbershopId !== barbershop.id) {
-    throw new Error('O servico selecionado nao pertence a esta barbearia.');
+    throw new Error('O serviço selecionado não pertence a esta barbearia.');
   }
 
   return {
@@ -537,14 +537,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
   );
   const primaryColor = isSafeHexColor(branding.primaryColor) ? branding.primaryColor : '#f59e0b';
   const secondaryColor = isSafeHexColor(branding.secondaryColor) ? branding.secondaryColor : '#0ea5e9';
-  const brandingHeaderStyle = {
-    background: `linear-gradient(135deg, ${primaryColor}33, rgba(15,23,42,0.86) 45%, ${secondaryColor}26)`
-  };
   const primaryActionStyle = {
-    backgroundColor: primaryColor,
-    boxShadow: `0 18px 36px ${primaryColor}24`
-  };
-  const heroCtaStyle = {
     backgroundColor: primaryColor,
     boxShadow: `0 18px 36px ${primaryColor}24`
   };
@@ -616,8 +609,8 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
         setBarbershop(null);
         setBarbershopError(getOperationalErrorMessage(
           error,
-          'Nao foi possivel carregar esta barbearia. Tente novamente.',
-          { networkMessage: 'Nao foi possivel conectar ao sistema de agendamento. Tente novamente.' }
+          'Não foi possível carregar esta barbearia. Tente novamente.',
+          { networkMessage: 'Não foi possível conectar ao sistema de agendamento. Tente novamente.' }
         ));
       } finally {
         if (active) setLoadingBarbershop(false);
@@ -701,13 +694,13 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
       .catch((error) => {
         if (!active) return;
         const configurationMessage = 'A agenda desta barbearia precisa ser configurada. Entre em contato com a barbearia.';
-        setRemoteAvailability({ key: availabilityKey, slots: [], error: error instanceof Error && error.message === configurationMessage ? configurationMessage : 'Nao foi possivel consultar os horarios. Tente novamente.' });
+        setRemoteAvailability({ key: availabilityKey, slots: [], error: error instanceof Error && error.message === configurationMessage ? configurationMessage : 'Não foi possível consultar os horários. Tente novamente.' });
       });
     return () => { active = false; controller.abort(); };
   }, [availabilityKey, canLoadAvailability]);
   const selectedDateTimeLabel = selectedSlot
-    ? `${bookingDateLabel} as ${selectedSlot.label}`
-    : 'Selecione data e horario';
+    ? `${bookingDateLabel} às ${selectedSlot.label}`
+    : 'Selecione data e horário';
   const bookingSteps = useMemo(() => getPublicBookingSteps({
     hasBarber: Boolean(selectedBarber?.id),
     hasService: Boolean(selectedService?.id),
@@ -737,28 +730,28 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     ? `${selectedWorkday.start} - ${selectedWorkday.end}`
     : 'Fechado';
 
-  const workdayDescription = !shouldUseLocalFallback ? 'Horarios consultados no sistema de agendamento.' : selectedWorkday
+  const workdayDescription = !shouldUseLocalFallback ? 'Horários consultados no sistema de agendamento.' : selectedWorkday
     ? workdayHasValidRange
       ? `Expediente do dia selecionado · intervalos de ${slotStepMinutes} min`
-      : 'Horario configurado de forma invalida para este dia'
+      : 'Horário configurado de forma inválida para este dia'
     : !bookingReadiness.hasConfiguredBusinessHours
-      ? 'Defina os horarios de funcionamento no painel interno.'
+      ? 'Defina os horários de funcionamento no painel interno.'
       : !bookingReadiness.hasValidSlotStepMinutes
-        ? 'Intervalo de agenda invalido para esta barbearia.'
+        ? 'Intervalo de agenda inválido para esta barbearia.'
         : 'Sem atendimento neste dia';
 
   const emptySlotsMessage = !shouldUseLocalFallback ? 'Nenhum horário disponível para esta data.' : selectedWorkday
     ? workdayHasValidRange
-      ? 'Nenhum horario disponivel para esta combinacao.'
-      : 'Horario de funcionamento indisponivel neste dia.'
+      ? 'Nenhum horário disponível para esta combinação.'
+      : 'Horário de funcionamento indisponível neste dia.'
     : !bookingReadiness.hasConfiguredBusinessHours
-      ? 'Horarios de funcionamento nao configurados para esta barbearia.'
+      ? 'Horários de funcionamento não configurados para esta barbearia.'
       : !bookingReadiness.hasValidSlotStepMinutes
-        ? 'Intervalo de agenda invalido para esta barbearia.'
-        : 'A barbearia nao atende neste dia.';
+        ? 'Intervalo de agenda inválido para esta barbearia.'
+        : 'A barbearia não atende neste dia.';
   const emptySlotsNextStep = contactLinks.whatsapp
     ? 'Escolha outra data, tente outro profissional ou fale com a barbearia pelo WhatsApp.'
-    : 'Escolha outra data ou tente outro profissional, se houver outro disponivel.';
+    : 'Escolha outra data ou tente outro profissional, se houver outro disponível.';
   
   const availableSlots = useMemo(() => {
     if (!shouldUseLocalFallback) return remoteAvailability.key === availabilityKey ? remoteAvailability.slots : [];
@@ -781,10 +774,10 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({
     try {
       const record = createPublicAppointment(input, 'validation');
       const errors = validatePublicAppointmentRecord(record);
-      if (!availableSlots.some((slot) => slot.startAt === input.selectedSlot?.startAt && slot.endAt === input.selectedSlot?.endAt)) errors.push('Escolha um horario disponivel.');
+      if (!availableSlots.some((slot) => slot.startAt === input.selectedSlot?.startAt && slot.endAt === input.selectedSlot?.endAt)) errors.push('Escolha um horário disponível.');
       return { valid: errors.length === 0, errors };
     } catch {
-      return { valid: false, errors: ['Preencha seus dados e escolha um horario disponivel.'] };
+      return { valid: false, errors: ['Preencha seus dados e escolha um horário disponível.'] };
     }
   };
   const bookingValidation = validateBooking({
@@ -839,12 +832,12 @@ const handleSubmit = async (event: React.FormEvent) => {
   }
 
   if (selectedBarber.barbershopId && selectedBarber.barbershopId !== barbershop.id) {
-    setErrors(['O barbeiro selecionado nao pertence a esta barbearia.']);
+    setErrors(['O barbeiro selecionado não pertence a esta barbearia.']);
     return;
   }
 
   if (selectedService.barbershopId && selectedService.barbershopId !== barbershop.id) {
-    setErrors(['O servico selecionado nao pertence a esta barbearia.']);
+    setErrors(['O serviço selecionado não pertence a esta barbearia.']);
     return;
   }
 
@@ -923,7 +916,7 @@ const handleSubmit = async (event: React.FormEvent) => {
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-red-400/20 bg-red-500/10 text-red-300">
             <Scissors size={30} />
           </div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-red-300">Link indisponivel</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-red-300">Link indisponível</p>
           <h1 className="font-display text-2xl font-bold mb-3">{barbershopError}</h1>
           <p className="ui-owner-help text-sm">Confira o link recebido ou fale diretamente com a barbearia.</p>
         </div>
@@ -942,16 +935,16 @@ const handleSubmit = async (event: React.FormEvent) => {
             <CheckCircle size={42} />
           </div>
           <p className="mb-2 text-xs font-bold uppercase tracking-widest text-green-300">Reserva confirmada</p>
-          <h1 className="font-display text-2xl font-bold mb-2">Horario reservado com sucesso</h1>
-          <p className="ui-owner-help text-sm mb-6">A barbearia ja recebeu seu agendamento. O pagamento, quando houver, e combinado diretamente no atendimento.</p>
+          <h1 className="font-display text-2xl font-bold mb-2">Horário reservado com sucesso</h1>
+          <p className="ui-owner-help text-sm mb-6">A barbearia já recebeu seu agendamento. O pagamento, quando houver, é combinado diretamente no atendimento.</p>
 
           <div className="ui-owner-card rounded-2xl p-4 text-left space-y-3 mb-6">
             <p className="ui-owner-help text-xs font-bold uppercase tracking-widest">Resumo confirmado</p>
             <SummaryRow label="Barbearia" value={branding.shopName} />
             <SummaryRow label="Cliente" value={createdAppointment.clientName} />
-            <SummaryRow label="Servico" value={`${createdAppointment.serviceType} · ${formatCurrency(createdAppointment.serviceValue)}`} />
+            <SummaryRow label="Serviço" value={`${createdAppointment.serviceType} · ${formatCurrency(createdAppointment.serviceValue)}`} />
             <SummaryRow label="Barbeiro" value={createdAppointment.barberName} />
-            <SummaryRow label="Horario" value={whenLabel} highlight />
+            <SummaryRow label="Horário" value={whenLabel} highlight />
             <p className="ui-owner-status-success inline-flex rounded-full px-3 py-1 text-xs font-bold">Status: solicitado</p>
           </div>
 
@@ -975,159 +968,86 @@ const handleSubmit = async (event: React.FormEvent) => {
   return (
     <div className="ui-public-shell min-h-screen p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto">
-        <header className="flex items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <img src="/brand-mark.svg" alt={`Marca da ${branding.shopName}`} className="w-12 h-12" decoding="async" />
-            <div>
-              <h1 className="font-display font-bold text-lg">{branding.shopName}</h1>
-              <p className="text-gold-400 text-[10px] uppercase tracking-widest font-bold">Reserva oficial</p>
-            </div>
-          </div>
-          {contactLinks.whatsapp && (
-            <a href={contactLinks.whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-green-400/20 bg-green-500/10 px-3 py-2 text-sm font-bold text-green-200">
-              <Phone size={16} />
-              WhatsApp
-            </a>
+        <section className="ui-surface overflow-hidden rounded-3xl mb-5" aria-label="Sobre a barbearia">
+          {branding.coverImageUrl && (
+            <img
+              src={branding.coverImageUrl}
+              alt={`Capa da ${branding.shopName}`}
+              className="h-40 w-full object-cover sm:h-52 md:h-64"
+              decoding="async"
+              fetchPriority="high"
+              loading="eager"
+            />
           )}
-        </header>
-
-        <section className="ui-public-hero overflow-hidden rounded-3xl mb-5">
-          <div className="relative min-h-[300px] md:min-h-[340px]" style={brandingHeaderStyle}>
-            {branding.coverImageUrl && (
-              <img
-                src={branding.coverImageUrl}
-                alt={`Capa da ${branding.shopName}`}
-                className="absolute inset-0 h-full w-full object-cover"
-                decoding="async"
-                fetchPriority="high"
-                loading="eager"
-              />
+          <div className="space-y-4 p-4 sm:p-6">
+            <header className="flex items-center gap-3">
+              {branding.logoUrl && (
+                <img src={branding.logoUrl} alt={`Logo da ${branding.shopName}`} className="h-14 w-14 shrink-0 rounded-xl border border-border object-contain" decoding="async" />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{landingContent.eyebrow}</p>
+                <h1 className="font-display text-2xl font-bold break-words sm:text-3xl">{landingContent.headline}</h1>
+              </div>
+            </header>
+            <p className="text-sm leading-relaxed text-muted-foreground">{landingContent.description}</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-foreground">
+              <span>{barberOptions.length} {barberOptions.length === 1 ? 'profissional' : 'profissionais'}</span>
+              <span>{services.length} {services.length === 1 ? 'serviço' : 'serviços'}</span>
+            </div>
+            {contactLinks.address && (
+              <p className="flex items-start gap-2 text-sm text-foreground">
+                <MapPin size={18} className="shrink-0" aria-hidden="true" />
+                <span className="min-w-0 break-words">{contactLinks.address}</span>
+              </p>
             )}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/62 to-gray-950/95" />
-            <div className="relative flex min-h-[300px] flex-col justify-between p-5 md:min-h-[340px] md:p-7">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 text-xs font-bold uppercase tracking-widest text-gray-100">
-                  <CalendarCheck size={14} />
-                  {landingContent.eyebrow}
-                </span>
-                <div className="flex flex-wrap gap-2 text-xs font-semibold text-gray-200 md:justify-end">
-                  {contactLinks.instagram && (
-                    <a href={contactLinks.instagram} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-pink-400/20 bg-pink-500/10 px-3 py-2 text-pink-100">
-                      <MessageCircle size={14} />
-                      Instagram
-                    </a>
-                  )}
-                  {contactLinks.address && (
-                    <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/35 px-3 py-2">
-                      <MapPin size={14} />
-                      Localizacao
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="max-w-2xl">
-                <div className="mb-4 flex h-18 w-18 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-gray-950/75 text-gold-300 shadow-xl shadow-black/30 md:h-20 md:w-20">
-                  {branding.logoUrl ? (
-                    <img src={branding.logoUrl} alt={`Logo da ${branding.shopName}`} className="h-full w-full object-cover" decoding="async" />
-                  ) : (
-                    <Scissors size={28} />
-                  )}
-                </div>
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.24em] text-gold-300">{landingContent.eyebrow}</p>
-                <h2 className="font-display text-3xl font-black leading-tight text-white md:text-5xl">{landingContent.headline}</h2>
-                <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-gray-300">{landingContent.subheadline}</p>
-                <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray-200 md:text-base">{landingContent.description}</p>
-
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <a href="#booking-flow" className="inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-black text-black" style={heroCtaStyle}>
-                    {landingContent.ctaLabel}
-                  </a>
-                </div>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2">
-                {landingContent.trustItems.map((item) => (
-                  <div key={item} className="rounded-2xl border border-white/10 bg-black/35 p-3 backdrop-blur">
-                    <CheckCircle size={16} className="mb-1.5 text-green-300" />
-                    <p className="text-sm font-bold text-white">{item}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="flex flex-wrap gap-3">
+              <a href="#booking-flow" className="ui-button ui-button-primary min-h-11 w-full justify-center sm:w-auto">
+                {landingContent.ctaLabel}
+              </a>
+              {contactLinks.whatsapp && (
+                <a href={contactLinks.whatsapp} target="_blank" rel="noreferrer" className="ui-button ui-button-secondary min-h-11">
+                  <Phone size={16} aria-hidden="true" /> WhatsApp
+                </a>
+              )}
+              {contactLinks.instagram && (
+                <a href={contactLinks.instagram} target="_blank" rel="noreferrer" className="ui-button ui-button-secondary min-h-11">
+                  <MessageCircle size={16} aria-hidden="true" /> Instagram
+                </a>
+              )}
             </div>
           </div>
         </section>
 
         <section className="ui-surface mb-4 rounded-2xl p-2.5">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="grid grid-cols-5 gap-1 sm:gap-2">
             {bookingSteps.map((step, index) => (
               <div
                 key={step.key}
-                className={`rounded-xl border px-2 py-3 text-center transition-all ${
+                className={`min-w-0 rounded-xl border px-1 py-2 text-center transition-all ${
                   step.active ? 'ui-owner-badge' : step.complete ? 'ui-owner-status-success' : 'ui-owner-card text-muted-foreground'
                 }`}
                 style={step.active ? selectedCardStyle : undefined}
               >
                 <p className="mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface-muted text-xs font-bold">{index + 1}</p>
-                <p className="text-[11px] font-bold uppercase tracking-wide">{step.label}</p>
+                <p className="text-[10px] font-bold sm:text-xs">{step.label}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <main id="booking-flow" className="grid scroll-mt-6 lg:grid-cols-[0.82fr_1.18fr] gap-4 items-start">
-          <section className="ui-surface rounded-3xl p-5 md:p-6 lg:sticky lg:top-5">
-            <div className="flex items-center gap-2 text-gold-400 mb-3">
-              <CalendarCheck size={22} />
-              <span className="text-xs font-bold uppercase tracking-widest">Reserva em poucos passos</span>
-            </div>
-            <h2 className="font-display text-2xl font-bold mb-2">Reserve em poucos segundos</h2>
-            <p className="ui-owner-help text-sm leading-relaxed mb-5">Escolha profissional, servico, data e horario. Antes de confirmar, confira o resumo da reserva.</p>
-
-            <div className="grid xs:grid-cols-2 gap-3">
-              <div className="ui-owner-card rounded-xl p-4">
-                <Clock className="text-blue-300 mb-2" size={20} />
-                <p className="font-bold text-sm">{workdayLabel}</p>
-                <p className="ui-owner-help text-xs">{workdayDescription}</p>
-              </div>
-              <div className="ui-owner-card rounded-xl p-4">
-                <Scissors className="text-gold-400 mb-2" size={20} />
-                <p className="font-bold text-sm">{services.length} servicos</p>
-                <p className="ui-owner-help text-xs">Agenda por servico</p>
-              </div>
-            </div>
-
-            <div className="ui-owner-card mt-4 rounded-2xl p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="ui-owner-help text-xs font-bold uppercase tracking-widest">Sua reserva</p>
-                  <h3 className="font-display text-lg font-bold">Resumo rapido</h3>
-                </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-bold ${bookingSummary.ready ? 'ui-owner-status-success' : 'ui-owner-badge'}`}>
-                  {bookingSummary.ready ? 'Pronto' : 'Em andamento'}
-                </span>
-              </div>
-              <div className="space-y-2 text-sm">
-                <SummaryRow label="Barbeiro" value={bookingSummary.barberName} />
-                <SummaryRow label="Servico" value={bookingSummary.serviceName} />
-                <SummaryRow label="Valor" value={bookingSummary.serviceValue} />
-                <SummaryRow label="Duracao" value={bookingSummary.duration} />
-                <SummaryRow label="Horario" value={selectedDateTimeLabel} highlight={Boolean(selectedSlot)} />
-              </div>
-            </div>
-          </section>
+        <main id="booking-flow" className="grid scroll-mt-6 lg:grid-cols-[1.18fr_0.82fr] gap-4 items-start">
 
           <form onSubmit={handleSubmit} className="ui-surface rounded-3xl p-5 md:p-6 space-y-5">
             {!bookingReadiness.ready && (
               <div className="ui-owner-status-warning space-y-1 rounded-xl p-3 text-sm">
-                <p className="font-semibold text-foreground">Antes de agendar, esta barbearia precisa concluir a configuracao:</p>
+                <p className="font-semibold text-foreground">Antes de agendar, esta barbearia precisa concluir a configuração:</p>
                 {bookingReadiness.issues.map((issue) => <p key={issue}>{issue}</p>)}
               </div>
             )}
 
             {barberOptions.length === 0 && (
               <div className="ui-owner-status-error rounded-xl p-3 text-sm">
-                Esta barbearia ainda nao tem barbeiros ativos. O owner precisa cadastrar ou ativar um barbeiro no painel interno.
+                Esta barbearia ainda não tem barbeiros ativos. O owner precisa cadastrar ou ativar um barbeiro no painel interno.
               </div>
             )}
 
@@ -1140,7 +1060,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             <div className="space-y-3">
               <SectionTitle step="01" title="Profissional" description="Escolha quem vai te atender." />
               {barberOptions.length === 0 ? (
-                <EmptyState message="Nenhum barbeiro ativo nesta barbearia. Assim que a equipe for configurada, os profissionais aparecerao aqui." />
+                <EmptyState message="Nenhum barbeiro ativo nesta barbearia. Assim que a equipe for configurada, os profissionais aparecerão aqui." />
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {barberOptions.map((barber) => {
@@ -1168,9 +1088,9 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              <SectionTitle step="02" title="Servico" description="Confira valor e duracao." />
+              <SectionTitle step="02" title="Serviço" description="Confira valor e duração." />
               {services.length === 0 ? (
-                <EmptyState message="Nenhum servico ativo nesta barbearia. O agendamento publico sera liberado quando houver pelo menos um servico cadastrado." />
+                <EmptyState message="Nenhum serviço ativo nesta barbearia. O agendamento público será liberado quando houver pelo menos um serviço cadastrado." />
               ) : (
                 <div className="grid gap-3">
                   {services.map((service: Service) => {
@@ -1180,7 +1100,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                         key={service.id}
                         type="button"
                         aria-pressed={selected}
-                        aria-label={`${selected ? 'Servico selecionado' : 'Escolher servico'}: ${service.name}, ${formatCurrency(service.price)}, ${service.durationMinutes} minutos`}
+                        aria-label={`${selected ? 'Serviço selecionado' : 'Escolher serviço'}: ${service.name}, ${formatCurrency(service.price)}, ${service.durationMinutes} minutos`}
                         onClick={() => handleServiceChange(service.id)}
                         className={`rounded-2xl border p-3.5 text-left text-foreground transition-all ${selected ? 'ui-owner-card-solid' : 'ui-owner-card'}`}
                         style={selected ? selectedCardStyle : undefined}
@@ -1224,7 +1144,7 @@ const handleSubmit = async (event: React.FormEvent) => {
 </select>
               </div>
               <div>
-                <label className="ui-label mb-1.5 block">Servico</label>
+                <label className="ui-label mb-1.5 block">Serviço</label>
                 <select required
                   value={selectedService?.id || ''}
                   onChange={(e) => handleServiceChange(e.target.value)}
@@ -1237,7 +1157,8 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              <SectionTitle step="03" title="Horario" description="Escolha data e horario livre." />
+              <SectionTitle step="03" title="Horário" description="Escolha data e horário livre." />
+              <p className="text-xs text-muted-foreground">{workdayLabel} · {workdayDescription}</p>
               <div className="ui-owner-card rounded-2xl p-4" style={subtleAccentStyle}>
                 <label className="ui-label mb-1.5 block">Data</label>
                 <input type="date" required min={getTodayString(shouldUseLocalFallback ? undefined : barbershop?.operationalTimezone)} value={date} onChange={(e) => { setDate(e.target.value); setSelectedSlot(null); }} className="ui-input w-full" />
@@ -1245,7 +1166,7 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div>
-              <label className="ui-label mb-2 block">Horarios disponiveis</label>
+              <label className="ui-label mb-2 block">Horários disponíveis</label>
               {availabilityLoading ? <p role="status">Consultando horários...</p> : availabilityError ? <p role="alert" className="ui-owner-status-error">{availabilityError}</p> : availableSlots.length === 0 ? (
                 <p className="ui-owner-empty text-sm">
   {emptySlotsMessage} {emptySlotsNextStep}
@@ -1257,7 +1178,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                       key={slot.startAt}
                       type="button"
                       aria-pressed={selectedSlot?.startAt === slot.startAt}
-                      aria-label={`${selectedSlot?.startAt === slot.startAt ? 'Horario selecionado' : 'Escolher horario'}: ${slot.label}`}
+                      aria-label={`${selectedSlot?.startAt === slot.startAt ? 'Horário selecionado' : 'Escolher horário'}: ${slot.label}`}
                       onClick={() => setSelectedSlot(slot)}
                       style={selectedSlot?.startAt === slot.startAt ? selectedCardStyle : undefined}
                       className={`py-3.5 rounded-2xl border text-sm font-bold transition-all ${
@@ -1288,32 +1209,47 @@ const handleSubmit = async (event: React.FormEvent) => {
             </div>
 
             <div>
-              <label className="ui-label mb-1.5 block">Observacoes</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Opcional: detalhe alguma preferencia para o atendimento" className="ui-textarea w-full" />
+              <label className="ui-label mb-1.5 block">Observações</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Opcional: detalhe alguma preferência para o atendimento" className="ui-textarea w-full" />
             </div>
 
-            <div className="ui-owner-card rounded-2xl p-4">
+            {selectedSlot && <div className="ui-owner-card rounded-2xl p-4">
               <p className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">Confira sua reserva</p>
               <div className="grid gap-2 text-sm text-foreground sm:grid-cols-2">
                 <SummaryRow label="Barbearia" value={branding.shopName} />
                 <SummaryRow label="Barbeiro" value={bookingSummary.barberName} />
-                <SummaryRow label="Servico" value={bookingSummary.serviceName} />
+                <SummaryRow label="Serviço" value={bookingSummary.serviceName} />
                 <SummaryRow label="Data" value={bookingDateLabel} />
-                <SummaryRow label="Horario" value={bookingSummary.slotLabel} highlight={Boolean(selectedSlot)} />
-                <SummaryRow label="Duracao" value={bookingSummary.duration} />
+                <SummaryRow label="Horário" value={bookingSummary.slotLabel} highlight={Boolean(selectedSlot)} />
+                <SummaryRow label="Duração" value={bookingSummary.duration} />
                 <SummaryRow label="Valor" value={bookingSummary.serviceValue} highlight={Boolean(selectedService)} />
                 <SummaryRow label="Cliente" value={clientName.trim() || 'Informe seu nome'} />
                 <SummaryRow label="Status" value={isSubmitDisabled ? 'Faltam dados' : 'Pronto para reservar'} />
               </div>
               <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-                Revise os dados antes de confirmar. Esta etapa reserva o horario, mas nao confirma pagamento online.
+                Revise os dados antes de confirmar. Esta etapa reserva o horário, mas não confirma pagamento online.
               </p>
-            </div>
+            </div>}
 
             <button type="submit" disabled={isSubmitDisabled} style={primaryActionStyle} className="w-full disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-4 rounded-2xl shadow-lg">
-              {isSubmitting ? 'Confirmando...' : 'Reservar horario'}
+              {isSubmitting ? 'Confirmando...' : 'Reservar horário'}
             </button>
           </form>
+          <aside aria-label="Resumo da reserva" className="ui-surface rounded-3xl p-4 lg:sticky lg:top-5">
+            <h2 className="font-display text-lg font-bold mb-3">Sua reserva</h2>
+            {!selectedBarber && !selectedService && !selectedSlot && (
+              <p className="text-sm text-muted-foreground">Escolha profissional, serviço e horário para montar sua reserva.</p>
+            )}
+            <div className="space-y-2">
+              {selectedBarber && <SummaryRow label="Barbeiro" value={bookingSummary.barberName} />}
+              {selectedService && <>
+                <SummaryRow label="Serviço" value={bookingSummary.serviceName} />
+                <SummaryRow label="Valor" value={bookingSummary.serviceValue} />
+                <SummaryRow label="Duração" value={bookingSummary.duration} />
+              </>}
+              {selectedSlot && <SummaryRow label="Horário" value={selectedDateTimeLabel} highlight />}
+            </div>
+          </aside>
         </main>
       </div>
     </div>
