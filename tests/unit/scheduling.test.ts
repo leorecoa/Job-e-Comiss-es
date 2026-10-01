@@ -1063,8 +1063,7 @@ describe('barbershop repository local fallback', () => {
   it('maps Supabase branding fields to camelCase', async () => {
     vi.resetModules();
 
-    const maybeSingle = vi.fn().mockResolvedValue({
-      data: {
+    const publicShop = {
         id: 'barbershop-brand',
         name: 'Barbearia Premium',
         slug: 'barbearia-premium',
@@ -1079,14 +1078,12 @@ describe('barbershop repository local fallback', () => {
         secondary_color: '#eeeeee',
         business_hours: DEFAULT_BARBERSHOP_BUSINESS_HOURS,
         slot_step_minutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
+        operational_timezone: 'America/Recife',
         active: true
-      },
-      error: null
-    });
-    const eqActive = vi.fn(() => ({ maybeSingle }));
-    const eqSlug = vi.fn(() => ({ eq: eqActive }));
-    const select = vi.fn(() => ({ eq: eqSlug }));
-    const from = vi.fn(() => ({ select }));
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ barbershop: publicShop })));
+    vi.stubGlobal('fetch', fetchMock);
+    const from = vi.fn(() => { throw new Error('anon SELECT operational_timezone denied: 42501'); });
 
     vi.doMock('../../lib/supabase', () => ({
       isSupabaseConfigured: true,
@@ -1112,9 +1109,10 @@ describe('barbershop repository local fallback', () => {
       slotStepMinutes: DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES
     });
 
-    expect(from).toHaveBeenCalledWith('barbershops');
-    expect(select).toHaveBeenCalledWith('id,name,slug,phone,address,logo_url,cover_image_url,description,instagram_url,whatsapp,primary_color,secondary_color,business_hours,slot_step_minutes,active,operational_timezone');
+    expect(from).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith('/api/public-booking/barbershop?slug=barbearia-premium', expect.objectContaining({ method: 'GET' }));
 
+    vi.unstubAllGlobals();
     vi.doUnmock('../../lib/supabase');
   });
 

@@ -215,7 +215,7 @@ export const OwnerSetupChecklist: React.FC<OwnerSetupChecklistProps> = ({
     }
 
     try {
-      await navigator.clipboard.writeText(checklist.publicBookingPath);
+      await navigator.clipboard.writeText(new URL(checklist.publicBookingPath, window.location.origin).href);
       setCopyFeedback('Link copiado.');
     } catch {
       setCopyFeedback('Não foi possível copiar o link.');

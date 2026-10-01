@@ -25,7 +25,7 @@ const publicErrorCodes = [
   'PUBLIC_APPOINTMENT_SLOT_CONFLICT'
 ] as const;
 
-const getServerCredentials = (): { url: string; key: string } | null => {
+export const getServerCredentials = (): { url: string; key: string } | null => {
   const url = process.env.SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   return url && key ? { url: url.replace(/\/$/, ''), key } : null;
