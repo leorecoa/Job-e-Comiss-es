@@ -655,6 +655,61 @@ const openOwnerManagement = async (page: Page) => {
     .click();
 };
 
+test('owner adds and replaces a barber photo with persistence after refresh', async ({ page }) => {
+  await installOwnerSupabaseMocks(page);
+  let path: string | null = null;
+  const uploaded: string[] = [];
+  const removed: string[] = [];
+  const row = () => ({ id: OWNER_BARBER_ID, name: 'Leo Barber', active: true, barbershop_id: OWNER_BARBERSHOP_ID, photo_path: path });
+  await page.route('**/rest/v1/barbers?*', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'PATCH') {
+      expect(url.searchParams.get('id')).toBe(`eq.${OWNER_BARBER_ID}`);
+      expect(url.searchParams.get('barbershop_id')).toBe(`eq.${OWNER_BARBERSHOP_ID}`);
+      expect(url.searchParams.get('photo_path')).toBe(path ? `eq.${path}` : 'is.null');
+      const body = request.postDataJSON();
+      expect(Object.keys(body)).toEqual(['photo_path']);
+      expect(uploaded).toContain(body.photo_path);
+      path = body.photo_path;
+    }
+    const single = request.headers().accept?.includes('vnd.pgrst.object');
+    await fulfillJson(route, 200, single ? row() : [row()]);
+  });
+  await page.route('**/storage/v1/object/**', async route => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 200, headers: CORS_HEADERS });
+    if (request.method() === 'GET') return route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII=', 'base64'), headers: CORS_HEADERS });
+    if (request.method() === 'DELETE') {
+      const paths = request.postDataJSON().prefixes as string[];
+      expect(paths).not.toContain(path);
+      removed.push(...paths);
+      return fulfillJson(route, 200, []);
+    }
+    expect(request.method()).toBe('POST');
+    const objectPath = new URL(request.url()).pathname.split('/barbershop-branding/')[1];
+    expect(objectPath).toMatch(new RegExp(`^${OWNER_BARBERSHOP_ID}/barbers/${OWNER_BARBER_ID}/[a-f0-9-]+\\.png$`));
+    uploaded.push(objectPath);
+    await fulfillJson(route, 200, { Key: `barbershop-branding/${objectPath}` });
+  });
+  await signInAsOwner(page, '/#management-catalog');
+  const input = page.locator(`#barber-photo-${OWNER_BARBER_ID}`);
+  await expect(input).toBeVisible();
+  const fixture = { name: 'photo.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII=', 'base64') };
+  await input.setInputFiles(fixture);
+  await expect(page.getByText('Foto salva.', { exact: true })).toBeVisible();
+  const first = path;
+  await page.reload();
+  await expect(page.getByRole('img', { name: 'Foto de Leo Barber' })).toHaveAttribute('src', `${SUPABASE_URL}/storage/v1/object/public/barbershop-branding/${first}`);
+  await input.setInputFiles(fixture);
+  await expect(page.getByText('Foto salva.', { exact: true })).toBeVisible();
+  expect(path).not.toBe(first);
+  expect(removed).toEqual([first]);
+  await page.reload();
+  await expect(page.getByRole('img', { name: 'Foto de Leo Barber' })).toHaveAttribute('src', `${SUPABASE_URL}/storage/v1/object/public/barbershop-branding/${path}`);
+  expect(uploaded).toHaveLength(2);
+});
+
 test.describe('owner team invitations', () => {
   const invitationId = 'eeee0033-0000-4000-8000-000000000201';
   const secondBarber = 'eeee0033-0000-4000-8000-000000000011';

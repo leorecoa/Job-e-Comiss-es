@@ -59,7 +59,7 @@ describe('owner catalog management', () => {
 
     const barbers = await listBarbers(OWNER_BARBERSHOP_UUID, { includeInactive: true });
 
-    expect(select).toHaveBeenCalledWith('id,name,barbershop_id,active');
+    expect(select).toHaveBeenCalledWith('id,name,barbershop_id,active,photo_path');
     expect(query.eq).toHaveBeenCalledTimes(1);
     expect(query.eq).toHaveBeenCalledWith('barbershop_id', OWNER_BARBERSHOP_UUID);
     expect(barbers).toEqual([

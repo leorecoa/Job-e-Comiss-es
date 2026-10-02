@@ -4,6 +4,7 @@ import { Appointment, AppSettings, BarberOption, Barbershop, Service, UserProfil
 import { getBarbershopBySlug } from '../services/barbershopRepository';
 import { listPublicAvailability } from '../services/appointmentRepository';
 import { shouldUseLocalFallback } from '../lib/supabase';
+import { BarberPhoto } from './BarberPhoto';
 import {
   DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES,
   createPublicAppointment,
@@ -35,6 +36,7 @@ export type PublicBarberOption = {
   name: string;
   barbershopId?: string;
   active?: boolean;
+  photoPath?: string | null;
 };
 
 const getTodayString = (timeZone?: string | null): string => {
@@ -130,6 +132,7 @@ export const normalizePublicBarberOptions = (
       value: `id:${id}`,
       id,
       name,
+      photoPath: barber.photoPath,
       barbershopId: barber.barbershopId,
       active: barber.active !== false
     });
@@ -1075,9 +1078,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                         className={`rounded-2xl border p-3.5 text-left text-foreground transition-all ${selected ? 'ui-owner-card-solid' : 'ui-owner-card'}`}
                         style={selected ? selectedCardStyle : undefined}
                       >
-                        <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-surface-muted text-gold-700">
-                          <Scissors size={20} />
-                        </span>
+                        <span className="mb-3 block"><BarberPhoto barber={barber} /></span>
                         <span className="block font-bold">{barber.name}</span>
                         <span className="mt-1 block text-xs text-muted-foreground">{selected ? 'Selecionado' : 'Toque para escolher'}</span>
                       </button>

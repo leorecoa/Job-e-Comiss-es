@@ -39,6 +39,7 @@ type MockBarber = {
   name: string;
   barbershop_id: string;
   active: boolean;
+  photo_path?: string | null;
 };
 
 type MockService = {
@@ -376,6 +377,32 @@ const fillValidPublicBookingForm = async (page: Page) => {
 };
 
 test.describe('public booking /book/:slug', () => {
+  test('barber photos follow IDs for namesakes with missing and broken image fallbacks', async ({ page }) => {
+    const firstPath = `${LEO_BARBERSHOP_ID}/barbers/${LEO_BARBER_ID}/one.png`;
+    const secondPath = `${LEO_BARBERSHOP_ID}/barbers/${OTHER_BARBER_ID}/two.jpg`;
+    await installSupabaseMocks(page, { barbers: [
+      { id: LEO_BARBER_ID, name: 'Mesmo nome', barbershop_id: LEO_BARBERSHOP_ID, active: true, photo_path: firstPath },
+      { id: OTHER_BARBER_ID, name: 'Mesmo nome', barbershop_id: LEO_BARBERSHOP_ID, active: true, photo_path: secondPath },
+      { id: '44ff8c5c-3a89-4ef0-98c1-d345c613fa00', name: 'Sem foto', barbershop_id: LEO_BARBERSHOP_ID, active: true, photo_path: null }
+    ] });
+    await page.route('**/storage/v1/object/public/**', route => route.fulfill({
+      contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII=', 'base64')
+    }));
+    await page.goto('/book/leo-do-leo');
+    const photos = page.getByRole('img', { name: 'Foto de Mesmo nome' });
+    await expect(photos).toHaveCount(2);
+    await expect(photos.nth(0)).toHaveAttribute('src', `${SUPABASE_URL}/storage/v1/object/public/barbershop-branding/${firstPath}`);
+    await expect(photos.nth(1)).toHaveAttribute('src', `${SUPABASE_URL}/storage/v1/object/public/barbershop-branding/${secondPath}`);
+    const secondCard = page.getByRole('button', { name: 'Escolher barbeiro: Mesmo nome', exact: true });
+    await secondCard.click();
+    await expect(page.getByRole('button', { name: 'Barbeiro selecionado: Mesmo nome' }).locator('img')).toHaveAttribute('src', new RegExp(`${OTHER_BARBER_ID}/two.jpg$`));
+    await expect(page.getByLabel('Foto indisponível: Sem foto')).toBeVisible();
+    await page.route(`**/storage/v1/object/public/**/${OTHER_BARBER_ID}/two.jpg`, route => route.abort());
+    await page.reload();
+    await expect(page.getByLabel('Foto indisponível: Mesmo nome')).toBeVisible();
+    await expect(page.getByRole('img', { name: 'Foto de Mesmo nome' })).toHaveCount(1);
+  });
+
   test('keeps the banner clear and the mobile summary progressive', async ({ page }, testInfo) => {
     await installSupabaseMocks(page, { barbershops: [{ ...leoBarbershop, cover_image_url: '/brand-mark.svg', logo_url: '/brand-mark.svg' }] });
     await page.emulateMedia({ reducedMotion: 'reduce' });

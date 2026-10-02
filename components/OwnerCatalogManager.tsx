@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Package, Plus, RotateCcw, Save, Scissors, Trash2 } from 'lucide-react';
 import { BarberOption, Service } from '../types';
+import { BarberPhoto } from './BarberPhoto';
+import { validateBarberPhoto } from '../services/barberPhoto';
 
 type OwnerCatalogManagerProps = {
   barbers: BarberOption[];
@@ -10,6 +12,7 @@ type OwnerCatalogManagerProps = {
   onCreateBarber: (name: string) => Promise<void> | void;
   onUpdateBarber: (barberId: string, patch: { name?: string; active?: boolean }) => Promise<void> | void;
   onRemoveBarber: (barberId: string) => Promise<void> | void;
+  onUploadBarberPhoto?: (barberId: string, file: File) => Promise<void>;
   onCreateService: (input: { name: string; price: number; durationMinutes: number; commissionRate?: number }) => Promise<void> | void;
   onUpdateService: (serviceId: string, patch: { name?: string; price?: number; durationMinutes?: number; commissionRate?: number; active?: boolean }) => Promise<void> | void;
   onRemoveService: (serviceId: string) => Promise<void> | void;
@@ -31,6 +34,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
   onCreateBarber,
   onUpdateBarber,
   onRemoveBarber,
+  onUploadBarberPhoto,
   onCreateService,
   onUpdateService,
   onRemoveService
@@ -159,6 +163,7 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
               ) : (
                 barbers.map((barber) => (
                   <div key={barber.id} className="ui-owner-record-card">
+                    <BarberPhotoControl barber={barber} onUpload={onUploadBarberPhoto} />
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                       <input
                         value={barberDrafts[barber.id] || ''}
@@ -412,6 +417,45 @@ export const OwnerCatalogManager: React.FC<OwnerCatalogManagerProps> = ({
         </div>
       )}
     </section>
+  );
+};
+
+const BarberPhotoControl: React.FC<{
+  barber: BarberOption;
+  onUpload?: (barberId: string, file: File) => Promise<void>;
+}> = ({ barber, onUpload }) => {
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState('');
+  const uploading = React.useRef(false);
+  return (
+    <div className="mb-3 space-y-2">
+      <BarberPhoto barber={barber} />
+      <label className="block text-sm font-bold text-foreground" htmlFor={`barber-photo-${barber.id}`}>
+        {barber.photoPath ? 'Alterar foto' : 'Adicionar foto'} de {barber.name}
+      </label>
+      <input id={`barber-photo-${barber.id}`} type="file" accept="image/png,image/jpeg,image/webp"
+        className="ui-input min-h-11 w-full" disabled={!onUpload || pending}
+        onChange={async (event) => {
+          const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = '';
+          if (!file || !onUpload || uploading.current) return;
+          uploading.current = true;
+          setPending(true);
+          setMessage('');
+          try {
+            validateBarberPhoto(file);
+            await onUpload(barber.id, file);
+            setMessage('Foto salva.');
+          } catch (error) {
+            setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a foto. Tente novamente.');
+          } finally {
+            uploading.current = false;
+            setPending(false);
+          }
+        }} />
+      <p className="ui-owner-help text-sm">{onUpload ? 'PNG, JPEG ou WebP, até 5 MB.' : 'Fotos disponíveis somente no modo conectado.'}</p>
+      <p role="status" aria-live="polite" className="text-sm text-foreground">{pending ? 'Salvando foto...' : message}</p>
+    </div>
   );
 };
 
