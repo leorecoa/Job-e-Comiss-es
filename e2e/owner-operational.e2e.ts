@@ -1504,6 +1504,14 @@ test.describe('owner operational dashboard e2e', () => {
     await expect(page.getByText(/Booking pronto para receber agendamentos\./i)).toBeVisible();
     await expect(page.getByText('/book/leo-do-leo')).toBeVisible();
     await expect(page.getByRole('link', { name: /Abrir link/i })).toHaveAttribute('href', '/book/leo-do-leo');
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+        writeText: async (text: string) => { (window as Window & { copiedBookingLink?: string }).copiedBookingLink = text; }
+      } });
+    });
+    await page.getByRole('button', { name: 'Copiar link', exact: true }).click();
+    expect(await page.evaluate(() => (window as Window & { copiedBookingLink?: string }).copiedBookingLink))
+      .toBe(`${new URL(page.url()).origin}/book/leo-do-leo`);
 
     await expect(page.getByRole('heading', { name: /Catálogo operacional/i })).toBeVisible();
     await expect(page.locator('input[value="Leo Barber"]').first()).toBeVisible();

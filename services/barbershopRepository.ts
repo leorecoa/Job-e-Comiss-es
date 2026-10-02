@@ -163,12 +163,12 @@ const BRANDING_WITH_HOURS_SELECT = 'id,name,slug,phone,address,logo_url,cover_im
 const BASIC_SELECT = 'id,name,slug,phone,address,active';
 const INTERNAL_BRANDING_SELECT = `${BRANDING_WITH_HOURS_SELECT},financial_timezone,operational_timezone`;
 
-const getActiveBarbershopBy = async (column: 'id' | 'slug', value: string): Promise<Barbershop | null> => {
+const getActiveBarbershopBy = async (column: 'id', value: string): Promise<Barbershop | null> => {
   if (!supabase) return null;
 
   const { data, error } = await supabase
     .from('barbershops')
-    .select(column === 'id' ? INTERNAL_BRANDING_SELECT : `${BRANDING_WITH_HOURS_SELECT},operational_timezone`)
+    .select(INTERNAL_BRANDING_SELECT)
     .eq(column, value)
     .eq('active', true)
     .maybeSingle<DatabaseBarbershopBrandingRow>();
@@ -198,7 +198,17 @@ export const getBarbershopBySlug = async (slug: string): Promise<Barbershop | nu
   }
   assertOperationalSupabase();
 
-  return getActiveBarbershopBy('slug', slug);
+  const scopedSlug = slug.trim().toLowerCase();
+  const response = await fetch(`/api/public-booking/barbershop?slug=${encodeURIComponent(scopedSlug)}`, {
+    method: 'GET', headers: { accept: 'application/json' }
+  });
+  const body = await response.json().catch(() => null) as { barbershop?: DatabaseBarbershopBrandingRow | null } | null;
+  if (!response.ok || !body || !('barbershop' in body)) throw new Error('PUBLIC_BOOKING_UNAVAILABLE');
+  if (body.barbershop === null) return null;
+  const row = body.barbershop;
+  if (!row || row.slug !== scopedSlug || row.active !== true || typeof row.id !== 'string' || typeof row.name !== 'string'
+    || !(row.operational_timezone === null || typeof row.operational_timezone === 'string')) throw new Error('PUBLIC_BOOKING_UNAVAILABLE');
+  return mapBarbershopRow(row);
 };
 
 export const getBarbershopOperationalTimezone = async (id: string): Promise<string | null> => {

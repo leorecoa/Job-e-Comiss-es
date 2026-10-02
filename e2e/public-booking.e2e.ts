@@ -186,6 +186,8 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
   };
 
   const barbersRequests: string[] = [];
+  const brandingRequests: string[] = [];
+  const directBrandingRequests: string[] = [];
   const servicesRequests: string[] = [];
   const directServicesRequests: string[] = [];
   const slotRequests: CapturedRequest[] = [];
@@ -195,6 +197,13 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
   await page.route('**/api/public-booking/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
+
+    if (url.pathname === '/api/public-booking/barbershop') {
+      brandingRequests.push(request.url());
+      const barbershop = state.barbershops.find((shop) => shop.slug === url.searchParams.get('slug') && shop.active) || null;
+      await fulfillJson(route, 200, { barbershop });
+      return;
+    }
 
     if (url.pathname === '/api/public-booking/availability') {
       slotRequests.push({ method: request.method(), url: request.url(), body: null });
@@ -248,6 +257,11 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
     }
 
     if (url.pathname === '/rest/v1/barbershops') {
+      directBrandingRequests.push(request.url());
+      if (url.searchParams.get('select')?.split(',').includes('operational_timezone')) {
+        await fulfillJson(route, 401, { code: '42501', message: 'permission denied for table barbershops' });
+        return;
+      }
       const slug = toEqValue(url.searchParams.get('slug'));
       const id = toEqValue(url.searchParams.get('id'));
       const active = toEqValue(url.searchParams.get('active'));
@@ -336,6 +350,8 @@ const installSupabaseMocks = async (page: Page, scenario: MockScenario = {}) => 
   });
 
   return {
+    brandingRequests,
+    directBrandingRequests,
     barbersRequests,
     servicesRequests,
     directServicesRequests,
@@ -488,10 +504,23 @@ test.describe('public booking /book/:slug', () => {
     expect(network.barbersRequests.some((url) => url.includes('active=eq.true'))).toBeTruthy();
     expect(network.servicesRequests.some((url) => url.includes('/api/public-booking/catalog?slug=leo-do-leo'))).toBeTruthy();
     expect(network.directServicesRequests).toHaveLength(0);
+    expect(network.brandingRequests.length).toBeGreaterThanOrEqual(2);
+    expect(network.brandingRequests.every(url => new URL(url).searchParams.get('slug') === 'leo-do-leo')).toBe(true);
+    expect(network.directBrandingRequests).toHaveLength(0);
     expect(network.slotRequests.some((request) => (
       request.method === 'GET'
       && request.url.includes('/api/public-booking/availability?slug=leo-do-leo')
     ))).toBeTruthy();
+    expect(network.appointmentReadRequests).toHaveLength(0);
+  });
+
+  test('branding proxy failure stays unavailable without direct SELECT or tenant fallback', async ({ page }) => {
+    const network = await installSupabaseMocks(page);
+    await page.route('**/api/public-booking/barbershop?**', route => fulfillJson(route, 503, { code: 'PUBLIC_BOOKING_UNAVAILABLE' }));
+    await page.goto('/book/leo-do-leo');
+    await expect(page.getByText('Link indisponível', { exact: true })).toBeVisible();
+    expect(network.directBrandingRequests).toHaveLength(0);
+    expect(network.servicesRequests).toHaveLength(0);
     expect(network.appointmentReadRequests).toHaveLength(0);
   });
 

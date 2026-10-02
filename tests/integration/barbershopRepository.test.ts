@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const supabaseMock = vi.hoisted(() => ({
   localFallback: false,
@@ -26,8 +26,10 @@ import {
   normalizeBarbershopSlug
 } from '../../services/barbershopRepository';
 import { DEFAULT_BARBERSHOP_BUSINESS_HOURS, DEFAULT_BARBERSHOP_SLOT_STEP_MINUTES } from '../../scheduling';
+import { GET as getPublicBarbershop } from '../../api/public-booking/barbershop';
 
 describe('barbershop onboarding repository', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
   beforeEach(() => {
     vi.clearAllMocks();
     supabaseMock.localFallback = false;
@@ -114,9 +116,14 @@ describe('barbershop onboarding repository', () => {
     supabaseMock.from.mockReturnValue(query);
     expect((await getBarbershopById('shop-1'))?.operationalTimezone).toBe(operationalTimezone);
     expect(query.select).toHaveBeenLastCalledWith(expect.stringContaining('operational_timezone'));
-    await getBarbershopBySlug('shop');
-    expect(query.select).toHaveBeenLastCalledWith(expect.stringContaining('operational_timezone'));
-    expect(query.select).toHaveBeenLastCalledWith(expect.not.stringContaining('financial_timezone'));
+    supabaseMock.from.mockClear();
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ barbershop: {
+      id: 'shop-1', name: 'Shop', slug: 'shop', active: true, operational_timezone: operationalTimezone
+    } })));
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await getBarbershopBySlug('shop'))?.operationalTimezone).toBe(operationalTimezone);
+    expect(fetchMock).toHaveBeenCalledWith('/api/public-booking/barbershop?slug=shop', expect.objectContaining({ method: 'GET' }));
+    expect(supabaseMock.from).not.toHaveBeenCalled();
     expect(supabaseMock.rpc).not.toHaveBeenCalled();
   });
 
@@ -159,9 +166,55 @@ describe('barbershop onboarding repository', () => {
     supabaseMock.from.mockReturnValue(query);
     expect((await getBarbershopById('shop-1'))?.financialTimezone).toBe(financialTimezone);
     expect(query.select).toHaveBeenLastCalledWith(expect.stringContaining('financial_timezone'));
-    await getBarbershopBySlug('shop');
-    expect(query.select).toHaveBeenLastCalledWith(expect.not.stringContaining('financial_timezone'));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ barbershop: {
+      id: 'shop-1', name: 'Shop', slug: 'shop', active: true, operational_timezone: null
+    } }))));
+    expect((await getBarbershopBySlug('shop'))?.financialTimezone).toBeNull();
     expect(supabaseMock.rpc).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on public HTTP/network/malformed responses without direct SELECT or local fallback', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('{"code":"42501","message":"private SQL"}', { status: 401 }))
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce(new Response('{}'))
+      .mockResolvedValueOnce(new Response('not-json'))
+      .mockResolvedValueOnce(new Response('{"barbershop":null}'));
+    vi.stubGlobal('fetch', fetchMock);
+    for (let i = 0; i < 4; i++) await expect(getBarbershopBySlug('shop')).rejects.toThrow();
+    expect(await getBarbershopBySlug('shop')).toBeNull();
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
+  });
+
+  it('loads through the real proxy handler when anonymous timezone SELECT is denied', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://supabase.example.test');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-server-only');
+    const directRead = vi.fn(() => { throw { code: '42501', message: 'permission denied' }; });
+    supabaseMock.from.mockImplementation(directRead);
+    const fetchMock = vi.fn(async (url: string, options: RequestInit) => {
+      if (url.startsWith('/api/public-booking/barbershop?')) {
+        expect(options.headers).toEqual({ accept: 'application/json' });
+        return getPublicBarbershop({ url, method: 'GET' } as Request);
+      }
+      const query = new URL(url);
+      expect(query.searchParams.get('slug')).toBe('eq.shop');
+      expect(query.searchParams.get('active')).toBe('eq.true');
+      if ((options.headers as Record<string, string>).authorization !== 'Bearer test-server-only') {
+        return new Response('{"code":"42501"}', { status: 401 });
+      }
+      return new Response(JSON.stringify([{
+        id: 'shop-1', name: 'Shop', slug: 'shop', active: true,
+        operational_timezone: 'America/Recife', financial_timezone: 'not-public'
+      }]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await getBarbershopBySlug('shop')).toMatchObject({
+      id: 'shop-1', operationalTimezone: 'America/Recife', financialTimezone: null
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(directRead).not.toHaveBeenCalled();
+    supabaseMock.from.mockReset();
   });
 
   it('maps an unauthenticated RPC response to a friendly error', async () => {
