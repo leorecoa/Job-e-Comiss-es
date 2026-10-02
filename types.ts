@@ -15,6 +15,7 @@ export enum ClientType {
 export type BarberOption = {
   id: string;
   name: string;
+  photoPath?: string | null;
   barbershopId?: string; // Added for multi-tenancy
   active?: boolean;
 };

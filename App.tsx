@@ -32,7 +32,7 @@ import { isProductionWithoutSupabase, isSupabaseConfigured, PRODUCTION_SUPABASE_
 import { createAppointment as createAppointmentRecord, createBarberAppointment, createPublicAppointment, listInternalAppointments, OWNER_CREATE_UNCONFIRMED_MESSAGE, updateAppointment as updateAppointmentRecord } from './services/appointmentRepository';
 import { completeAppointmentWithFinancialRecord, listFinancialRecords, mapFinancialRecordToClient } from './services/financialRecordRepository';
 import { canDeleteClientHistory, getClientHistoryEditLabel, resolveClientEditTarget } from './clientEditing';
-import { createBarber, listBarbers, removeBarber, updateBarber } from './services/barberRepository';
+import { createBarber, listBarbers, removeBarber, updateBarber, uploadBarberPhoto } from './services/barberRepository';
 import { createService, listPublicServices, listServices, removeService, updateService } from './services/serviceRepository';
 import { AppRole, AuthSession, canAccessInternalPanel, getCurrentAuthSession, signInWithPassword, signOut as signOutAuth, signUpWithPassword } from './services/authRepository';
 import { 
@@ -1130,6 +1130,14 @@ const App: React.FC<{ initialAuthSession?: AuthSession }> = ({ initialAuthSessio
     }
   };
 
+  const handleUploadOwnerBarberPhoto = async (barberId: string, file: File) => {
+    const barbershopId = getOwnerCatalogBarbershopId();
+    if (!barbershopId) throw new Error('Barbearia não encontrada para atualizar a foto.');
+    const updated = await uploadBarberPhoto(barberId, barbershopId, file);
+    setOwnerCatalogBarbers(current => current.map(barber => barber.id === updated.id ? updated : barber));
+    setSettings(current => ({ ...current, barbers: current.barbers.map(barber => barber.id === updated.id ? updated : barber) }));
+  };
+
   const handleRemoveOwnerBarber = async (barberId: string) => {
     const barbershopId = getOwnerCatalogBarbershopId();
 
@@ -1971,6 +1979,7 @@ const App: React.FC<{ initialAuthSession?: AuthSession }> = ({ initialAuthSessio
                   onCreateBarber={handleCreateOwnerBarber}
                   onUpdateBarber={handleUpdateOwnerBarber}
                   onRemoveBarber={handleRemoveOwnerBarber}
+                  onUploadBarberPhoto={shouldUseLocalFallback ? undefined : handleUploadOwnerBarberPhoto}
                   onCreateService={handleCreateOwnerService}
                   onUpdateService={handleUpdateOwnerService}
                   onRemoveService={handleRemoveOwnerService}

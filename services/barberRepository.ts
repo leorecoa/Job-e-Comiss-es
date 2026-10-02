@@ -2,6 +2,7 @@ import { assertOperationalSupabase, shouldUseLocalFallback, supabase } from '../
 import { BarberOption } from '../types';
 import { generateId, isUuid } from '../utils';
 import { countAppointmentsForBarber } from './appointmentRepository';
+import { BARBER_PHOTO_BUCKET, isBarberPhotoPath, validateBarberPhoto } from './barberPhoto';
 
 // This key is for local storage fallback when Supabase is not configured
 const SETTINGS_STORAGE_KEY = 'barbearia_settings';
@@ -11,6 +12,7 @@ type DatabaseBarberRow = {
   name: string;
   barbershop_id: string | null;
   active: boolean; // Assuming active is always present in DB
+  photo_path: string | null;
 };
 
 export type ListBarbersOptions = {
@@ -85,7 +87,7 @@ export const listBarbers = async (barbershopId?: string, options?: ListBarbersOp
 
   let query = supabase
     .from('barbers')
-    .select('id,name,barbershop_id,active');
+    .select('id,name,barbershop_id,active,photo_path');
   
   if (barbershopId) {
     query = query.eq('barbershop_id', barbershopId);
@@ -103,6 +105,7 @@ export const listBarbers = async (barbershopId?: string, options?: ListBarbersOp
   return (data || []).map(row => ({
     id: row.id,
     name: row.name,
+    photoPath: row.photo_path,
     barbershopId: row.barbershop_id || undefined,
     active: row.active
   }));
@@ -143,7 +146,7 @@ export const createBarber = async ({ name, barbershopId, active = true }: Create
       barbershop_id: barbershopId,
       active
     })
-    .select('id,name,barbershop_id,active')
+    .select('id,name,barbershop_id,active,photo_path')
     .single()
     .returns<DatabaseBarberRow>(); // Explicitly cast to ensure type safety
   
@@ -151,6 +154,7 @@ export const createBarber = async ({ name, barbershopId, active = true }: Create
   return {
     id: data.id,
     name: data.name,
+    photoPath: data.photo_path,
     barbershopId: data.barbershop_id || undefined,
     active: data.active
   };
@@ -206,7 +210,7 @@ export const updateBarber = async (
   }
 
   const { data, error } = await query
-    .select('id,name,barbershop_id,active')
+    .select('id,name,barbershop_id,active,photo_path')
     .single<DatabaseBarberRow>();
 
   if (error) throw error;
@@ -214,9 +218,48 @@ export const updateBarber = async (
   return {
     id: data.id,
     name: data.name,
+    photoPath: data.photo_path,
     barbershopId: data.barbershop_id || undefined,
     active: data.active
   };
+};
+
+export const uploadBarberPhoto = async (barberId: string, barbershopId: string, file: File): Promise<BarberOption> => {
+  if (shouldUseLocalFallback || !supabase) throw new Error('Fotos estão disponíveis somente no modo conectado.');
+  assertOperationalSupabase();
+  if (!isUuid(barberId) || !isUuid(barbershopId)) throw new Error('Barbeiro ou barbearia inválidos.');
+  const extension = validateBarberPhoto(file);
+  const readCurrent = () => supabase.from('barbers').select('photo_path')
+    .eq('id', barberId).eq('barbershop_id', barbershopId).single<{ photo_path: string | null }>();
+  const previous = await readCurrent();
+  if (previous.error || !previous.data) throw new Error('Não foi possível carregar a foto atual.');
+  const oldPath = previous.data.photo_path;
+  const path = `${barbershopId}/barbers/${barberId}/${crypto.randomUUID()}.${extension}`;
+  const bucket = supabase.storage.from(BARBER_PHOTO_BUCKET);
+  const cleanup = async (candidate: string) => {
+    if (!isBarberPhotoPath(candidate, barbershopId, barberId)) return;
+    try {
+      // A lost response is not proof of rollback. Never delete a current photo.
+      const current = await readCurrent();
+      if (!current.error && current.data && current.data.photo_path !== candidate) await bucket.remove([candidate]);
+    } catch { /* Best effort: an orphan is safer than deleting a live photo. */ }
+  };
+  try {
+    const uploaded = await bucket.upload(path, file, { upsert: false, contentType: file.type, cacheControl: '3600' });
+    if (uploaded.error) throw uploaded.error;
+    let update = supabase.from('barbers').update({ photo_path: path })
+      .eq('id', barberId).eq('barbershop_id', barbershopId);
+    // Do not overwrite a photo changed by another owner tab during the upload.
+    update = oldPath === null ? update.is('photo_path', null) : update.eq('photo_path', oldPath);
+    const saved = await update.select('id,name,barbershop_id,active,photo_path').single<DatabaseBarberRow>();
+    if (saved.error || !saved.data) throw new Error('Photo update failed');
+    if (oldPath) await cleanup(oldPath);
+    return { id: saved.data.id, name: saved.data.name, active: saved.data.active,
+      barbershopId: saved.data.barbershop_id || undefined, photoPath: saved.data.photo_path };
+  } catch {
+    await cleanup(path);
+    throw new Error('Não foi possível salvar a foto. Atualize a página e tente novamente.');
+  }
 };
 
 export const removeBarber = async (

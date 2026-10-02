@@ -113,7 +113,7 @@ describe('public booking tenant isolation repositories', () => {
     const barbers = await listBarbers('shop-leo');
 
     expect(supabaseMock.from).toHaveBeenCalledWith('barbers');
-    expect(select).toHaveBeenCalledWith('id,name,barbershop_id,active');
+    expect(select).toHaveBeenCalledWith('id,name,barbershop_id,active,photo_path');
     expect(query.eq).toHaveBeenNthCalledWith(1, 'barbershop_id', 'shop-leo');
     expect(query.eq).toHaveBeenNthCalledWith(2, 'active', true);
     expect(barbers).toEqual([
