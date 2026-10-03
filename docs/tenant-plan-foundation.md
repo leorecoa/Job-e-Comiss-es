@@ -51,3 +51,37 @@ Absence must not accidentally become an access-denial rule on that cutover.
 
 No payment provider identifiers, amounts, invoices, webhooks, pricing UI, schedule
 changes or financial-record changes belong to this foundation.
+
+## Read-only commercial resolver (037)
+
+`public.get_tenant_commercial_state()` has zero arguments. Only an authenticated
+user with an active owner profile and an existing linked tenant may read it.
+Identity comes from `auth.uid()` and tenant from that profile, never from browser
+selectors, metadata, `UserProfile.planType` / `isPro`, or localStorage.
+
+The STABLE SECURITY DEFINER function uses `search_path = pg_catalog` and qualified
+references. EXECUTE is granted only to authenticated; PUBLIC, anon and service_role
+cannot execute it. Both commercial tables remain closed to direct CRUD, with no
+new table/column grants or policies. RPC access confers no writing authority.
+
+An authorized call returns exactly one row: `status`, `plan_code`,
+`trial_started_at`, `trial_ends_at`, `current_period_start`, `current_period_end`.
+The period fields alias `current_period_started_at` / `current_period_ends_at`;
+the persisted columns are unchanged. Instants remain timestamptz, without calendar
+or timezone conversion. No administrative metadata is returned.
+
+Only a missing subscription after successful authorization returns `unassigned`
+with all other fields NULL. This means neither blocked, free, trial nor active.
+Missing identity/profile/tenant, an inactive owner or another role raises
+`TENANT_COMMERCIAL_STATE_FORBIDDEN` (P0001), not unassigned. Query errors propagate;
+they are not converted into a commercial state.
+
+Persisted pending/trialing/active/paused/canceled states are returned literally,
+including trialing with a past trial end. No expiry calculation, plan seed,
+subscription creation, writer, billing, trigger or enforcement is introduced.
+The RPC is not wired into Auth, onboarding, agenda, booking or frontend guards;
+its failure cannot become an operational access decision in this PR.
+
+Review 037 and run `supabase/tests/tenant_commercial_state_test.sql` locally before
+manual rollout. Never repair/reset/reapply old migrations to accommodate an old
+local container. No operational behavior or legacy frontend state is changed.
