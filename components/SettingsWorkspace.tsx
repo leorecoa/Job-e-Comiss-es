@@ -8,6 +8,7 @@ type SettingsWorkspaceProps = {
   readiness: React.ReactNode;
   team: React.ReactNode;
   catalog: React.ReactNode;
+  commercialStateContent?: React.ReactNode;
   activeSection: ManagementSectionHash;
   onNavigate: (section: ManagementSectionHash) => void;
 };
@@ -24,6 +25,7 @@ export const SettingsWorkspace: React.FC<SettingsWorkspaceProps> = ({
   readiness,
   team,
   catalog,
+  commercialStateContent,
   activeSection,
   onNavigate
 }) => {
@@ -60,6 +62,7 @@ export const SettingsWorkspace: React.FC<SettingsWorkspaceProps> = ({
     </Surface>
 
     <div className="ui-settings-content">
+      {commercialStateContent && <div className="ui-settings-group">{commercialStateContent}</div>}
       <div id="management-public-presence" className="ui-settings-group" tabIndex={-1}>{publicPresence}</div>
       <div id="management-readiness" className="ui-settings-group" tabIndex={-1}>{readiness}</div>
       <div id="management-team" className="ui-settings-group" tabIndex={-1}>{team}</div>

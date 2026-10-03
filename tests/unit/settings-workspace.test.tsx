@@ -4,6 +4,16 @@ import { describe, expect, it } from 'vitest';
 import { SettingsWorkspace } from '../../components/SettingsWorkspace';
 
 describe('owner settings workspace', () => {
+  it('composes optional commercial content outside operational readiness', () => {
+    const props = { publicPresence: 'Presence', readiness: 'Readiness', team: 'Team', catalog: 'Catalog',
+      activeSection: '#management-team' as const, onNavigate: () => undefined };
+    const without = renderToStaticMarkup(<SettingsWorkspace {...props} />);
+    const withCard = renderToStaticMarkup(<SettingsWorkspace {...props} commercialStateContent={<section>Commercial</section>} />);
+    expect(without).not.toContain('Commercial');
+    expect(withCard).toContain('<section>Commercial</section>');
+    expect(withCard).toContain('tabindex="-1">Readiness</div>');
+    expect(withCard.replace('<div class="ui-settings-group"><section>Commercial</section></div>', '')).toBe(without);
+  });
   it('groups existing administrative content under labelled navigation', () => {
     const html = renderToStaticMarkup(
       <SettingsWorkspace
