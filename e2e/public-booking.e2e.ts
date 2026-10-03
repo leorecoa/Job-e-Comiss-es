@@ -391,6 +391,13 @@ test.describe('public booking /book/:slug', () => {
     await page.goto('/book/leo-do-leo');
     const photos = page.getByRole('img', { name: 'Foto de Mesmo nome' });
     await expect(photos).toHaveCount(2);
+    for (const [width, size] of [[360, 80], [390, 80], [768, 96], [1280, 96]]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(photos.first()).toHaveCSS('width', `${size}px`);
+      await expect(photos.first()).toHaveCSS('height', `${size}px`);
+      await expect(photos.first()).toHaveCSS('object-fit', 'cover');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
     await expect(photos.nth(0)).toHaveAttribute('src', `${SUPABASE_URL}/storage/v1/object/public/barbershop-branding/${firstPath}`);
     await expect(photos.nth(1)).toHaveAttribute('src', `${SUPABASE_URL}/storage/v1/object/public/barbershop-branding/${secondPath}`);
     const secondCard = page.getByRole('button', { name: 'Escolher barbeiro: Mesmo nome', exact: true });

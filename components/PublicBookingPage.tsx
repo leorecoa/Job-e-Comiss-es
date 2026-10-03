@@ -1078,7 +1078,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                         className={`rounded-2xl border p-3.5 text-left text-foreground transition-all ${selected ? 'ui-owner-card-solid' : 'ui-owner-card'}`}
                         style={selected ? selectedCardStyle : undefined}
                       >
-                        <span className="mb-3 block"><BarberPhoto barber={barber} /></span>
+                        <span className="mb-3 block"><BarberPhoto barber={barber} size="booking" /></span>
                         <span className="block font-bold">{barber.name}</span>
                         <span className="mt-1 block text-xs text-muted-foreground">{selected ? 'Selecionado' : 'Toque para escolher'}</span>
                       </button>
