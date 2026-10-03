@@ -1,12 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, type Browser } from 'playwright';
+import { expect, test } from 'playwright/test';
 import { build } from 'vite';
 import { readFileSync } from 'node:fs';
 
-let bundle: string, browser: Browser;
-beforeAll(async () => {
+let bundle: string;
+test.beforeAll(async () => {
   // Exercise the actual JSX composition from App, without its unrelated operational loaders.
-  const app = readFileSync(new URL('../../App.tsx', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
   const slot = app.slice(app.indexOf('commercialStateContent={'), app.indexOf('publicPresence={', app.indexOf('commercialStateContent={')));
   const output = await build({ configFile: false, logLevel: 'silent',
     define: { 'process.env.NODE_ENV': '"development"' },
@@ -29,14 +28,10 @@ beforeAll(async () => {
         window.operationalClicks=0;
       `; } }] });
   bundle = (Array.isArray(output) ? output[0] : output as any).output[0].code;
-  browser = await chromium.launch();
-}, 30000);
-afterAll(async () => { await browser?.close(); });
+});
 
-describe('commercial App slot and workspace integration', () => {
-  it('isolates commercial errors from operations and scopes requests to active remote owners', async () => {
-    const page = await browser.newPage();
-    try {
+test.describe('commercial App slot and workspace integration', () => {
+  test('isolates commercial errors from operations and scopes requests to active remote owners', async ({ page }) => {
       await page.setContent('<div id="root"></div>');
       await page.addScriptTag({ content: bundle });
       await page.waitForFunction(() => Boolean((window as any).renderWorkspace));
@@ -63,6 +58,5 @@ describe('commercial App slot and workspace integration', () => {
       await page.waitForFunction(() => (window as any).requests.length === 3);
       await page.evaluate(() => (window as any).requests[1].resolve({ status: 'active', planCode: 'old', trialStartedAt: null, trialEndsAt: null, currentPeriodStart: null, currentPeriodEnd: null }));
       expect(await page.locator('body').innerText()).not.toContain('Código do plano: old');
-    } finally { await page.close(); }
   });
 });

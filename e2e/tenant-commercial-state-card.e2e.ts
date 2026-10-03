@@ -1,8 +1,7 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { chromium, type Browser, type Page } from 'playwright';
+import { expect, test, type Page } from 'playwright/test';
 import { build } from 'vite';
 
-let bundle: string, browser: Browser, page: Page;
+let bundle: string, page: Page;
 const row = { status: 'unassigned', planCode: null, trialStartedAt: null, trialEndsAt: null, currentPeriodStart: null, currentPeriodEnd: null };
 const render = (props = { active: true, userId: 'owner', barbershopId: 'tenant' }) => page.evaluate(props => (window as any).renderCard(props), props);
 const settle = (index: number, data: unknown = row, reject = false) => page.evaluate(({ index, data, reject }) => {
@@ -10,7 +9,7 @@ const settle = (index: number, data: unknown = row, reject = false) => page.eval
 }, { index, data, reject });
 const has = (text: string) => page.getByText(text, { exact: false }).waitFor();
 
-beforeAll(async () => {
+test.beforeAll(async () => {
   const output = await build({ configFile: false, logLevel: 'silent', define: { 'process.env.NODE_ENV': '"development"' },
     build: { write: false, minify: false, lib: { entry: '/commercial-harness.js', name: 'CommercialTest', formats: ['iife'] } },
     plugins: [{ name: 'commercial-test-entry', enforce: 'pre', resolveId(id) {
@@ -26,11 +25,9 @@ beforeAll(async () => {
         window.unmount=()=>root.unmount();
       `; } }] });
   bundle = (Array.isArray(output) ? output[0] : output as any).output[0].code;
-  browser = await chromium.launch({ headless: true });
-}, 30000);
-afterAll(async () => { await browser?.close(); });
-beforeEach(async () => {
-  await page?.close(); page = await browser.newPage();
+});
+test.beforeEach(async ({ page: testPage }) => {
+  page = testPage;
   await page.setContent('<div id="root"></div>');
   await page.evaluate(() => {
     for (const name of ['localStorage', 'sessionStorage']) Object.defineProperty(window, name, {
@@ -47,33 +44,39 @@ async function start() {
   await has('Carregando estado comercial');
 }
 
-describe('commercial card with real React lifecycle', () => {
-  it.each([{ active: false, userId: 'o', barbershopId: 't' }, { active: true, userId: '', barbershopId: 't' }, { active: true, userId: 'o', barbershopId: '' }])('does not query inactive/incomplete context %j', async props => {
+test.describe('commercial card with real React lifecycle', () => {
+  for (const props of [{ active: false, userId: 'o', barbershopId: 't' }, { active: true, userId: '', barbershopId: 't' }, { active: true, userId: 'o', barbershopId: '' }]) {
+  test(`does not query inactive/incomplete context ${JSON.stringify(props)}`, async () => {
     await render(props);
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     expect(await page.evaluate(() => (window as any).requests.length)).toBe(0);
   });
-  it.each([
+  }
+  for (const [status, label] of [
     ['unassigned','Não atribuído'], ['pending','Pendente'], ['trialing','Em período de teste'],
     ['active','Ativo'], ['paused','Pausado'], ['canceled','Cancelado']
-  ])('renders literal %s', async (status, label) => {
+  ]) {
+  test(`renders literal ${status}`, async () => {
     await start(); await settle(1, { ...row, status }); await has(label);
     expect(await page.locator('body').innerText()).not.toContain('Código do plano');
     expect(await page.locator('body').innerText()).not.toContain('Início do período');
     if (status === 'unassigned') await has('Nenhuma assinatura comercial atribuída.');
   });
-  it('preserves plan, past trial status and UTC dates; invalid dates stay local', async () => {
+  }
+  test('preserves plan, past trial status and UTC dates; invalid dates stay local', async () => {
     await start(); await settle(1, { ...row, status: 'trialing', planCode: 'literal_code',
       trialStartedAt: '2000-01-01T23:30:00-03:00', trialEndsAt: 'invalid',
       currentPeriodStart: '2000-02-01T00:00:00Z', currentPeriodEnd: '2000-03-01T00:00:00Z' });
     await has('Código do plano: literal_code'); await has('02/01/2000, 02:30 UTC');
     await has('Fim do período de teste: Data indisponível'); await has('Em período de teste');
   });
-  it.each(['2030-02-30T10:00:00Z', '2030-10-01T10:00:00'])('does not invent a date for %s', async value => {
+  for (const value of ['2030-02-30T10:00:00Z', '2030-10-01T10:00:00']) {
+  test(`does not invent a date for ${value}`, async () => {
     await start(); await settle(1, { ...row, status: 'active', trialStartedAt: value });
     await has('Início do período de teste: Data indisponível'); await has('Ativo');
   });
-  it('isolates error and retries; StrictMode stale rejection cannot overwrite success', async () => {
+  }
+  test('isolates error and retries; StrictMode stale rejection cannot overwrite success', async () => {
     await start(); expect(await page.getByRole('button').isDisabled()).toBe(true);
     await settle(1, 'private SQL', true); await has('Estado comercial indisponível');
     expect(await page.locator('body').innerText()).not.toMatch(/private SQL|Não atribuído/);
@@ -84,7 +87,7 @@ describe('commercial card with real React lifecycle', () => {
     await settle(0, 'late error', true); await has('Ativo');
     expect(await page.locator('body').innerText()).not.toContain('indisponível');
   });
-  it('discards old tenant data and pending results on context change', async () => {
+  test('discards old tenant data and pending results on context change', async () => {
     await start(); await settle(1, { ...row, planCode: 'old plan', status: 'active' }); await has('old plan');
     await render({ active: true, userId: 'other', barbershopId: 'other' });
     await page.waitForFunction(() => (window as any).requests.length === 4);
@@ -93,7 +96,7 @@ describe('commercial card with real React lifecycle', () => {
     await settle(0, { ...row, planCode: 'stale' });
     expect(await page.locator('body').innerText()).not.toContain('stale');
   });
-  it('discards success after deactivation and rejection after unmount', async () => {
+  test('discards success after deactivation and rejection after unmount', async () => {
     await start(); await render({ active: false, userId: 'owner', barbershopId: 'tenant' });
     await page.getByRole('heading', { name: 'Estado comercial' }).waitFor({ state: 'detached' });
     await settle(1); expect(await page.locator('#root').innerText()).toBe('');
