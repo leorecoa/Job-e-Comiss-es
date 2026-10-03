@@ -62,6 +62,8 @@ jobs:
           e2e/owner-operational.e2e.ts
           e2e/public-booking.e2e.ts
           e2e/barber-dashboard.e2e.ts
+          e2e/tenant-commercial-state-card.e2e.ts
+          e2e/tenant-commercial-display.e2e.ts
           --reporter="line,html"
 
       - name: Upload Playwright failure artifacts

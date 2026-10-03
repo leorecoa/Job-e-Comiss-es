@@ -60,6 +60,7 @@ import { AUTH_CALLBACK_PATH, AuthCallbackScreen } from './components/AuthCallbac
 import { DashboardShell, type DashboardNavigationItem } from './components/DashboardShell';
 import { InlineNotice, LoadingState, Surface } from './components/ui';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
+import { TenantCommercialStateCard } from './components/TenantCommercialStateCard';
 import { FinancialTimezoneSettings } from './components/FinancialTimezoneSettings';
 import { OperationalTimezoneSettings } from './components/OperationalTimezoneSettings';
 import {
@@ -1924,6 +1925,11 @@ const App: React.FC<{ initialAuthSession?: AuthSession }> = ({ initialAuthSessio
         <div hidden={activeOwnerSection !== 'management'}>
           <React.Suspense fallback={<SectionFallback />}>
             <SettingsWorkspace
+              commercialStateContent={isSupabaseConfigured && !shouldUseLocalFallback && !isAuthLoading
+                && authSession?.role === 'owner' && authSession.userId && authSession.barbershopId ? (
+                  <TenantCommercialStateCard active={activeOwnerSection === 'management'}
+                    userId={authSession.userId} barbershopId={authSession.barbershopId} />
+                ) : undefined}
               publicPresence={(
                 <>
                 <BarbershopBrandingSettings

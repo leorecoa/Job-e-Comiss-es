@@ -5,9 +5,11 @@ test.describe('owner auth callback', () => {
     const consoleMessages: string[] = [];
     page.on('console', (message) => consoleMessages.push(message.text()));
 
+    await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, route => route.abort());
+
     await page.goto(
       '/auth/callback?error=access_denied&error_description=sensitive&redirect=https://evil.example',
-      { waitUntil: 'commit' }
+      { waitUntil: 'load' }
     );
 
     await expect(page.getByRole('heading', { name: 'Nao foi possivel confirmar seu email' })).toBeVisible();
