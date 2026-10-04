@@ -85,3 +85,30 @@ its failure cannot become an operational access decision in this PR.
 Review 037 and run `supabase/tests/tenant_commercial_state_test.sql` locally before
 manual rollout. Never repair/reset/reapply old migrations to accommodate an old
 local container. No operational behavior or legacy frontend state is changed.
+
+## Administrative writer (038)
+
+`private.set_tenant_subscription(uuid, text, text, timestamptz, timestamptz,
+timestamptz, timestamptz)` returns void. All seven arguments are explicit:
+tenant, existing plan code, status, trial start/end and current-period start/end.
+NULL clears an optional pair; partial pairs are rejected by the 035 constraints.
+There are no commercial defaults, inferred dates or transition matrix.
+
+This VOLATILE SECURITY INVOKER function uses `search_path = pg_catalog` and
+qualified objects. Only trusted database administration with the existing
+underlying privileges can use it. PUBLIC, anon, authenticated (owner/barber)
+and service_role have no EXECUTE. Table grants and RLS are unchanged. Private
+schema placement alone is not authorization; the explicit function ACL matters.
+No HTTP endpoint or browser authority is introduced. A database administrator
+already able to write tables is still trusted, not sandboxed by this function.
+
+The atomic tenant-key UPSERT replaces the full current state, preserving
+created_at and using the existing transaction-time updated_at trigger.
+Concurrent successful writes use last-write-wins in database write order,
+not request arrival order; no optimistic version check is promised. Paused and
+canceled rows remain persisted. Missing rows alone mean unassigned.
+
+No plans are seeded. No billing, gating, commercial history, automation or
+automatic provisioning exists. Review/apply only 038 through the normal manual
+rollout; never repair/reset/reapply 001-037. Validate foundation, reader and
+writer pgTAP together against a local database containing the approved baseline.
