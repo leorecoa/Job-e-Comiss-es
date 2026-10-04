@@ -145,3 +145,50 @@ ACL/RLS and the reader remain unchanged; no HTTP endpoint is introduced.
 Run `supabase/tests/founding_partner_pilot_test.sql` with psql/pgTAP preserving
 its relative migration include, alongside the 035/037/038 tests. All fixtures
 and the registration/repeat exercises are rolled back; use a local test database.
+
+## Observational entitlement resolver (040)
+
+`private.resolve_tenant_entitlements(p_barbershop_id uuid)` returns exactly one
+row: `commercial_status text`, `commercial_condition text`,
+`can_create_internal_appointment boolean`, `can_accept_public_booking boolean`,
+`reason text`, `evaluated_at timestamptz`. It is VOLATILE SECURITY INVOKER with
+`search_path=pg_catalog`; PUBLIC/anon/authenticated/service_role have no EXECUTE.
+Administration must supply a trusted tenant and retain underlying read authority.
+No client/table grants or RLS change, public RPC, endpoint or operational caller
+is introduced. Reader 037 remains literal/informational; writer 038 remains
+administrative and generic. No frontend commercial state becomes authority.
+
+| Persisted status | Derived condition | Both capabilities | Reason |
+| --- | --- | --- | --- |
+| NULL (no subscription) | unassigned | true | UNASSIGNED_COMPATIBILITY |
+| pending | pending | false | COMMERCIAL_PENDING |
+| trialing | trial_valid | true | TRIAL_VALID |
+| trialing | trial_not_started | false | TRIAL_NOT_STARTED |
+| trialing | trial_expired | false | TRIAL_EXPIRED |
+| active | active | true | COMMERCIAL_ACTIVE |
+| paused | paused | false | COMMERCIAL_PAUSED |
+| canceled | canceled | false | COMMERCIAL_CANCELED |
+
+One database `clock_timestamp()` supplies both classification and `evaluated_at`.
+Trials use `[trial_started_at, trial_ends_at)`. The literal stored status never
+changes; future/expired trials remain `trialing`. No special founding_partner
+branch or active-period expiry is inferred. Missing subscription remains
+compatible, not a plan or an error. True grants no operational authorization;
+false blocks nothing today. No state is mutated or automatically provisioned.
+
+Explicit P0001 errors are `COMMERCIAL_ENTITLEMENT_TENANT_REQUIRED`,
+`COMMERCIAL_ENTITLEMENT_TENANT_NOT_FOUND`, `COMMERCIAL_ENTITLEMENT_PLAN_INVALID`,
+`COMMERCIAL_ENTITLEMENT_STATUS_INVALID` and `COMMERCIAL_ENTITLEMENT_TRIAL_INVALID`.
+Database errors propagate; errors never become unassigned or capability booleans.
+035 constraints normally make the defensive corrupt-plan/status/trial branches
+unreachable. Tests preserve those constraints and verify rejection at the data
+boundary rather than manufacturing corruption. Exact microsecond equality at
+trial boundaries is inspected in the comparison operators; behavioral tests
+check each window against the actual returned evaluation instant, without an
+injected clock. That source check alone is not an end-to-end boundary proof.
+
+Next comes observational validation, not enforcement. TOCTOU is unresolved:
+027 availability locks do not coordinate with 038 administrative replacements.
+Future transactional enforcement needs an explicitly shared protocol. No locks,
+billing, gating, transitions, bootstrap changes or operational restrictions are
+part of 040. Run the 035/037/038/039/040 pgTAP contracts together locally.

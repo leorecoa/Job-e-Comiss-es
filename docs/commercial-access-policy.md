@@ -2,9 +2,9 @@
 
 ## Status and scope
 
-Approved architectural contract for future work. This document implements no
-resolver, entitlement, gating or operational restriction. Migrations 001-039
-remain the baseline; this documentation PR requires no migration 040.
+Migration 040 introduces only an administrative, observational entitlement
+resolver. It implements no gating or operational restriction. Migrations
+001-039 remain unchanged; no operational path calls the resolver.
 All tenants keep their current operational behavior in the observational phase.
 
 See [tenant plan foundation](tenant-plan-foundation.md) for persisted contracts.
@@ -15,7 +15,7 @@ Commercial state comes from `tenant_subscriptions` and represents the persisted
 commercial relationship: `pending`, `trialing`, `active`, `paused` or `canceled`.
 Only absence of a subscription for a valid, authorized tenant means `unassigned`.
 
-Entitlement will be a separate derived decision about which capabilities may
+Entitlement is a separate derived decision about which capabilities may
 execute. Reading that decision must not modify the commercial state. Commercial
 permission never substitutes for operational authorization, identity checks or
 tenant isolation: an operation must satisfy both when enforcement is introduced.
@@ -45,29 +45,31 @@ Preserved access always remains subject to the existing RBAC and tenant scope.
 | No subscription | `unassigned` | Preserve current operational compatibility until an explicit migration strategy is approved. |
 | `pending` | Pending relationship | Do not initiate new demand; preserve reads, history and existing commitments. |
 | `trialing`, start <= now < end | Valid trial | Permit new demand during `[trial_started_at, trial_ends_at)`. |
-| `trialing`, now < start | `trial_not_started` | Identify the future start without rewriting status; finalize the access decision per capability before enforcement. |
-| `trialing`, now >= end | `trial_expired` | Identify the ended window without rewriting status; finalize the access decision per capability before enforcement. |
+| `trialing`, now < start | `trial_not_started` | No new demand in the observational decision; no operational enforcement yet. |
+| `trialing`, now >= end | `trial_expired` | No new demand in the observational decision; no operational enforcement yet. |
 | `active` | Active relationship | Permit commercially approved capabilities; this is not proof of payment. |
 | `paused` | Paused relationship | Suspend new demand; preserve administration, history and existing commitments. |
 | `canceled` | Ended relationship | Accept no new demand; preserve data and existing commitments. |
 
 ## New demand and capability boundaries
 
-The first candidate capability is `can_create_appointment`. Distinguish
-`can_create_internal_appointment` from `can_accept_public_booking` conceptually;
-they need explicit policies even if an initial rule is shared.
+The observational capabilities are `can_create_internal_appointment` and
+`can_accept_public_booking`. Both are true only for `unassigned`, `trial_valid`
+and `active`; both are false for all other conditions in the matrix. True does
+not authorize RBAC/tenant access; false does not block any current operation.
 
 Suspending appointment creation does not automatically restrict team management,
 catalog, settings, reports, history or financial operations. Each capability
 requires its own approved policy. Editing, rescheduling, canceling or completing
 an existing appointment must not silently be classified as new demand. Specify
 their boundaries separately while preserving existing commitments and financial
-integrity. No capability named here is implemented by this PR.
+integrity. No capability named here is enforced by this PR.
 
 ## Trial and trusted time
 
-Future evaluation uses a trusted database/server-side clock, never browser
-`Date.now()`. The interval includes the start and excludes the end. At exactly
+040 captures `pg_catalog.clock_timestamp()` exactly once per evaluation, returns
+it as `evaluated_at`, and uses it for every temporal comparison. No external
+clock is accepted. The interval includes the start and excludes the end. At exactly
 `trial_ends_at`, derive `trial_expired`; before the start derive
 `trial_not_started`. These are derived conditions, not persisted statuses.
 
@@ -100,8 +102,16 @@ the proxy and UI cannot be the only enforcement boundary.
 - A write decision and mutation must avoid TOCTOU at the appropriate transactional boundary, including concurrent administrative commercial changes.
 - Preserve all operational RBAC, RLS, ACLs and tenant isolation independently of commercial decisions.
 
-No new grants, policies, RPCs, SQL functions or endpoints are authorized by this
-documentation change. A cached UI decision cannot authorize a later write.
+040 adds only `private.resolve_tenant_entitlements(uuid)`, SECURITY INVOKER,
+VOLATILE, with `search_path=pg_catalog`. PUBLIC, anon, authenticated and
+service_role have no EXECUTE. No table grant, policy, public RPC or endpoint is
+added. Trusted administration supplies a verified tenant; this private helper
+does not resolve browser identity. A cached result cannot authorize a later write.
+
+TOCTOU remains unresolved intentionally: availability locks in 027 do not
+coordinate with the administrative UPSERT in 038. A future enforcement PR must
+define a shared transactional protocol before claiming race-safe commercial
+authorization. This resolver adds no locks and is not an enforcement boundary.
 
 ## Bootstrap and protected access
 
@@ -128,9 +138,9 @@ commercial conditions, communicate them, explicitly assign state, test the
 policy, then roll out in a controlled and reversible manner. No automatic
 backfill or restriction is part of this contract.
 
-1. Current phase: document commercial access policy only.
-2. Implement a server-side entitlement resolver without enforcement.
-3. Validate a test matrix and observational behavior without blocking operations.
+1. Commercial access policy documented.
+2. Current phase: 040 implements the private resolver without enforcement.
+3. Next: validate observational behavior without blocking operations.
 4. Introduce enforcement per capability, starting with creation of new demand.
 
 Billing, checkout, payment providers, webhooks and cron remain separate work.
@@ -138,7 +148,7 @@ Do not modify 035/037/038/039 to collapse these responsibilities together.
 
 ## Decisions required before enforcement
 
-- Approve the exact per-capability effect of `trial_not_started` and `trial_expired`, without automatic persisted transitions.
+- Approve activation of the observational matrix in operational writers, without automatic persisted transitions.
 - Specify permitted capabilities for each plan and boundaries for existing commitments; no unapproved feature limits are inferred.
 - Define per-capability failures, transaction/concurrency behavior and any caching/invalidation contract.
 - Approve tenant communication, assignment criteria and reversible rollout procedure.
