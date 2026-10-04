@@ -3,6 +3,10 @@
 PR A introduces commercial state only. It does not grant features, charge money,
 change onboarding, or gate any operational path.
 
+The approved [commercial access policy](commercial-access-policy.md) separates
+this persisted state from future entitlement decisions. It preserves unassigned
+compatibility and reader 037's informational contract; no enforcement is active.
+
 ## Model
 
 - `commercial_plans.code`: stable lowercase identifier, 1-64 characters, with a
