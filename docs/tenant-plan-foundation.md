@@ -112,3 +112,32 @@ No plans are seeded. No billing, gating, commercial history, automation or
 automatic provisioning exists. Review/apply only 038 through the normal manual
 rollout; never repair/reset/reapply 001-037. Validate foundation, reader and
 writer pgTAP together against a local database containing the approved baseline.
+
+## Founding Partner pilot (039)
+
+039 registers only `founding_partner` / `Parceiro Fundador`. It assigns no tenant.
+An exact identity already present is left untouched, including timestamps;
+a different name raises `FOUNDING_PARTNER_PLAN_CONFLICT`, never overwriting it.
+
+The pilot is 30 days defined as exactly 720 elapsed hours, using the half-open
+interval [trial_started_at, trial_ends_at). Administration explicitly supplies
+both instants (with offsets), status `trialing`, and NULL for both current-period
+fields through writer 038. Calculate the end with `interval '720 hours'`, not
+calendar days dependent on session timezone/DST. Confirm the tenant and any
+existing subscription before calling the full-replacement, last-write-wins writer.
+038 remains generic: it does not enforce a pilot-specific duration globally.
+
+The offer is R$ 0 during the pilot, without a card, with implementation and
+support included. This is not a persisted or definitive price, nor lifetime
+free access. Continuation is optional, subject to a later commercial decision
+and presentation of terms before contracting.
+
+After the end instant the persisted status remains literally `trialing` until
+an explicit administrative decision. There is no automatic expiry transition,
+charge, renewal, blocking, billing, gating, cron, webhook or commercial history.
+Owner/barber/browser/service_role cannot activate or modify the pilot. Existing
+ACL/RLS and the reader remain unchanged; no HTTP endpoint is introduced.
+
+Run `supabase/tests/founding_partner_pilot_test.sql` with psql/pgTAP preserving
+its relative migration include, alongside the 035/037/038 tests. All fixtures
+and the registration/repeat exercises are rolled back; use a local test database.
