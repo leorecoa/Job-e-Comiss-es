@@ -108,10 +108,19 @@ service_role have no EXECUTE. No table grant, policy, public RPC or endpoint is
 added. Trusted administration supplies a verified tenant; this private helper
 does not resolve browser identity. A cached result cannot authorize a later write.
 
-TOCTOU remains unresolved intentionally: availability locks in 027 do not
-coordinate with the administrative UPSERT in 038. A future enforcement PR must
-define a shared transactional protocol before claiming race-safe commercial
-authorization. This resolver adds no locks and is not an enforcement boundary.
+041 makes the administrative writer from 038 acquire the existing 027 tenant
+advisory transaction lock before validation and UPSERT. This also serializes
+the first subscription against appointment writers when no subscription row
+exists (`unassigned`). Commit/rollback releases the lock naturally. The helper
+requires READ COMMITTED; no global isolation configuration changes.
+
+This reduces the coordination TOCTOU gap, but is not enforcement: appointment
+writers still never consult 040. A future entitlement evaluation must happen
+after acquiring locks, in the same transaction as creation. Locks do not freeze
+the clock; the decision instant versus commit-time expiry needs explicit policy.
+Direct administrative commercial SQL must follow the same protocol. For batches,
+acquire all tenant locks in sorted order before row locks; existing row-trigger
+lock inversions can still produce aborted deadlocks. No new mutex is introduced.
 
 ## Bootstrap and protected access
 
@@ -139,8 +148,8 @@ policy, then roll out in a controlled and reversible manner. No automatic
 backfill or restriction is part of this contract.
 
 1. Commercial access policy documented.
-2. Current phase: 040 implements the private resolver without enforcement.
-3. Next: validate observational behavior without blocking operations.
+2. 040 implements the private resolver; 041 coordinates commercial writes with agenda tenant locks.
+3. Current phase: validate coordination and observational behavior without commercial blocking.
 4. Introduce enforcement per capability, starting with creation of new demand.
 
 Billing, checkout, payment providers, webhooks and cron remain separate work.
@@ -149,6 +158,8 @@ Do not modify 035/037/038/039 to collapse these responsibilities together.
 ## Decisions required before enforcement
 
 - Approve activation of the observational matrix in operational writers, without automatic persisted transitions.
+- Audit service_role's remaining privileged direct INSERT/ALL on appointments before claiming complete enforcement; 041 does not revoke it or add a commercial trigger.
+- Classify reactivation of cancelled/no_show through update_owner_appointment explicitly as new demand or an existing commitment; 041 leaves that RPC unchanged.
 - Specify permitted capabilities for each plan and boundaries for existing commitments; no unapproved feature limits are inferred.
 - Define per-capability failures, transaction/concurrency behavior and any caching/invalidation contract.
 - Approve tenant communication, assignment criteria and reversible rollout procedure.
