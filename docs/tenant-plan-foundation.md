@@ -187,8 +187,44 @@ trial boundaries is inspected in the comparison operators; behavioral tests
 check each window against the actual returned evaluation instant, without an
 injected clock. That source check alone is not an end-to-end boundary proof.
 
-Next comes observational validation, not enforcement. TOCTOU is unresolved:
-027 availability locks do not coordinate with 038 administrative replacements.
-Future transactional enforcement needs an explicitly shared protocol. No locks,
-billing, gating, transitions, bootstrap changes or operational restrictions are
-part of 040. Run the 035/037/038/039/040 pgTAP contracts together locally.
+040 itself adds no locks, billing, gating, transitions, bootstrap changes or
+operational restrictions. Run the 035/037/038/039/040 contracts with 041 below.
+
+## Commercial write coordination (041)
+
+041 replaces only the definition of `private.set_tenant_subscription(...)`,
+preserving its seven arguments, void return, INVOKER/VOLATILE/search_path, ACL,
+validation errors, NULL/full-replacement semantics and timestamp behavior.
+Its first statement calls `private.lock_availability_tenants(array[p_barbershop_id])`
+from 027, before any commercial mutation. No helper, namespace, table, artificial
+row lock, session lock or explicit unlock is introduced. Execution still requires
+trusted administrative privileges; a tenant ID itself conveys no authority.
+PUBLIC, anon, authenticated and service_role remain without commercial EXECUTE.
+
+Existing appointment writers already acquire this same tenant transaction lock.
+Even without a subscription, the tenant key coordinates initial assignment with
+agenda writes. Whichever transaction gets the lock first proceeds; the other
+waits until commit/rollback. Commercial writers remain last-write-wins after
+serialization. READ COMMITTED is enforced by the unchanged helper. Different
+tenant keys do not share an intentional global mutex. Sorted multi-tenant locking
+and advisory-before-row ordering remain necessary for administrative batches.
+
+This is coordination only: no appointment writer changes or calls to resolver
+040, no capabilities enforced, no commercial rejection of appointments/bookings.
+False observational decisions still do not block operations. Coordination reduces
+TOCTOU exposure, but future enforcement must evaluate after locks in the creation
+transaction. Locks do not stop time. Direct privileged SQL that bypasses the
+administrative writer must explicitly follow the protocol; it is not sandboxed.
+
+Before enforcement: audit privileged service_role INSERT/ALL on appointments,
+and decide how cancelled/no_show reactivation via update_owner_appointment is
+classified. Neither surface is changed here. No table grants/RLS change.
+
+Run `commercial_subscription_coordination_test.sql` and the previous commercial
+contracts, plus availability/write regressions. Run
+`scripts/test-commercial-subscription-concurrency.ps1 -Database validation_<name>`
+separately against a disposable local Docker database containing 001-041. It
+rejects the normal postgres database, uses synthetic fixtures with collision
+preflight/cleanup, and observes real advisory waits between open transactions.
+It tests both orders, missing rows, rollback, full replacement, different tenants
+and explicit rejection of REPEATABLE READ without changing global isolation.
