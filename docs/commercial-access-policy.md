@@ -2,10 +2,10 @@
 
 ## Status and scope
 
-Migration 040 introduces only an administrative, observational entitlement
-resolver. It implements no gating or operational restriction. Migrations
-001-039 remain unchanged; no operational path calls the resolver.
-All tenants keep their current operational behavior in the observational phase.
+Migration 042 is the first enforcement: only `can_accept_public_booking` in
+`create_public_appointment`. It reuses resolver 040 after the existing 027 locks
+and operational validation, immediately before INSERT. Migrations 001-041,
+owner/barber writers, reads, bootstrap and existing commitments remain unchanged.
 
 See [tenant plan foundation](tenant-plan-foundation.md) for persisted contracts.
 
@@ -35,18 +35,19 @@ backfill existing or newly created tenants.
 Resolver errors, invalid identity, missing tenant and malformed commercial data
 must not be converted to `unassigned`. A failed lookup is not proof of absence.
 
-## Future access matrix
+## Capability matrix
 
-This matrix is policy for later enforcement, not an instruction to block today.
+042 applies this matrix only to new bookings through the official public RPC.
+Internal creation remains observational, not commercially blocked.
 Preserved access always remains subject to the existing RBAC and tenant scope.
 
-| Persisted state / condition | Derived meaning | Future access policy |
+| Persisted state / condition | Derived meaning | Policy (public creation enforced in 042) |
 | --- | --- | --- |
 | No subscription | `unassigned` | Preserve current operational compatibility until an explicit migration strategy is approved. |
 | `pending` | Pending relationship | Do not initiate new demand; preserve reads, history and existing commitments. |
 | `trialing`, start <= now < end | Valid trial | Permit new demand during `[trial_started_at, trial_ends_at)`. |
-| `trialing`, now < start | `trial_not_started` | No new demand in the observational decision; no operational enforcement yet. |
-| `trialing`, now >= end | `trial_expired` | No new demand in the observational decision; no operational enforcement yet. |
+| `trialing`, now < start | `trial_not_started` | No new public booking through the official RPC. |
+| `trialing`, now >= end | `trial_expired` | No new public booking through the official RPC. |
 | `active` | Active relationship | Permit commercially approved capabilities; this is not proof of payment. |
 | `paused` | Paused relationship | Suspend new demand; preserve administration, history and existing commitments. |
 | `canceled` | Ended relationship | Accept no new demand; preserve data and existing commitments. |
@@ -56,14 +57,15 @@ Preserved access always remains subject to the existing RBAC and tenant scope.
 The observational capabilities are `can_create_internal_appointment` and
 `can_accept_public_booking`. Both are true only for `unassigned`, `trial_valid`
 and `active`; both are false for all other conditions in the matrix. True does
-not authorize RBAC/tenant access; false does not block any current operation.
+not authorize RBAC/tenant access; false blocks only the official public writer.
 
 Suspending appointment creation does not automatically restrict team management,
 catalog, settings, reports, history or financial operations. Each capability
 requires its own approved policy. Editing, rescheduling, canceling or completing
 an existing appointment must not silently be classified as new demand. Specify
 their boundaries separately while preserving existing commitments and financial
-integrity. No capability named here is enforced by this PR.
+integrity. Reactivation `cancelled/no_show -> scheduled/confirmed` is future
+internal new demand. Its enforcement is deferred; owner update is unchanged.
 
 ## Trial and trusted time
 
@@ -74,16 +76,15 @@ clock is accepted. The interval includes the start and excludes the end. At exac
 `trial_not_started`. These are derived conditions, not persisted statuses.
 
 Never automatically persist `expired`, change `trialing` to `paused`/`canceled`,
-charge, renew or block merely because time elapsed. The Founding Partner pilot
+charge, renew or globally block merely because time elapsed. The Founding Partner pilot
 remains exactly 720 elapsed hours; writer 038 remains generic. A past
 `current_period_end` (stored as `current_period_ends_at`) does not invalidate
 `active` without a separately approved policy.
 
 ## Public booking
 
-For future enforcement, public presentation may remain available and existing
-appointments must be preserved. Restrictive commercial conditions may prevent
-NEW bookings under an explicitly approved capability policy.
+Public presentation and existing appointments remain available. Restrictive
+commercial conditions now deny NEW bookings via `create_public_appointment`.
 
 External unavailability must not reveal debt, plan or commercial situation.
 A prior availability response is neither a reservation nor authorization to
@@ -114,10 +115,10 @@ the first subscription against appointment writers when no subscription row
 exists (`unassigned`). Commit/rollback releases the lock naturally. The helper
 requires READ COMMITTED; no global isolation configuration changes.
 
-This reduces the coordination TOCTOU gap, but is not enforcement: appointment
-writers still never consult 040. A future entitlement evaluation must happen
-after acquiring locks, in the same transaction as creation. Locks do not freeze
-the clock; the decision instant versus commit-time expiry needs explicit policy.
+041 alone coordinated writes without enforcement. 042 evaluates 040 freshly
+after all existing locks and operational checks in the creation transaction.
+The decision instant is that final evaluation, not transaction start or commit.
+Locks do not freeze time: a trial expiring while waiting is denied afterward.
 Direct administrative commercial SQL must follow the same protocol. For batches,
 acquire all tenant locks in sorted order before row locks; existing row-trigger
 lock inversions can still produce aborted deadlocks. No new mutex is introduced.
@@ -134,11 +135,13 @@ Do not make the entire dashboard depend on a commercial resolver succeeding.
 
 ## Failure policy
 
-In the current observational phase, commercial failures do not affect operations.
-Before enforcement, explicitly approve failure behavior per capability, including
-unavailable resolution and stale results. Do not introduce a global accidental
-block, a silent authorization bypass, or a conversion of errors to `unassigned`.
-This document does not choose a universal fail-open/fail-closed policy.
+For new public creation, capability IS NOT TRUE denies with internal P0001
+`PUBLIC_APPOINTMENT_COMMERCIAL_UNAVAILABLE`, without commercial details.
+Resolver/structural/DB errors propagate and abort creation; none becomes
+`unassigned`. The unchanged proxy allowlist returns generic
+`PUBLIC_BOOKING_UNAVAILABLE` (503, no-store). No blind retry or idempotency is
+added. HTTP timeout is NOT proof of database rollback. Other operational paths
+do not depend on this resolver; this is not a global failure policy.
 
 ## Rollout and next phases
 
@@ -149,17 +152,17 @@ backfill or restriction is part of this contract.
 
 1. Commercial access policy documented.
 2. 040 implements the private resolver; 041 coordinates commercial writes with agenda tenant locks.
-3. Current phase: validate coordination and observational behavior without commercial blocking.
-4. Introduce enforcement per capability, starting with creation of new demand.
+3. 042 enforces only public booking creation inside the existing SQL transaction.
+4. Internal new-demand enforcement and privilege hardening remain separate work.
 
 Billing, checkout, payment providers, webhooks and cron remain separate work.
 Do not modify 035/037/038/039 to collapse these responsibilities together.
 
-## Decisions required before enforcement
+## Remaining boundaries
 
-- Approve activation of the observational matrix in operational writers, without automatic persisted transitions.
-- Audit service_role's remaining privileged direct INSERT/ALL on appointments before claiming complete enforcement; 041 does not revoke it or add a commercial trigger.
-- Classify reactivation of cancelled/no_show through update_owner_appointment explicitly as new demand or an existing commitment; 041 leaves that RPC unchanged.
+- Internal writers remain outside commercial enforcement, without automatic persisted transitions.
+- service_role still has privileged direct INSERT/ALL on appointments under the versioned baseline. No versioned production endpoint was found using direct INSERT. This administrative bypass is NOT the official public channel; 042 changes no grant and makes no universal INSERT-enforcement claim. Audit/reduction belongs to separate hardening.
+- Reactivation of cancelled/no_show is classified as future internal new demand; 042 leaves update_owner_appointment unchanged.
 - Specify permitted capabilities for each plan and boundaries for existing commitments; no unapproved feature limits are inferred.
 - Define per-capability failures, transaction/concurrency behavior and any caching/invalidation contract.
 - Approve tenant communication, assignment criteria and reversible rollout procedure.
