@@ -174,7 +174,8 @@ Trials use `[trial_started_at, trial_ends_at)`. The literal stored status never
 changes; future/expired trials remain `trialing`. No special founding_partner
 branch or active-period expiry is inferred. Missing subscription remains
 compatible, not a plan or an error. True grants no operational authorization;
-false blocks nothing today. No state is mutated or automatically provisioned.
+040 alone blocks nothing. 042 now enforces only public booking creation.
+No state is mutated or automatically provisioned.
 
 Explicit P0001 errors are `COMMERCIAL_ENTITLEMENT_TENANT_REQUIRED`,
 `COMMERCIAL_ENTITLEMENT_TENANT_NOT_FOUND`, `COMMERCIAL_ENTITLEMENT_PLAN_INVALID`,
@@ -209,7 +210,7 @@ serialization. READ COMMITTED is enforced by the unchanged helper. Different
 tenant keys do not share an intentional global mutex. Sorted multi-tenant locking
 and advisory-before-row ordering remain necessary for administrative batches.
 
-This is coordination only: no appointment writer changes or calls to resolver
+041 alone is coordination only: no appointment writer changes or calls to resolver
 040, no capabilities enforced, no commercial rejection of appointments/bookings.
 False observational decisions still do not block operations. Coordination reduces
 TOCTOU exposure, but future enforcement must evaluate after locks in the creation
@@ -228,3 +229,35 @@ rejects the normal postgres database, uses synthetic fixtures with collision
 preflight/cleanup, and observes real advisory waits between open transactions.
 It tests both orders, missing rows, rollback, full replacement, different tenants
 and explicit rejection of REPEATABLE READ without changing global isolation.
+
+## Public booking enforcement (042)
+
+Only `create_public_appointment` now checks `can_accept_public_booking`, after
+the unchanged tenant/barber/phone locks and operational validation, immediately
+before INSERT. The fresh 040 evaluation uses its own clock_timestamp: a trial
+that expires during a lock wait is denied. The decision is evaluation-time,
+not transaction-start or commit-time. Unassigned, active and valid trial remain
+allowed; pending, future/expired trial, paused and canceled are denied.
+
+No subscription is provisioned. Owner/barber creation, existing commitments,
+completion and reads remain unchanged. Internal reactivation
+`cancelled/no_show -> scheduled/confirmed` is future new demand, not implemented.
+No billing or global commercial enforcement is introduced.
+
+Capability IS NOT TRUE raises only `PUBLIC_APPOINTMENT_COMMERCIAL_UNAVAILABLE`.
+Resolver errors propagate fail-closed without INSERT; errors never mean
+unassigned. The unchanged proxy returns generic `PUBLIC_BOOKING_UNAVAILABLE`
+with no-store, not commercial details. An HTTP timeout does not prove rollback;
+no automatic retry or idempotency is added.
+
+service_role retains privileged direct INSERT under the baseline. No versioned
+production endpoint uses that path. It remains an administrative bypass outside
+the official public RPC; reducing that privilege requires separate hardening.
+No RLS, grants, resolver or commercial-writer definition changes in 042.
+
+Validate 035/037/038/039/040/041 plus `public_booking_entitlement_test.sql`,
+operational regressions and the following against disposable local 001-042 only:
+
+```powershell
+scripts/test-public-booking-entitlement-concurrency.ps1 -Database validation_<name>
+```

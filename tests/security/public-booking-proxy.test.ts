@@ -40,6 +40,18 @@ describe('public booking Vercel proxy', () => {
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe('https://project.supabase.co/rest/v1/rpc/get_public_availability_by_slug');
   });
 
+  it.each(['PUBLIC_APPOINTMENT_COMMERCIAL_UNAVAILABLE', 'COMMERCIAL_ENTITLEMENT_TRIAL_INVALID', 'canceling statement due to lock timeout'])('hides internal creation failure %s without retry', async (message) => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ message, details: 'plan=private-plan; status=paused; trial=private; capability=false', hint: 'private SQL' }), { status: 400 }));
+    const response = await createHandler(new Request('https://example.test/api/public-booking/create', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(validPayload)
+    }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ code: 'PUBLIC_BOOKING_UNAVAILABLE' });
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('slots accepts only GET', async () => {
     const response = await slotsHandler(new Request('https://example.test/api/public-booking/slots', { method: 'POST' }));
     expect(response.status).toBe(405);
