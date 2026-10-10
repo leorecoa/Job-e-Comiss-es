@@ -33,10 +33,14 @@ describe('Vercel defensive security headers', () => {
 
   it('applies the required defensive headers to every route', () => {
     expect(allRoutes).toBeDefined();
+    expect(headers.size).toBe(allRoutes?.headers.length);
     expect(headers.get('x-content-type-options')).toBe('nosniff');
     expect(headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
     expect(headers.get('x-frame-options')).toBe('DENY');
-    expect(headers.has('cross-origin-opener-policy')).toBe(false);
+    expect(headers.get('cross-origin-opener-policy')).toBe('same-origin');
+    expect(headers.get('cross-origin-resource-policy')).toBe('same-origin');
+    expect(headers.has('cross-origin-embedder-policy')).toBe(false);
+    expect([...headers.keys()].some((key) => key.startsWith('access-control-'))).toBe(false);
     expect(headers.get('permissions-policy')).toBe(
       'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()'
     );
